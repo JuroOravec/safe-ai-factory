@@ -1,0 +1,36 @@
+import { join } from 'node:path';
+
+import { validateTypescript } from '../../../utils/typescript.js';
+import type { TestProfile } from '../types.js';
+
+async function vitestValidateFiles(opts: {
+  testsDir: string;
+  generatedFiles: string[];
+  repoRoot: string;
+  errMessage: string;
+}): Promise<void> {
+  const { testsDir, generatedFiles, repoRoot, errMessage } = opts;
+  if (generatedFiles.length === 0) return;
+  console.log(`\nValidating generated spec files...`);
+  await validateTypescript({
+    files: generatedFiles.map((f) => join(testsDir, f)),
+    cwd: repoRoot,
+    errMessage,
+  });
+}
+
+export const vitestProfile: TestProfile = {
+  id: 'ts-vitest',
+  language: 'TypeScript',
+  framework: 'Vitest',
+  specExtension: '.spec.ts',
+  fileNamingRule:
+    'Files MUST use the ".spec.ts" suffix (e.g. "public/happy-path.spec.ts"). They can live anywhere under tests/.',
+  helpersFilename: 'helpers.ts',
+  infraFilename: 'infra.spec.ts',
+  importRules:
+    'Add `/* eslint-disable */` and `// @ts-nocheck` at the top. Import `{ describe, expect, it }` from "vitest". Import helpers from "../helpers.js".',
+  assertionRules:
+    'Use `expect(x).toBe(y)`, `expect(x).toContain(y)`, `expect(x).toEqual(y)`. Async tests use `async/await`.',
+  validateFiles: vitestValidateFiles,
+};

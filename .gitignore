@@ -1,0 +1,27 @@
+node_modules/
+.venv/
+dist/
+coverage/
+*.tsbuildinfo
+.pnpm-store/
+
+# Shotgun (codebase index and spec output)
+.shotgun/
+.tmp-openspec/
+
+# Cursor
+.cursor/debug.log
+.cursor/logs/
+
+# Environment
+.env
+.env.*
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

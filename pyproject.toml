@@ -1,0 +1,11 @@
+[project]
+name = "agents-tools"
+version = "0.0.0"
+description = "Python tooling for the agents monorepo (Shotgun, etc.)"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "shotgun-sh>=0.10",
+]
+
+[tool.uv]
+dev-dependencies = []

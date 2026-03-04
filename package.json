@@ -1,0 +1,85 @@
+{
+  "name": "safe-ai-factory",
+  "version": "0.0.0",
+  "description": "Spec-driven AI factory. Use with any agentic CLI. Language-agnostic. Safe by design.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint .",
+    "knip": "knip --exclude types",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "validate": "tsx src/commands/cli.ts validate",
+    "check": "tsx src/commands/cli.ts check",
+    "check:agent": "tsx src/commands/cli.ts check --reporter=agent",
+    "agents": "tsx src/commands/cli.ts agents",
+    "agents:init": "pnpm agents init",
+    "agents:feat:new": "pnpm agents feat:new",
+    "agents:feat:design": "pnpm agents feat:design --model openrouter/anthropic/claude-sonnet-4.6",
+    "agents:feat:test-gen": "pnpm agents feat:test-gen",
+    "agents:feat:fail2pass": "pnpm agents feat:fail2pass",
+    "agents:feat:run": "pnpm agents feat:run --model openrouter/anthropic/claude-sonnet-4.6",
+    "agents:feat:continue": "pnpm agents feat:continue --model openrouter/anthropic/claude-sonnet-4.6",
+    "agents:feat:assess": "pnpm agents feat:assess",
+    "agents:feat:finish": "pnpm agents feat:finish",
+    "agents:feat:debug": "pnpm agents feat:debug",
+    "agents:docker:test:build": "pnpm agents docker:test:build",
+    "agents:docker:coder:build": "pnpm agents docker:coder:build",
+    "agents:docker:coder-base:build": "pnpm agents docker:coder-base:build",
+    "agents:docker:stage:build": "pnpm agents docker:stage:build",
+    "agents:cache:list": "pnpm agents cache:list",
+    "agents:cache:clear": "pnpm agents cache:clear",
+    "openspec": "openspec",
+    "shotgun": "uv run shotgun-sh"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.34",
+    "@clack/prompts": "^1.0.1",
+    "@mastra/core": "^1.7.0",
+    "dockerode": "^4.0.9",
+    "fast-xml-parser": "^5.4.2",
+    "minimatch": "^10.2.4",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9",
+    "@fission-ai/openspec": "^1.2.0",
+    "@strongdm/leash": "^1.1.6",
+    "@types/dockerode": "^4.0.1",
+    "@types/node": "^22",
+    "@vitest/coverage-v8": "^2.1.9",
+    "dotenv": "^17.3.1",
+    "esbuild": "^0.27.3",
+    "eslint": "^9",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "knip": "^5.85.0",
+    "prettier": "^3",
+    "tsup": "^8",
+    "tsx": "^4",
+    "typescript": "^5",
+    "typescript-eslint": "^8",
+    "vitest": "^2"
+  }
+}

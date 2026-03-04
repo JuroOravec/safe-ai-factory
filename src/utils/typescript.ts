@@ -1,0 +1,49 @@
+import { spawnSync } from 'node:child_process';
+
+// TypeScript validation: ensure generated spec files have no syntax/type errors.
+// - catch: spawnSync threw (e.g. npx/tsc not on PATH). Non-fatal — validation skipped.
+// - status === 0: tsc found no errors. Validation passed.
+// - status !== 0: tsc ran and reported real errors (bad imports, broken syntax).
+export async function validateTypescript(opts: {
+  files: string[];
+  cwd: string;
+  errMessage: string;
+}) {
+  const { files, cwd, errMessage } = opts;
+  try {
+    const tscResult = spawnSync(
+      'npx',
+      [
+        'tsc',
+        '--noEmit',
+        '--allowJs',
+        '--checkJs',
+        'false',
+        '--strict',
+        'false',
+        '--moduleResolution',
+        'bundler',
+        '--module',
+        'esnext',
+        '--target',
+        'esnext',
+        '--skipLibCheck',
+        'true',
+        ...files,
+      ],
+      { cwd, encoding: 'utf8', timeout: 30_000 },
+    );
+    if (tscResult.status === 0) {
+      console.log(`  TypeScript validation passed.`);
+    } else {
+      const output = (tscResult.stdout ?? '') + (tscResult.stderr ?? '');
+      console.error(`  ${errMessage}`);
+      for (const line of output.split('\n').filter(Boolean).slice(0, 20)) {
+        console.error(`    ${line}`);
+      }
+      process.exit(1);
+    }
+  } catch {
+    console.warn(`  TypeScript validation skipped (tsc not available).`);
+  }
+}

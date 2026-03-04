@@ -1,0 +1,89 @@
+name: Publish Docker Images
+
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate
+        run: pnpm run validate
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build all test runner images
+        run: pnpm agents docker:test:build --all
+
+      - name: Build coder base image
+        run: pnpm agents docker:coder-base:build
+
+      - name: Build coder image
+        run: pnpm agents docker:coder:build
+
+      - name: Build stage image
+        run: pnpm agents docker:stage:build
+
+      - name: Tag and Push images
+        run: |
+          docker images --format "{{.Repository}}" | grep "^factory-" | while read -r repo; do
+            echo "Publishing $repo"
+            # Push latest tag
+            docker tag "$repo:latest" "${{ env.IMAGE_PREFIX }}/$repo:latest"
+            docker push "${{ env.IMAGE_PREFIX }}/$repo:latest"
+            
+            # If triggered by a tag, push that version tag as well
+            if [[ $GITHUB_REF == refs/tags/* ]]; then
+              VERSION=${GITHUB_REF#refs/tags/}
+              docker tag "$repo:latest" "${{ env.IMAGE_PREFIX }}/$repo:$VERSION"
+              docker push "${{ env.IMAGE_PREFIX }}/$repo:$VERSION"
+            fi
+          done

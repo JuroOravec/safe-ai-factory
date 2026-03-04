@@ -1,0 +1,27 @@
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    globals: true,
+    include: ['src/**/*.test.ts', 'openspec/**/tests/**/*.spec.ts'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.ts', 'scripts/**/*.ts'],
+      exclude: [
+        '**/*.test.ts',
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/coverage/**',
+        '**/__generated__/**',
+      ],
+      reporter: ['text', 'lcov'],
+      // TODO - require 98% test coverage
+      thresholds: {
+        lines: 40,
+        functions: 40,
+        branches: 35,
+        statements: 40,
+      },
+    },
+  },
+});

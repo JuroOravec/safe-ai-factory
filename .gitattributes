@@ -1,0 +1,13 @@
+# Normalize line endings
+* text=auto
+
+# Mark generated files (excluded from GitHub language stats and PR diffs)
+dist/** linguist-generated
+
+# Binary files
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

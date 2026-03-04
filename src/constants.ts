@@ -1,0 +1,19 @@
+/**
+ * Package-level constants. Prefer a single source of truth for paths that
+ * must stay consistent regardless of where the process is invoked from.
+ */
+
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * Absolute path to the repository root.
+ *
+ * Resolved from this file's location (src/constants.ts → one level up = repo root).
+ * Use this instead of computing repo root from import.meta.url in other modules —
+ * that pattern breaks when files live at different depths (e.g. scripts/ vs src/).
+ */
+export function getRepoRoot(): string {
+  const thisFile = fileURLToPath(import.meta.url);
+  return resolve(dirname(thisFile), '..');
+}
