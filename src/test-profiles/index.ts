@@ -66,6 +66,6 @@ export function resolveTestProfile(id: string): TestProfile {
   }
   throw new Error(
     `Unsupported test profile "${id}". Supported profiles: ${SUPPORTED_PROFILE_IDS.join(', ')}.\n` +
-      `To add a new language, open a PR adding templates under src/blackbox/test-profile/<id>/templates/.`,
+      `To add a new language, open a PR adding templates under src/test-profiles/<id>/templates/.`,
   );
 }

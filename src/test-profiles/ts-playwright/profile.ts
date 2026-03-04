@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { validateTypescript } from '../../../utils/typescript.js';
+import { validateTypescript } from '../../utils/typescript.js';
 import type { OnDoneOpts, TestProfile, ValidateFilesOpts } from '../types.js';
 
 async function tsPlaywrightValidateFiles(opts: ValidateFilesOpts): Promise<void> {

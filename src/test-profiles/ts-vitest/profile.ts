@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import { validateTypescript } from '../../../utils/typescript.js';
+import { validateTypescript } from '../../utils/typescript.js';
 import type { TestProfile } from '../types.js';
 
 async function vitestValidateFiles(opts: {
