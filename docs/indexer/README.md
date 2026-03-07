@@ -55,9 +55,9 @@ This parses your repository and builds a semantic graph the agents can query.
 The indexer is used automatically when you run `feat:design`:
 
 ```bash
-pnpm agents feat:design my-feature
+pnpm agents feat:design
 # or explicitly:
-pnpm agents feat:design my-feature --indexer shotgun
+pnpm agents feat:design --indexer shotgun
 ```
 
 The Architect and Black Box Testing agents query the index as they write specs and tests, grounding every decision in your actual codebase.
@@ -67,7 +67,7 @@ The Architect and Black Box Testing agents query the index as they write specs a
 Pass `--indexer none` to skip the indexer entirely — useful for quick runs or when the index hasn't been built yet:
 
 ```bash
-pnpm agents feat:design my-feature --indexer none
+pnpm agents feat:design --indexer none
 ```
 
 ---
@@ -80,7 +80,7 @@ Override it with `-p / --project` when you have multiple indexed codebases or no
 
 ```bash
 saif init --project my-app
-saif feat design my-feature --project my-app
+saif feat design --project my-app
 ```
 
 ---

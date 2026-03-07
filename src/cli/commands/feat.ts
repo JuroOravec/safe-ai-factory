@@ -16,6 +16,7 @@ import { defineCommand, runMain } from 'citty';
 
 import { runBlackboxDesign } from '../../blackbox/design.js';
 import { generateSpecTestScaffold } from '../../blackbox/impl.js';
+import { getChangeDirAbsolute, getChangeDirRelative } from '../../constants.js';
 import { DEFAULT_DESIGNER_PROFILE } from '../../designer-profiles/index.js';
 import { DEFAULT_INDEXER_PROFILE } from '../../indexer-profiles/index.js';
 import {
@@ -144,7 +145,7 @@ const newCommand = defineCommand({
     const openspecDir = parseOpenspecDir(args);
 
     execSync(`npx openspec new change ${featName}`, { stdio: 'inherit', cwd: projectDir });
-    const changeDir = resolve(projectDir, openspecDir, 'changes', featName);
+    const changeDir = getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName: featName });
     if (description) {
       const proposalPath = resolve(changeDir, 'proposal.md');
       writeFileSync(proposalPath, `## What Changes\n\n${description}\n`, 'utf8');
@@ -164,6 +165,11 @@ const designCommand = defineCommand({
   },
   args: {
     name: featNameArg,
+    yes: {
+      ...featYesArg,
+      description:
+        'Non-interactive mode. Requires --name/-n. Skips confirm when designer output exists; assumes redo.',
+    },
     model: {
       type: 'string',
       description: 'LLM model to pass to the designer profile.',
@@ -179,28 +185,43 @@ const designCommand = defineCommand({
     requireLlmApiKey();
 
     const projectDir = parseProjectDir(args);
+    const nonInteractive = args.yes === true;
+    if (nonInteractive && !getFeatNameFromArgs(args)) {
+      console.error('Error: --name/-n is required when using --yes/-y');
+      process.exit(1);
+    }
+    const projectName = resolveProjectName(args, projectDir);
     const featName = await getFeatNameOrPrompt(args, projectDir);
     const openspecDir = parseOpenspecDir(args);
     const testProfile = parseTestProfile(args);
     const designerProfile = parseDesignerProfile(args);
+    const indexerProfile = parseIndexerProfile(args);
 
-    const specDir = `${openspecDir}/changes/${featName}`;
+    const specDir = getChangeDirRelative({ openspecDir, changeName: featName });
     const designerBaseOpts = { cwd: projectDir, featName, openspecDir };
 
-    let runDesigner = !designerProfile.hasRun(designerBaseOpts);
+    // 1. Generate full specs and plan from user's proposal.
+    // 1a. Check if the designer has already run
+    let runDesigner = !(await designerProfile.hasRun(designerBaseOpts));
     if (!runDesigner) {
-      intro(`${designerProfile.displayName} output present`);
-      const redo = await confirm({
-        message: `${specDir} already has designer output. Redo ${designerProfile.displayName} spec generation?`,
-      });
-      outro('');
-      if (isCancel(redo)) {
-        cancel('Operation cancelled.');
-        process.exit(1);
+      // Allow non-interactive mode to override the prompt.
+      if (nonInteractive) {
+        runDesigner = true;
+      } else {
+        intro(`${designerProfile.displayName} output present`);
+        const redo = await confirm({
+          message: `${specDir} already has designer output. Redo ${designerProfile.displayName} spec generation?`,
+        });
+        outro('');
+        if (isCancel(redo)) {
+          cancel('Operation cancelled.');
+          process.exit(1);
+        }
+        runDesigner = redo === true;
       }
-      runDesigner = redo === true;
     }
 
+    // 1b. Run the designer if needed
     if (runDesigner) {
       console.log(`\n${designerProfile.displayName} (spec generation): ${featName}`);
       await designerProfile.run({
@@ -211,9 +232,8 @@ const designCommand = defineCommand({
       console.log(`\nSkipping designer (${specDir} already has required spec files).`);
     }
 
-    const indexerProfile = parseIndexerProfile(args);
-    const projectName = resolveProjectName(args, projectDir);
-
+    // 2. Generate tests from the specs.
+    // 2a. Read specs and generate a plan of what to test as markdown and JSON.
     console.log(`\nBlack Box Design + Impl: ${featName} (profile: ${testProfile.id})`);
     if (indexerProfile) {
       console.log(`  Indexer: ${indexerProfile.displayName} (project: ${projectName})`);
@@ -229,6 +249,7 @@ const designCommand = defineCommand({
     console.log(`  Test plan:  ${designResult.testPlanPath}`);
     console.log(`  Catalog:    ${designResult.catalogPath}`);
 
+    // 2b. Write actual tests from the test plan.
     console.log(`\nGenerating spec files from catalog...`);
     const implResult = await generateSpecTestScaffold({
       changeName: featName,
@@ -248,6 +269,7 @@ const designCommand = defineCommand({
       for (const f of implResult.skippedFiles) console.log(`    ~ ${f}`);
     }
 
+    // 2c. Validate the generated tests.
     await testProfile.validateFiles?.({
       testsDir: implResult.testsDir,
       generatedFiles: implResult.generatedFiles,

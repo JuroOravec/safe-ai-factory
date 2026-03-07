@@ -29,7 +29,7 @@ The profile must match on both generation and execution. If you ran `feat:design
 Run `feat:design` to let AI agent write tests for your feature:
 
 ```bash
-pnpm agents feat:design my-feature --test-profile py-pytest
+pnpm agents feat:design --test-profile py-pytest
 ```
 
 Docker pulls the test runner image from GHCR. Nothing to configure. No `docker build` needed for default images.
@@ -125,41 +125,41 @@ To make it easier, each language language (Node, Python, Go, Rust) offers both P
 
 ```bash
 # TypeScript + Vitest
-pnpm agents feat:run --test-profile ts-vitest my-feature
+pnpm agents feat:run --test-profile ts-vitest
 
 # TypeScript + Playwright
-pnpm agents feat:run --test-profile ts-playwright my-feature
+pnpm agents feat:run --test-profile ts-playwright
 
 # Python + Pytest
-pnpm agents feat:run --test-profile py-pytest my-feature
+pnpm agents feat:run --test-profile py-pytest
 
 # Python + Playwright
-pnpm agents feat:run --test-profile py-playwright my-feature
+pnpm agents feat:run --test-profile py-playwright
 
 ...
 ```
 
 Each profile has its own image. They're all pre-built and pulled automatically.
 
-| Profile         | Language + framework          | URL|
-| --------------- | ----------------------------- |---|
-| `ts-vitest`     | TypeScript + Vitest (default) | ghcr.io/JuroOravec/safe-ai-factory/factory-test-ts-vitest |
-| `ts-playwright` | TypeScript + Playwright       | ghcr.io/JuroOravec/safe-ai-factory/factory-test-ts-playwright|
-| `py-pytest`     | Python + pytest               | ghcr.io/JuroOravec/safe-ai-factory/factory-test-py-pytest|
-| `py-playwright` | Python + Playwright           | ghcr.io/JuroOravec/safe-ai-factory/factory-test-py-playwright|
-| `go-gotest`     | Go + gotest                   | ghcr.io/JuroOravec/safe-ai-factory/factory-test-go-gotest|
-| `go-playwright` | Go + Playwright               | ghcr.io/JuroOravec/safe-ai-factory/factory-test-go-playwright|
-| `rs-rusttest`   | Rust + cargo test             | ghcr.io/JuroOravec/safe-ai-factory/factory-test-rs-rusttest|
-| `rs-playwright` | Rust + Playwright             | ghcr.io/JuroOravec/safe-ai-factory/factory-test-rs-playwright|
+| Profile         | Language + framework          | URL                                                           |
+| --------------- | ----------------------------- | ------------------------------------------------------------- |
+| `ts-vitest`     | TypeScript + Vitest (default) | ghcr.io/JuroOravec/safe-ai-factory/factory-test-ts-vitest     |
+| `ts-playwright` | TypeScript + Playwright       | ghcr.io/JuroOravec/safe-ai-factory/factory-test-ts-playwright |
+| `py-pytest`     | Python + pytest               | ghcr.io/JuroOravec/safe-ai-factory/factory-test-py-pytest     |
+| `py-playwright` | Python + Playwright           | ghcr.io/JuroOravec/safe-ai-factory/factory-test-py-playwright |
+| `go-gotest`     | Go + gotest                   | ghcr.io/JuroOravec/safe-ai-factory/factory-test-go-gotest     |
+| `go-playwright` | Go + Playwright               | ghcr.io/JuroOravec/safe-ai-factory/factory-test-go-playwright |
+| `rs-rusttest`   | Rust + cargo test             | ghcr.io/JuroOravec/safe-ai-factory/factory-test-rs-rusttest   |
+| `rs-playwright` | Rust + Playwright             | ghcr.io/JuroOravec/safe-ai-factory/factory-test-rs-playwright |
 
 Use `--test-profile py-pytest` or `--test-image <url>` to switch.
 
-##  Pin to a release (optional)
+## Pin to a release (optional)
 
 To lock to a specific version instead of `latest`:
 
 ```bash
-pnpm agents feat:run --test-image ghcr.io/JuroOravec/safe-ai-factory/factory-test-ts-vitest:v1.0.0 my-feature
+pnpm agents feat:run --test-image ghcr.io/JuroOravec/safe-ai-factory/factory-test-ts-vitest:v1.0.0
 ```
 
 Images are tagged with each release (e.g. `v1.0.0`). Use `:latest` for the bleeding edge.
@@ -168,7 +168,7 @@ Images are tagged with each release (e.g. `v1.0.0`). Use `:latest` for the bleed
 
 ## Changing profiles
 
-If you already ran `feat:design` with one profile (e.g. `ts-vitest`) and then switch to another (e.g. `py-pytest`), you must re-run `feat:design` with `--force`  flag to regenerate the test scaffold.
+If you already ran `feat:design` with one profile (e.g. `ts-vitest`) and then switch to another (e.g. `py-pytest`), you must re-run `feat:design` with `--force` flag to regenerate the test scaffold.
 
 That will overwrite existing test files, so back up any custom edits first.
 

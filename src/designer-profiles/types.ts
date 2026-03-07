@@ -72,7 +72,7 @@ export interface DesignerProfile {
    * (i.e. its expected output files are present on disk).
    * Used by the CLI to prompt "Output present. Redo?".
    */
-  hasRun(opts: DesignerBaseOpts): boolean;
+  hasRun(opts: DesignerBaseOpts): boolean | Promise<boolean>;
 
   /**
    * Executes the design phase for the feature.

@@ -42,7 +42,7 @@ saif feat new -n add-login
 With description (skips description prompt):
 
 ```bash
-saif feat new -n add-login -d "Add login endpoint"
+saif feat new -d "Add login endpoint"
 ```
 
 Non-interactive (no prompts at all):
@@ -55,18 +55,18 @@ saif feat new -y -n add-login -d "Add login endpoint"
 Custom openspec directory:
 
 ```bash
-saif feat new -n greet-cmd --openspec-dir ./my-openspec
+saif feat new --openspec-dir ./my-openspec
 ```
 
 Custom project directory (e.g. when running from a parent monorepo):
 
 ```bash
-saif feat new -n greet-cmd --project-dir ./packages/my-app
+saif feat new --project-dir ./packages/my-app
 ```
 
 ## What it does
 
-1. Runs `pnpm openspec new change <name>` to create the change directory.
+1. Runs `pnpm openspec new change` to create the change directory.
 2. Creates `proposal.md` in the change dir with given name / description
 
 ## Next steps

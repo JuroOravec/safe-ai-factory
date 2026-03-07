@@ -2,7 +2,7 @@
 
 [Aider](https://github.com/Aider-AI/aider) is an AI pair-programming tool that edits code in your terminal. It uses litellm, so it works with OpenAI, Anthropic, OpenRouter, Gemini, and many other providers.
 
-**Usage:** `pnpm agents feat:run my-feature --agent aider`
+**Usage:** `pnpm agents feat:run --agent aider`
 
 ## How we call it
 

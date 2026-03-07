@@ -74,11 +74,11 @@ When `--test-image` or `--coder-image` is omitted, Docker pulls the default imag
 
 ```bash
 # Test runners (use :latest or :v1.0.0 to pin a release)
-pnpm agents feat:run --test-image ghcr.io/JuroOravec/safe-ai-factory/factory-test-ts-vitest:latest <feat-name>
-pnpm agents feat:run --test-image ghcr.io/JuroOravec/safe-ai-factory/factory-test-py-pytest:v1.0.0 <feat-name>
+pnpm agents feat:run --test-image ghcr.io/JuroOravec/safe-ai-factory/factory-test-ts-vitest:latest
+pnpm agents feat:run --test-image ghcr.io/JuroOravec/safe-ai-factory/factory-test-py-pytest:v1.0.0
 
 # Coder image
-pnpm agents feat:run --coder-image ghcr.io/JuroOravec/safe-ai-factory/factory-coder:latest <feat-name>
+pnpm agents feat:run --coder-image ghcr.io/JuroOravec/safe-ai-factory/factory-coder:latest
 ```
 
 ## Storage

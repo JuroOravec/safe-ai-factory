@@ -2,7 +2,7 @@
 
 [GitHub Copilot CLI](https://github.com/github/copilot-cli) routes AI requests through GitHub's API. Requires an active Copilot subscription.
 
-**Usage:** `pnpm agents feat:run my-feature --agent copilot`
+**Usage:** `pnpm agents feat:run --agent copilot`
 
 ## How we call it
 
@@ -14,6 +14,7 @@ copilot \
   --no-auto-update \
   --autopilot
 ```
+
 `--model "$LLM_MODEL"` is appended only when `LLM_MODEL` is set.
 
 ## Notes

@@ -14,7 +14,7 @@ The agent guesses. It invents a database schema that doesn't match yours, import
 
 With a designer, a dedicated research-and-spec agent runs first:
 
-> `feat:design add-login` →
+> `feat:design` →
 >
 > `plan.md` — Implementation steps grounded in your existing patterns  
 > `specification.md` — Precise behavior contract the agent must satisfy  
@@ -30,7 +30,7 @@ The coding agent sees a grounded spec, not a one-liner. It ships closer code on 
 Use `--designer <id>` with `saif feat design`:
 
 ```bash
-saif feat design add-login --designer shotgun
+saif feat design --designer shotgun
 ```
 
 | ID | Name | Project URL |
@@ -46,7 +46,7 @@ The designer runs as part of `feat:design`.
 ### 1. Create a proposal
 
 ```bash
-saif feat new add-login
+saif feat new
 ```
 
 Edit `openspec/changes/add-login/proposal.md` with what you want to build. One paragraph is enough — the designer figures out the rest.
@@ -54,21 +54,21 @@ Edit `openspec/changes/add-login/proposal.md` with what you want to build. One p
 ### 2. Run spec generation — `saif feat design`
 
 ```bash
-saif feat design add-login
+saif feat design
 # or explicitly:
-saif feat design add-login --designer shotgun
+saif feat design --designer shotgun
 ```
 
 The designer reads your `proposal.md`, researches the codebase (via the active indexer), and writes the 4 spec files into `openspec/changes/add-login/`.
 
-If the spec files already exist, the CLI asks whether to redo them — so re-running is always safe.
+If the spec files already exist, the CLI asks whether to redo them — so re-running is always safe. Use `-y`/`--yes` with `--name` to skip the prompt and assume redo (non-interactive mode).
 
 ### 3. Choose a model — `--model`
 
 Pass `--model` to override the LLM the designer uses:
 
 ```bash
-saif feat design add-login --model claude-opus-4-5
+saif feat design --model claude-opus-4-5
 ```
 
 ### 4. Disable the designer
@@ -76,7 +76,7 @@ saif feat design add-login --model claude-opus-4-5
 Pass `--designer none` to skip spec generation entirely and jump straight to black-box test design — useful when you've already written your spec files manually:
 
 ```bash
-saif feat design add-login --designer none
+saif feat design --designer none
 ```
 
 ---

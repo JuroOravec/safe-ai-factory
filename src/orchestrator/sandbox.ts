@@ -28,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { minimatch } from 'minimatch';
 
 import type { TestCatalog } from '../blackbox/schema.js';
+import { getChangeDirAbsolute } from '../constants.js';
 
 const _orchestratorDir = dirname(fileURLToPath(import.meta.url));
 
@@ -189,17 +190,24 @@ export function createSandbox(opts: CreateSandboxOpts): SandboxPaths {
   });
 
   // Read the test catalog to discover which tests are hidden.
-  const testsJsonPath = join(projectDir, openspecDir, 'changes', changeName, 'tests', 'tests.json');
+  const testsJsonPath = join(
+    getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
+    'tests',
+    'tests.json',
+  );
   if (!existsSync(testsJsonPath)) {
     throw new Error(
-      `tests.json not found at ${testsJsonPath}. Run 'pnpm agents feat:design ${changeName}' first.`,
+      `tests.json not found at ${testsJsonPath}. Run 'pnpm agents feat:design -n ${changeName}' first.`,
     );
   }
   const catalog = JSON.parse(readFileSync(testsJsonPath, 'utf8')) as TestCatalog;
 
   // Remove the hidden/ subdirectory, so the agent cannot see holdout tests
   // or their metadata (paths, names, descriptions).
-  const inCodeTestsDir = join(codePath, openspecDir, 'changes', changeName, 'tests');
+  const inCodeTestsDir = join(
+    getChangeDirAbsolute({ cwd: codePath, openspecDir, changeName }),
+    'tests',
+  );
   const inCodeHiddenDir = join(inCodeTestsDir, 'hidden');
   if (existsSync(inCodeHiddenDir)) {
     execSync(`rm -rf "${inCodeHiddenDir}"`);

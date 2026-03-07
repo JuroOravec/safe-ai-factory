@@ -12,6 +12,7 @@ import { isCancel, text } from '@clack/prompts';
 import { runBlackboxDesign } from '../blackbox/design.js';
 import { generateSpecTestScaffold } from '../blackbox/impl.js';
 import { TestCatalogSchema } from '../blackbox/schema.js';
+import { getChangeDirAbsolute } from '../constants.js';
 import type { GitProvider } from '../git/types.js';
 import { generatePRSummary } from '../mastra/agents/pr-summarizer.js';
 import { runSpecArbiter } from '../mastra/agents/spec-arbiter.js';
@@ -322,7 +323,10 @@ export async function runArbiterForFailure(
     projectName,
   } = opts;
 
-  const specPath = join(projectDir, openspecDir, 'changes', changeName, 'specification.md');
+  const specPath = join(
+    getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
+    'specification.md',
+  );
   const specContent = existsSync(specPath)
     ? readFileSync(specPath, 'utf8')
     : '(specification.md not found)';
@@ -540,8 +544,8 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
       // requires that directory to move it to archive/ and update specs, we copy
       // it from projectDir into the worktree before running the command. See swf-git.md
       // §8 "Sandbox vs. worktree source asymmetry" for details.
-      const srcChangeDir = join(projectDir, openspecDir, 'changes', changeName);
-      const destChangeDir = join(wtPath, openspecDir, 'changes', changeName);
+      const srcChangeDir = getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName });
+      const destChangeDir = getChangeDirAbsolute({ cwd: wtPath, openspecDir, changeName });
       if (existsSync(srcChangeDir) && !existsSync(destChangeDir)) {
         execSync(`cp -r "${srcChangeDir}" "${destChangeDir}"`, { cwd: projectDir });
       }
@@ -631,8 +635,9 @@ interface BuildInitialTaskOpts {
 
 function buildInitialTask(opts: BuildInitialTaskOpts): string {
   const { projectDir, changeName, openspecDir } = opts;
-  const planPath = join(projectDir, openspecDir, 'changes', changeName, 'plan.md');
-  const specPath = join(projectDir, openspecDir, 'changes', changeName, 'specification.md');
+  const changeDir = getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName });
+  const planPath = join(changeDir, 'plan.md');
+  const specPath = join(changeDir, 'specification.md');
 
   const parts = [
     `Implement the feature '${changeName}' as described in the plan below.`,
@@ -663,10 +668,14 @@ interface LoadCatalogOpts {
 
 export function loadCatalog(opts: LoadCatalogOpts) {
   const { projectDir, changeName, openspecDir } = opts;
-  const testsJsonPath = join(projectDir, openspecDir, 'changes', changeName, 'tests', 'tests.json');
+  const testsJsonPath = join(
+    getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
+    'tests',
+    'tests.json',
+  );
   if (!existsSync(testsJsonPath)) {
     throw new Error(
-      `tests.json not found at ${testsJsonPath}. Run 'pnpm agents feat:design ${changeName}' first.`,
+      `tests.json not found at ${testsJsonPath}. Run 'pnpm agents feat:design -n ${changeName}' first.`,
     );
   }
   const raw = JSON.parse(readFileSync(testsJsonPath, 'utf8')) as unknown;
@@ -712,7 +721,10 @@ export function getTestRunnerOpts({
   StartTestRunnerContainerOpts,
   'testsDir' | 'reportDir' | 'testScriptPath'
 > {
-  const testsDir = join(projectDir, openspecDir, 'changes', changeName, 'tests');
+  const testsDir = join(
+    getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
+    'tests',
+  );
 
   const testScriptPath = join(sandboxBasePath, 'test.sh');
   writeFileSync(testScriptPath, testScript, { encoding: 'utf8', mode: 0o755 });

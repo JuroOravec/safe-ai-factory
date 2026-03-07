@@ -13,8 +13,9 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join } from 'node:path';
 
+import { getChangeDirAbsolute, getChangeDirRelative } from '../../constants.js';
 import { runShotgunCli } from '../../indexer-profiles/shotgun/shotgun.js';
 import type { DesignerBaseOpts, DesignerProfile, DesignerRunOpts } from '../types.js';
 
@@ -26,14 +27,17 @@ export const shotgunDesignerProfile: DesignerProfile = {
 
   // We assume that shotgun designer has run when the required files are present.
   hasRun({ cwd, featName, openspecDir }: DesignerBaseOpts): boolean {
-    const changeDir = resolve(cwd, openspecDir, 'changes', featName);
-    return REQUIRED_FILES.every((f) => existsSync(resolve(changeDir, f)));
+    const changeDir = getChangeDirAbsolute({ cwd, openspecDir, changeName: featName });
+    return REQUIRED_FILES.every((f) => existsSync(join(changeDir, f)));
   },
 
   // Calls shotgun-sh to generate the spec files.
   run({ cwd, featName, openspecDir, model, prompt }: DesignerRunOpts): void {
-    const specDir = `${openspecDir}/changes/${featName}`;
-    const proposalPath = resolve(cwd, openspecDir, 'changes', featName, 'proposal.md');
+    const specDir = getChangeDirRelative({ openspecDir, changeName: featName });
+    const proposalPath = join(
+      getChangeDirAbsolute({ cwd, openspecDir, changeName: featName }),
+      'proposal.md',
+    );
 
     const proposalPrompt =
       prompt ??
@@ -44,6 +48,7 @@ export const shotgunDesignerProfile: DesignerProfile = {
     const runArgs = ['-n', proposalPrompt];
     if (model?.trim()) runArgs.splice(0, 0, '--model', model.trim());
 
+    // Run `shotgun-sh --spec-dir <specDir> run -n <proposalPrompt>`
     runShotgunCli(['--spec-dir', specDir, 'run', ...runArgs], {
       projectDir: cwd,
       // Shotgun needs these environment variables to stream the output to the console.

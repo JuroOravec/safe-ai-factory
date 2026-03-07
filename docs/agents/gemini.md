@@ -2,7 +2,7 @@
 
 [Gemini CLI](https://github.com/google-gemini/gemini-cli) is Google's terminal agent. Pre-installed in the Leash coder image.
 
-**Usage:** `pnpm agents feat:run my-feature --agent gemini`
+**Usage:** `pnpm agents feat:run --agent gemini`
 
 ## How we call it
 
@@ -13,6 +13,7 @@ gemini \
   --output-format stream-json \
   "$(cat "$FACTORY_TASK_PATH")"
 ```
+
 The prompt is passed as a positional argument (not `-p`, which is `--profile`).
 
 ## Notes

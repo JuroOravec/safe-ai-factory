@@ -31,7 +31,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getSaifRoot } from '../constants.js';
+import { getChangeDirAbsolute, getSaifRoot } from '../constants.js';
 
 /** In-container workspace path that Leash bind-mounts the sandbox into. */
 const CONTAINER_WORKSPACE = '/workspace';
@@ -572,7 +572,9 @@ function buildTaskPrompt(opts: BuildTaskPromptOpts): string {
   const planCandidates: string[] = [];
 
   if (changeName) {
-    planCandidates.push(join(codePath, openspecDir, 'changes', changeName, 'plan.md'));
+    planCandidates.push(
+      join(getChangeDirAbsolute({ cwd: codePath, openspecDir, changeName }), 'plan.md'),
+    );
   }
   planCandidates.push(join(codePath, 'plan.md'));
 

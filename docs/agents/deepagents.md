@@ -2,7 +2,7 @@
 
 [Deep Agents CLI](https://github.com/langchain-ai/deepagents) is LangChain's terminal agent. Installed at runtime via uv, pipx, or pip with provider extras (anthropic, groq, openrouter).
 
-**Usage:** `pnpm agents feat:run my-feature --agent deepagents`
+**Usage:** `pnpm agents feat:run --agent deepagents`
 
 ## How we call it
 
@@ -13,6 +13,7 @@ deepagents \
   --auto-approve \
   --shell-allow-list recommended
 ```
+
 `--model "$LLM_MODEL"` is appended when `LLM_MODEL` is set (see model format below).
 
 ## Notes

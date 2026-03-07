@@ -150,8 +150,8 @@ permit (
 Pass `--cedar` to supply your own policy file:
 
 ```bash
-pnpm agents feat:run my-feature --cedar ./my-policy.cedar
-pnpm agents feat:continue my-feature --cedar ./my-policy.cedar
+pnpm agents feat:run --cedar ./my-policy.cedar
+pnpm agents feat:continue --cedar ./my-policy.cedar
 ```
 
 The path must be absolute or relative to the repo root. The file is read at run time — no rebuild needed.
@@ -165,7 +165,7 @@ Custom policies are useful when you want to tighten the default (e.g. restrict n
 `--no-leash` skips Leash entirely. The agent runs directly on the host with filesystem-only isolation (rsync sandbox). There is no Cedar enforcement.
 
 ```bash
-pnpm agents feat:run my-feature --no-leash
+pnpm agents feat:run --no-leash
 ```
 
 Use this only for local development and debugging. Never use `--no-leash` in CI or production environments.

@@ -2,7 +2,7 @@
 
 [mini-SWE-agent](https://github.com/SWE-agent/mini-swe-agent) is a lightweight agent from Princeton & Stanford. Uses litellm. Installed via pipx — Python required.
 
-**Usage:** `pnpm agents feat:run my-feature --agent mini-swe-agent`
+**Usage:** `pnpm agents feat:run --agent mini-swe-agent`
 
 ## How we call it
 
@@ -12,6 +12,7 @@ mini \
   --yolo \
   --exit-immediately
 ```
+
 `-m "$LLM_MODEL"` when set; `-c mini.yaml -c <tmp_config>` appended when `LLM_BASE_URL` is set.
 
 ## Notes

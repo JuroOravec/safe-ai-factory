@@ -2,7 +2,7 @@
 
 [Kilo Code](https://github.com/Kilo-Org/kilocode) is an OpenCode fork. Installed via npm — requires Node.js 20.18.1+.
 
-**Usage:** `pnpm agents feat:run my-feature --agent kilocode`
+**Usage:** `pnpm agents feat:run --agent kilocode`
 
 ## How we call it
 
@@ -12,6 +12,7 @@ kilo run \
   --auto \
   "$(cat "$FACTORY_TASK_PATH")"
 ```
+
 Provider config (apiKey, baseURL) is injected via `OPENCODE_CONFIG_CONTENT` as JSON.
 
 ## Notes

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Agent } from '@mastra/core/agent';
 import { z } from 'zod';
 
+import { getChangeDirAbsolute } from '../../constants.js';
 import { fastModel } from '../../models.js';
 
 /** Maximum diff size (bytes) to pass verbatim; larger diffs are summarised to file headers only. */
@@ -141,7 +142,7 @@ export interface GeneratePRSummaryOpts {
 export async function generatePRSummary(opts: GeneratePRSummaryOpts): Promise<PRSummary> {
   const { changeName, openspecDir, projectDir, patchFile } = opts;
 
-  const changeDir = join(projectDir, openspecDir, 'changes', changeName);
+  const changeDir = getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName });
 
   const specContent = readFileSafe(join(changeDir, 'specification.md'));
   const proposalContent = readFileSafe(join(changeDir, 'proposal.md'));

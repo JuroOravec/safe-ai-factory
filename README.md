@@ -50,21 +50,21 @@ pnpm install
 saif init
 
 # 1. Scaffold proposal.md and edit it
-saif feat new -n add-login
+saif feat new
 
 # 2. Generate Shotgun specs + black-box tests
-pnpm agents feat:design add-login
+pnpm agents feat:design
 
 # 3. Confirm tests fail
-pnpm agents feat:fail2pass add-login
+pnpm agents feat:fail2pass
 
 # 4. Run coding agent in loops in sandbox until tests pass
-pnpm agents feat:run add-login
+pnpm agents feat:run
 # Prefer Aider?
-# pnpm agents feat:run add-login --agent aider
+# pnpm agents feat:run --agent aider
 
 # 5. Mark this change as done and create a PR
-pnpm agents feat:finish add-login --push origin --pr
+pnpm agents feat:finish --push origin --pr
 ```
 
 ## Prerequisites
@@ -210,7 +210,7 @@ Use any CLI agent you prefer — we wrap it in our safety loop:
 | … | [See all 14 agents →](./docs/agents/README.md) |
 
 ```bash
-pnpm agents feat:run my-feature --agent aider
+pnpm agents feat:run --agent aider
 ```
 
 **Custom agent?** Pass `--agent-script ./my-agent.sh` to use any CLI that reads tasks from stdin or env. No PR required.
@@ -226,7 +226,7 @@ You don't need to build anything. The factory ships pre-built coder and stage im
 Use `--profile` CLI option:
 
 ```bash
-pnpm agents feat:run my-feature --profile python-uv
+pnpm agents feat:run --profile python-uv
 ```
 
 [See all available profiles and step-by-step usage here](./docs/sandbox-profiles.md).
@@ -240,7 +240,7 @@ You can easily configure in which language + framework to run your tests in with
 Use `--test-profile` CLI option:
 
 ```bash
-pnpm agents feat:assess my-feature --test-profile py-playwright
+pnpm agents feat:assess --test-profile py-playwright
 ```
 
 | Profile         | Language + framework          |
@@ -265,9 +265,9 @@ Just like other parts of `safe-ai-factory`, this step is swappable.
 Use `--designer` to switch:
 
 ```bash
-pnpm agents feat:design add-login
+pnpm agents feat:design
 # or explicitly:
-pnpm agents feat:design add-login --designer shotgun
+pnpm agents feat:design --designer shotgun
 ```
 
 | Designer | Switch with |
@@ -289,10 +289,10 @@ Use `--indexer` to switch or disable:
 saif init
 
 # Use during spec generation:
-pnpm agents feat:design my-feature --indexer shotgun
+pnpm agents feat:design --indexer shotgun
 
 # Disable:
-pnpm agents feat:design my-feature --indexer none
+pnpm agents feat:design --indexer none
 ```
 
 | Indexer | Switch with |
@@ -310,7 +310,7 @@ By default the factory restricts the agent's filesystem access using a [Cedar](h
 Override with `--cedar` to supply your own policy:
 
 ```bash
-pnpm agents feat:run my-feature --cedar ./my-policy.cedar
+pnpm agents feat:run --cedar ./my-policy.cedar
 ```
 
 [See the full default policy and customization guide here](./docs/cedar-access-control.md).
