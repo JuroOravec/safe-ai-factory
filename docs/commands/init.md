@@ -22,6 +22,7 @@ saif init [options]
 | `--force`        | `-f`  | boolean | Run `openspec init` even if `openspec/` exists         |
 | `--project`      | `-p`  | string  | Project name override (default: `package.json` "name") |
 | `--openspec-dir` | —     | string  | Path to openspec directory (default: `openspec`)       |
+| `--project-dir`  | —     | string  | Project directory (default: current working directory) |
 
 ## Examples
 
@@ -47,6 +48,12 @@ Use a custom openspec directory:
 
 ```bash
 saif init --openspec-dir ./my-openspec
+```
+
+Use a custom project directory (e.g. when running from a parent monorepo):
+
+```bash
+saif init --project-dir ./packages/my-app
 ```
 
 ## What it does

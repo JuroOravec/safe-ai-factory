@@ -27,10 +27,10 @@ The coding agent sees a grounded spec, not a one-liner. It ships closer code on 
 
 ## Choosing a designer
 
-Use `--designer <id>` with `feat:design`:
+Use `--designer <id>` with `saif feat design`:
 
 ```bash
-pnpm agents feat:design add-login --designer shotgun
+saif feat design add-login --designer shotgun
 ```
 
 | ID | Name | Project URL |
@@ -51,12 +51,12 @@ saif feat new add-login
 
 Edit `openspec/changes/add-login/proposal.md` with what you want to build. One paragraph is enough — the designer figures out the rest.
 
-### 2. Run spec generation — `feat:design`
+### 2. Run spec generation — `saif feat design`
 
 ```bash
-pnpm agents feat:design add-login
+saif feat design add-login
 # or explicitly:
-pnpm agents feat:design add-login --designer shotgun
+saif feat design add-login --designer shotgun
 ```
 
 The designer reads your `proposal.md`, researches the codebase (via the active indexer), and writes the 4 spec files into `openspec/changes/add-login/`.
@@ -68,7 +68,7 @@ If the spec files already exist, the CLI asks whether to redo them — so re-run
 Pass `--model` to override the LLM the designer uses:
 
 ```bash
-pnpm agents feat:design add-login --model claude-opus-4-5
+saif feat design add-login --model claude-opus-4-5
 ```
 
 ### 4. Disable the designer
@@ -76,7 +76,7 @@ pnpm agents feat:design add-login --model claude-opus-4-5
 Pass `--designer none` to skip spec generation entirely and jump straight to black-box test design — useful when you've already written your spec files manually:
 
 ```bash
-pnpm agents feat:design add-login --designer none
+saif feat design add-login --designer none
 ```
 
 ---

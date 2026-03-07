@@ -2,7 +2,7 @@
 
 [Shotgun](https://github.com/shotgun-sh/shotgun) is the default spec designer. It takes your feature proposal, researches your codebase, and produces a full technical spec — `plan.md`, `specification.md`, `research.md`, and `tasks.md` — before any coding agent runs.
 
-**Usage:** `pnpm agents feat:design <feature>` (default) or `pnpm agents feat:design <feature> --designer shotgun`
+**Usage:** `saif feat design <feature>` (default) or `saif feat design <feature> --designer shotgun`
 
 > **Note:** Shotgun also serves as a codebase indexer (`--indexer shotgun`). These are two separate roles. This page covers the designer role. See [Shotgun as indexer](../indexer/shotgun.md) for the indexing role.
 
@@ -36,13 +36,16 @@ This stores the configuration so you don't need to set environment variables on 
 
 ```bash
 # Default — Shotgun runs automatically:
-pnpm agents feat:design add-login
+saif feat design add-login
 
 # Explicit:
-pnpm agents feat:design add-login --designer shotgun
+saif feat design add-login --designer shotgun
 
 # With a specific model:
-pnpm agents feat:design add-login --designer shotgun --model claude-opus-4-5
+saif feat design add-login --designer shotgun --model claude-opus-4-5
+
+# From a parent monorepo (custom project dir):
+saif feat design add-login --project-dir ./packages/my-app
 ```
 
 If the spec files already exist in the feature directory, the CLI asks whether to redo them — safe to re-run at any time.

@@ -80,7 +80,7 @@ Override it with `-p / --project` when you have multiple indexed codebases or no
 
 ```bash
 saif init --project my-app
-pnpm agents feat:design my-feature --project my-app
+saif feat design my-feature --project my-app
 ```
 
 ---
