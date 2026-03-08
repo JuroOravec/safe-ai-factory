@@ -71,4 +71,4 @@ saif feat new --project-dir ./packages/my-app
 
 ## Next steps
 
-After creating a change, run `pnpm agents feat:design` to generate the spec and black-box test scaffolding, or see [Commands](README.md) for the full workflow.
+After creating a change, run `pnpm agents feat:design` to generate the specs and tests, or see [Commands](README.md) for the full workflow.

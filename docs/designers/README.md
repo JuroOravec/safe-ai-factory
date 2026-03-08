@@ -73,7 +73,7 @@ saif feat design --model claude-opus-4-5
 
 ### 4. Disable the designer
 
-Pass `--designer none` to skip spec generation entirely and jump straight to black-box test design — useful when you've already written your spec files manually:
+Pass `--designer none` to skip spec generation entirely and jump straight to tests generation — useful when you've already written your spec files manually:
 
 ```bash
 saif feat design --designer none

@@ -60,7 +60,7 @@ pnpm agents feat:design
 pnpm agents feat:design --indexer shotgun
 ```
 
-The Architect and Black Box Testing agents query the index as they write specs and tests, grounding every decision in your actual codebase.
+The Architect and tests-writing agents query the index as they write specs and tests, grounding every decision in your actual codebase.
 
 ### Disabling the indexer
 

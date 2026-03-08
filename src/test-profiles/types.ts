@@ -29,13 +29,13 @@ export interface TestProfile {
 
   /**
    * Filename (no directory) of the helpers template inside
-   * src/blackbox/templates/<id>/.
+   * src/test-profiles/templates/<id>/.
    */
   helpersFilename: string;
 
   /**
    * Filename (no directory) of the infra health-check template inside
-   * src/blackbox/templates/<id>/.
+   * src/test-profiles/templates/<id>/.
    * null means no infra spec file is used for this profile.
    */
   infraFilename: string | null;
@@ -52,7 +52,7 @@ export interface TestProfile {
   assertionRules: string;
 
   /**
-   * Optional hook called by generateSpecTestScaffold after all spec files are generated.
+   * Optional hook called by generateTests after all spec files are generated.
    * Use for profile-specific post-processing (e.g. Rust mod.rs generation).
    */
   onDone?: (opts: OnDoneOpts) => void | Promise<void>;

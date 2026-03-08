@@ -28,7 +28,7 @@ export default defineConfig({
 });
 `;
   writeFileSync(configPath, configContent, 'utf8');
-  console.log(`[blackbox:scaffold] Written \${configPath}`);
+  console.log(`[design-tests:ts-playwright] Written \${configPath}`);
 }
 
 export const tsPlaywrightProfile: TestProfile = {

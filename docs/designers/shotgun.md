@@ -82,7 +82,7 @@ Running `feat:design` with the Shotgun designer writes four files into `openspec
 | `research.md`      | Codebase findings Shotgun used to inform the spec                                |
 | `tasks.md`         | Discrete work items broken out from the plan                                     |
 
-These files are consumed downstream by the Black Box Testing Agent (which generates deterministic tests) and by the coding agent (which implements the spec).
+These files are consumed downstream by the when planning and writing tests.
 
 ---
 
@@ -94,7 +94,7 @@ These files are consumed downstream by the Black Box Testing Agent (which genera
 
 3. **Write the spec** — Based on the research, Shotgun's spec-writing agents produce `plan.md`, `specification.md`, `research.md`, and `tasks.md` — all grounded in your actual code structure.
 
-4. **Hand off** — The factory's Black Box Testing Agent reads `specification.md` and `plan.md` to generate deterministic tests. The coding agent reads the full spec to implement the feature.
+4. **Hand off** — During tests generationg, we read `specification.md` and `plan.md` to generate deterministic tests. A test-writing agent reads the full spec to implement the feature.
 
 ## Notes
 

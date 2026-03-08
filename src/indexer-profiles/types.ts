@@ -5,7 +5,7 @@
  *
  * Each profile is responsible for:
  *   1. `init`         — indexing the codebase (called by `saif init`)
- *   2. `getMastraTool` — producing a Mastra tool that the blackbox agents can call
+ *   2. `getMastraTool` — producing a Mastra tool that agents can call
  *                        to query the index by natural language question.
  *
  * Environment variables required by each profile should be documented in the profile

@@ -9,10 +9,10 @@ import { join } from 'node:path';
 
 import { isCancel, text } from '@clack/prompts';
 
-import { runBlackboxDesign } from '../blackbox/design.js';
-import { generateSpecTestScaffold } from '../blackbox/impl.js';
-import { TestCatalogSchema } from '../blackbox/schema.js';
 import { getChangeDirAbsolute } from '../constants.js';
+import { runDesignTests } from '../design-tests/design.js';
+import { TestCatalogSchema } from '../design-tests/schema.js';
+import { generateTests } from '../design-tests/write.js';
 import type { GitProvider } from '../git/types.js';
 import { type ModelOverrides, resolveAgentLlmConfig } from '../llm-config.js';
 import { generatePRSummary } from '../mastra/agents/pr-summarizer.js';
@@ -426,7 +426,7 @@ export async function runResultsJudgeForFailure(
   // then scaffold generates the spec files via the coder agent).
   console.log('[results-judge] Regenerating tests with updated spec...');
   try {
-    await runBlackboxDesign({
+    await runDesignTests({
       changeName,
       projectDir,
       openspecDir,
@@ -434,7 +434,7 @@ export async function runResultsJudgeForFailure(
       projectName,
       overrides,
     });
-    await generateSpecTestScaffold({ changeName, projectDir, openspecDir, testProfile, overrides });
+    await generateTests({ changeName, projectDir, openspecDir, testProfile, overrides });
     console.log('[results-judge] Tests regenerated successfully.');
   } catch (err) {
     console.warn(`[results-judge] Test regeneration failed (non-fatal): ${String(err)}`);

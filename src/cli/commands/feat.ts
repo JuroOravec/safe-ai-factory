@@ -17,9 +17,9 @@ import { resolve } from 'node:path';
 import { cancel, confirm, intro, isCancel, outro, text } from '@clack/prompts';
 import { defineCommand, runMain } from 'citty';
 
-import { runBlackboxDesign } from '../../blackbox/design.js';
-import { generateSpecTestScaffold } from '../../blackbox/impl.js';
 import { getChangeDirAbsolute, getChangeDirRelative } from '../../constants.js';
+import { runDesignTests } from '../../design-tests/design.js';
+import { generateTests } from '../../design-tests/write.js';
 import { DEFAULT_DESIGNER_PROFILE } from '../../designer-profiles/index.js';
 import { DEFAULT_INDEXER_PROFILE } from '../../indexer-profiles/index.js';
 import type { ModelOverrides } from '../../llm-config.js';
@@ -96,7 +96,7 @@ const modelOverrideArgs = {
   'agent-model': {
     type: 'string' as const,
     description:
-      'Per-agent model override, repeatable. Format: name=provider/model (e.g. blackbox-planner=openai/gpt-4o).',
+      'Per-agent model override, repeatable. Format: name=provider/model (e.g. tests-planner=openai/gpt-4o).',
   },
   'agent-base-url': {
     type: 'string' as const,
@@ -339,7 +339,7 @@ async function _runDesignTests({
     if (indexerProfile) {
       console.log(`  Indexer: ${indexerProfile.displayName} (project: ${projectName})`);
     }
-    const designResult = await runBlackboxDesign({
+    const designResult = await runDesignTests({
       changeName: featName,
       projectDir,
       openspecDir,
@@ -356,7 +356,7 @@ async function _runDesignTests({
 
   // 2b. Write actual tests from the test plan.
   console.log(`\nGenerating spec files from catalog...`);
-  const implResult = await generateSpecTestScaffold({
+  const implResult = await generateTests({
     changeName: featName,
     projectDir,
     openspecDir,

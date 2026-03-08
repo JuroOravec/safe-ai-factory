@@ -86,7 +86,7 @@ Use per-agent overrides (e.g. stronger planner, cheaper coder):
 saif feat design-tests \
   --agent-model tests-planner=anthropic/claude-opus-4-5 \
   --agent-model tests-catalog=anthropic/claude-3-5-sonnet-latest \
-  --agent-model tests-coder=openai/gpt-4o-mini
+  --agent-model tests-writer=openai/gpt-4o-mini
 ```
 
 ## What it does

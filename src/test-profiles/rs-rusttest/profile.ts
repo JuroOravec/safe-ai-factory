@@ -20,7 +20,7 @@ test-output = "immediate-final"
 `;
   mkdirSync(configDir, { recursive: true });
   writeFileSync(configPath, content, 'utf8');
-  console.log(`[blackbox:scaffold] Written ${configPath}`);
+  console.log(`[design-tests:rs-rusttest] Written ${configPath}`);
 }
 
 /**
@@ -78,7 +78,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 `;
   writeFileSync(cargoTomlPath, content, 'utf8');
-  console.log(`[blackbox:scaffold] Written ${cargoTomlPath}`);
+  console.log(`[design-tests:rs-rusttest] Written ${cargoTomlPath}`);
 }
 
 /**
@@ -110,7 +110,7 @@ function rusttestOnDone(opts: OnDoneOpts): void {
 
     if (!existsSync(modRsPath) || force) {
       writeFileSync(modRsPath, modRsContent, 'utf8');
-      console.log(`[blackbox:scaffold] Written ${modRsPath}`);
+      console.log(`[design-tests:rs-rusttest] Written ${modRsPath}`);
       generatedFiles.push(`${subdir}/mod.rs`);
     }
   }

@@ -2,7 +2,7 @@
 
 Generate specs from a feature's proposal — the first step of `feat design` only.
 
-Runs the designer (e.g. Shotgun) to produce spec files from `proposal.md`. Use this when you want spec generation only, without proceeding to black-box test planning and scaffolding. The full `feat design` command runs this step first, then continues automatically.
+Runs the designer (e.g. Shotgun) to produce spec files from `proposal.md`. Use this when you want spec generation only, without proceeding to tests generation. The full `feat design` command runs this step first, then continues automatically.
 
 When `--name`/`-n` is omitted, prompts interactively with a list of existing changes.
 
@@ -96,7 +96,7 @@ To continue to test planning and scaffolding, run `saif feat design` (which incl
 ## See also
 
 - [LLM configuration](../models.md) — Model flags, agent names, auto-discovery, and tier env vars
-- [feat design](feat-design.md) — Full design flow (spec gen + black-box design + test scaffolding)
-- [feat design-tests](feat-design-tests.md) — Black-box design + test scaffolding only (second step)
+- [feat design](feat-design.md) — Full design flow (spec gen + tests planning + tests generation)
+- [feat design-tests](feat-design-tests.md) — tests planning + test generation only (second step)
 - [feat new](feat-new.md) — Create a new change
 - [Designers](../designers/README.md)

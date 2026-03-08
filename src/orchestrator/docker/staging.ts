@@ -14,7 +14,7 @@ import { arch } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { TestCatalog } from '../../blackbox/schema.js';
+import type { TestCatalog } from '../../design-tests/schema.js';
 import {
   resolveStackStageDockerfilePath,
   type SupportedStackProfileId,

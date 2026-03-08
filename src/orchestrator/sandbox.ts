@@ -27,8 +27,8 @@ import { fileURLToPath } from 'node:url';
 
 import { minimatch } from 'minimatch';
 
-import type { TestCatalog } from '../blackbox/schema.js';
 import { getChangeDirAbsolute } from '../constants.js';
+import type { TestCatalog } from '../design-tests/schema.js';
 
 const _orchestratorDir = dirname(fileURLToPath(import.meta.url));
 

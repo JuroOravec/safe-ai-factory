@@ -187,7 +187,7 @@ Keys are checked in the order listed above; the first match wins.
 | Coding agent<br/>(e.g. OpenHands) | `coder`         | `feat run`<br/>`feat continue`                   |
 | Tests planner                     | `tests-planner` | `feat design-tests`<br/>`feat design`            |
 | Tests cataloger                   | `tests-catalog` | `feat design-tests`<br/>`feat design`            |
-| Tests coder                       | `tests-coder`   | `feat design-tests`<br/>`feat design`            |
+| Tests writer                       | `tests-writer`  | `feat design-tests`<br/>`feat design`            |
 | Results judge                     | `results-judge` | `feat run`<br/>`feat continue`<br/>`feat assess` |
 | PR summarizer                     | `pr-summarizer` | `feat run`<br/>`feat continue`<br/>`feat assess` |
 
@@ -200,7 +200,7 @@ saif feat run \
   --agent-model pr-summarizer=openai/gpt-4o-mini \
   --agent-model tests-planner=anthropic/claude-sonnet-4-6 \
   --agent-model tests-catalog=anthropic/claude-sonnet-4-6 \
-  --agent-model tests-coder=anthropic/claude-sonnet-4-6
+  --agent-model tests-writer=anthropic/claude-sonnet-4-6
 ```
 
 **Typical pattern — strong model for reasoning, cheaper model for utility tasks:**

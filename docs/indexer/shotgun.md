@@ -108,7 +108,7 @@ The factory reads `SHOTGUN_PYTHON` and substitutes it wherever it would otherwis
 
 3. **Ground the spec** — The Architect Agent uses those answers to write a `spec.md` and `plan.md` constrained strictly to your existing patterns. No invented imports, no phantom file paths.
 
-4. **Hand off** — The Black Box Testing Agent reads the same grounded plan to write deterministic tests that map to what the agent will actually implement.
+4. **Hand off** — The Tests planning Agent reads the same grounded plan to write deterministic tests that map to what the agent will actually implement.
 
 ---
 

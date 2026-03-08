@@ -1,7 +1,7 @@
 /**
  * Docker container management for the Software Factory Orchestrator.
  *
- * Manages the two-container Black Box verification architecture:
+ * Manages the two-container Black Box tests architecture:
  *   Container A — Application under test (with HTTP Sidecar for CLI features)
  *   Container B — Test Runner (runs spec files against Container A over HTTP)
  *   + optional ephemeral containers (postgres, redis, etc.)
@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 import { XMLParser } from 'fast-xml-parser';
 
-import type { TestCatalog } from '../../blackbox/schema.js';
+import type { TestCatalog } from '../../design-tests/schema.js';
 import type { SupportedStackProfileId } from '../../stack-profiles/index.js';
 import {
   assertSafeImageTag,

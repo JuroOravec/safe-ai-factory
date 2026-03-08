@@ -16,7 +16,7 @@
  *     - any other existing files under <feat>/   (research, notes, etc.)
  *   Output (written to disk by the profile):
  *     - openspec/changes/<feat>/plan.md          (REQUIRED — consumed by downstream agents)
- *     - openspec/changes/<feat>/specification.md (REQUIRED — consumed by blackbox test gen)
+ *     - openspec/changes/<feat>/specification.md (REQUIRED — consumed by tests design)
  *     - openspec/changes/<feat>/<others>         (optional, e.g. research.md, tasks.md)
  *
  * Environment variables required by each profile should be documented in the profile

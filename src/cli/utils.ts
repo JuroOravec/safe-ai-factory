@@ -177,3 +177,80 @@ export function parseTestProfile(args: { 'test-profile'?: string }): TestProfile
     process.exit(1);
   }
 }
+
+/**
+ * Parses CLI model override flags into a `ModelOverrides` object.
+ *
+ * Accepts:
+ *   --model <provider/model>              → applies to all agents
+ *   --base-url <url>                      → applies to all agents
+ *   --agent-model <name>=<provider/model> → applies to a named agent only
+ *   --agent-base-url <name>=<url>         → applies to a named agent only
+ *
+ * `--agent-model` and `--agent-base-url` may be repeated (citty passes multiple
+ * values as an array, a single value as a string, or omits them entirely).
+ */
+export function parseModelOverrides(args: {
+  model?: string;
+  'base-url'?: string;
+  'agent-model'?: string | string[];
+  'agent-base-url'?: string | string[];
+}): ModelOverrides {
+  const overrides: ModelOverrides = {};
+
+  // Global model override used by all agents unless a per-agent override exists.
+  // Example: `--model openai/gpt-4o`
+  if (typeof args.model === 'string' && args.model.trim()) {
+    overrides.model = args.model.trim();
+  }
+
+  // Global base URL override for all provider requests.
+  // Example: `--base-url https://api.openai.com/v1`
+  if (typeof args['base-url'] === 'string' && args['base-url'].trim()) {
+    overrides.baseUrl = args['base-url'].trim();
+  }
+
+  // Per-agent model overrides
+  // Example: `--agent-model tests-writer=openai/gpt-4o`
+  const agentModelRaw = args['agent-model'];
+  if (agentModelRaw != null) {
+    const entries = Array.isArray(agentModelRaw) ? agentModelRaw : [agentModelRaw];
+    overrides.agentModels = {};
+    for (const entry of entries) {
+      // Parse "<agentName>=<model>" pairs.
+      const eqIdx = entry.indexOf('=');
+      if (eqIdx === -1) {
+        console.warn(
+          `[cli] Ignoring malformed --agent-model value "${entry}": expected name=model`,
+        );
+        continue;
+      }
+      const name = entry.slice(0, eqIdx).trim();
+      const model = entry.slice(eqIdx + 1).trim();
+      if (name && model) overrides.agentModels[name] = model;
+    }
+  }
+
+  // Per-agent base URL overrides from `--agent-base-url name=url`.
+  // Example: `--agent-base-url tests-writer=https://api.openai.com/v1`
+  const agentBaseUrlRaw = args['agent-base-url'];
+  if (agentBaseUrlRaw != null) {
+    const entries = Array.isArray(agentBaseUrlRaw) ? agentBaseUrlRaw : [agentBaseUrlRaw];
+    overrides.agentBaseUrls = {};
+    for (const entry of entries) {
+      // Parse "<agentName>=<url>" pairs.
+      const eqIdx = entry.indexOf('=');
+      if (eqIdx === -1) {
+        console.warn(
+          `[cli] Ignoring malformed --agent-base-url value "${entry}": expected name=url`,
+        );
+        continue;
+      }
+      const name = entry.slice(0, eqIdx).trim();
+      const url = entry.slice(eqIdx + 1).trim();
+      if (name && url) overrides.agentBaseUrls[name] = url;
+    }
+  }
+
+  return overrides;
+}

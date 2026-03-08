@@ -22,6 +22,7 @@ Cursor proved in early 2026 that autonomous AI agents can build an entire browse
 - Prevents context rot with Ralph Wiggum loop.
 
 **Batteries-included:**
+
 - **21 LLM providers**
 - **14 Agentic CLI tools**
 - **4 Programming languages**
@@ -240,7 +241,7 @@ saif feat run \
 ```
 
 Six agents can be targeted individually via `--agent-model <name>=<provider/model>`:
-`coder`, `tests-planner`, `tests-catalog`, `tests-coder`, `results-judge`, `pr-summarizer`.
+`coder`, `tests-planner`, `tests-catalog`, `tests-writer`, `results-judge`, `pr-summarizer`.
 
 See [Models docs](docs/models.md) for the full reference.
 
@@ -299,8 +300,8 @@ pnpm agents feat:design
 pnpm agents feat:design --designer shotgun
 ```
 
-| Designer | Switch with |
-|----------|-------------|
+| Designer          | Switch with          |
+| ----------------- | -------------------- |
 | Shotgun (default) | `--designer shotgun` |
 
 [See all available designers and step-by-step usage here](./docs/designers/README.md).
@@ -324,8 +325,8 @@ pnpm agents feat:design --indexer shotgun
 pnpm agents feat:design --indexer none
 ```
 
-| Indexer | Switch with |
-|---------|-------------|
+| Indexer           | Switch with         |
+| ----------------- | ------------------- |
 | Shotgun (default) | `--indexer shotgun` |
 
 [See all available indexers and step-by-step usage here](./docs/indexer/README.md).

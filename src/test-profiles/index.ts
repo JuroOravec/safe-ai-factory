@@ -4,9 +4,9 @@
  * Supported profiles: ts-vitest | ts-playwright | py-pytest | py-playwright | go-gotest | go-playwright | rs-rusttest | rs-playwright
  *
  * The profile is used by:
- *   - blackbox-catalog agent   → generates entrypoint paths with correct extension + naming
- *   - blackbox-coder agent     → generates test code in the correct language/framework
- *   - generateSpecTestScaffold → copies the correct helpers/infra template files
+ *   - tests-catalog agent   → generates entrypoint paths with correct extension + naming
+ *   - tests-coder agent     → generates test code in the correct language/framework
+ *   - generateTests → copies the correct helpers/infra template files
  *   - parseTestScript (agents.ts) → loads the profile's test.sh as the default test script
  */
 
