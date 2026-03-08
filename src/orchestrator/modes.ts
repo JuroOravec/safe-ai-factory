@@ -120,12 +120,12 @@ export interface OrchestratorOpts {
    * Isolation is filesystem-only (rsync sandbox). No Cedar enforcement.
    * Default: false (Leash is enabled by default).
    */
-  noLeash: boolean;
+  dangerousDebug: boolean;
   /**
    * Absolute path to a Cedar policy file for Leash.
    *
    * Defaults to leash-policy.cedar in src/orchestrator/.
-   * Ignored when noLeash=true.
+   * Ignored when dangerousDebug=true.
    */
   cedarPolicyPath: string;
   /**
@@ -136,7 +136,7 @@ export interface OrchestratorOpts {
   /**
    * Docker image for the coder container.
    * Resolved from the stack profile (default: node-pnpm-python). Override via --coder-image.
-   * Ignored when noLeash=true.
+   * Ignored when dangerousDebug=true.
    */
   coderImage: string;
   /**
@@ -161,7 +161,7 @@ export interface OrchestratorOpts {
   /**
    * Content of the gate script to run after each OpenHands round. In leash mode the script is
    * written to sandboxBasePath/gate.sh and mounted read-only at /factory/gate.sh inside the
-   * container. In --no-leash mode it runs directly on the host via bash.
+   * container. In --dangerous-debug mode it runs directly on the host via bash.
    *
    * It must exit 0 to pass; non-zero causes the inner loop to retry with the output as feedback.
    *
@@ -185,7 +185,7 @@ export interface OrchestratorOpts {
   /**
    * Content of the startup script to run once before the agent loop begins.
    * Written to sandboxBasePath/startup.sh and mounted read-only at /factory/startup.sh
-   * inside the coder container (or run directly on the host in --no-leash mode).
+   * inside the coder container (or run directly on the host in --dangerous-debug mode).
    *
    * Use for workspace setup that requires the workspace to be mounted first:
    * pnpm install, pip install -r requirements.txt, cargo fetch, etc.
@@ -233,7 +233,7 @@ export interface OrchestratorOpts {
   stageScript: string;
   /**
    * Extra environment variables to forward into the agent container (Leash mode)
-   * or inject into the host process env (--no-leash mode).
+   * or inject into the host process env (--dangerous-debug mode).
    *
    * Parsed from --env KEY=VALUE flags and --env-file <path> by the CLI.
    * Reserved factory variables (FACTORY_*, WORKSPACE_BASE, LLM_API_KEY, LLM_MODEL,

@@ -17,7 +17,7 @@
  *   repository or modify openspec/ test files. Any openspec/ changes that
  *   slip through are stripped by the patch filter in sandbox.ts.
  *
- * Security (--no-leash mode):
+ * Security (--dangerous-debug mode):
  *   The agent runs directly on the host with the sandbox directory as its
  *   working directory. Isolation is purely filesystem-based (rsync copy in
  *   /tmp/factory-sandbox/). No Cedar policy enforcement. Use only for
@@ -73,22 +73,22 @@ export interface RunAgentOpts {
    * When true, skip Leash and run the agent directly on the host.
    * Isolation is filesystem-only (rsync sandbox). No Cedar enforcement.
    */
-  noLeash: boolean;
+  dangerousDebug: boolean;
   /**
    * Absolute path to a Cedar policy file for Leash.
    *
-   * Defaults to leash-policy.cedar in src/orchestrator/. Ignored when noLeash=true.
+   * Defaults to leash-policy.cedar in src/orchestrator/. Ignored when dangerousDebug=true.
    */
   cedarPolicyPath: string;
   /**
    * Docker image for the coder container.
-   * Ignored when noLeash=true.
+   * Ignored when dangerousDebug=true.
    */
   coderImage: string;
   /**
    * Maximum number of inner loop rounds (agent → gate → feedback) before giving up.
    * Forwarded as FACTORY_INNER_ROUNDS to coder-start.sh.
-   * Applies in both leash and no-leash modes. Resolved by caller (default: 5).
+   * Applies in both leash and dangerous-debug modes. Resolved by caller (default: 5).
    */
   innerRounds: number;
   /**
@@ -113,7 +113,7 @@ export interface RunAgentOpts {
   agentPath: string;
   /**
    * Additional environment variables to forward into the container (Leash mode)
-   * or inject into the host process env (no-leash mode).
+   * or inject into the host process env (dangerous-debug mode).
    *
    * Useful for agent-specific configuration (e.g. AIDER_MODEL, CLAUDE_API_KEY).
    * If a key conflicts with a reserved factory variable (FACTORY_*, WORKSPACE_BASE,
@@ -206,7 +206,7 @@ export function filterAgentEnv(agentEnv: Record<string, string>): Record<string,
  *             -e LLM_MODEL=... -e LLM_API_KEY=... [-e LLM_PROVIDER=...] [-e LLM_BASE_URL=...] [other -e ...]
  *             /factory/coder-start.sh
  *
- * In --no-leash mode the command is:
+ * In --dangerous-debug mode the command is:
  *   bash src/orchestrator/scripts/coder-start.sh
  *   (with WORKSPACE_BASE=codePath in env, cwd=codePath)
  *
@@ -221,7 +221,7 @@ export async function runAgent(opts: RunAgentOpts): Promise<RunAgentResult> {
     llmConfig,
     openspecDir,
     changeName,
-    noLeash,
+    dangerousDebug,
     cedarPolicyPath,
     coderImage,
     innerRounds,
@@ -250,8 +250,8 @@ export async function runAgent(opts: RunAgentOpts): Promise<RunAgentResult> {
   let spawnCwd: string;
   let spawnEnv: Record<string, string>;
 
-  if (noLeash) {
-    // ── No-Leash: run coder-start.sh directly on host via bash ────────────────
+  if (dangerousDebug) {
+    // ── Dangerous Debug: run coder-start.sh directly on host via bash ─────────
     cmd = 'bash';
     args = [CODER_START_SCRIPT];
     argsForPrint = [CODER_START_SCRIPT];
@@ -272,11 +272,11 @@ export async function runAgent(opts: RunAgentOpts): Promise<RunAgentResult> {
       FACTORY_AGENT_START_SCRIPT: agentStartPath,
       FACTORY_GATE_SCRIPT: `${sandboxBasePath}/gate.sh`,
       FACTORY_AGENT_SCRIPT: agentPath,
-      // In no-leash mode /workspace doesn't exist on the host; write the task
+      // In dangerous-debug mode /workspace doesn't exist on the host; write the task
       // file inside codePath (the spawn cwd) so coder-start.sh can create it.
       FACTORY_TASK_PATH: join(codePath, '.factory_task.md'),
     };
-    console.log('[agent-runner] Mode: no-leash (host execution, filesystem sandbox only)');
+    console.log('[agent-runner] Mode: dangerous-debug (host execution, filesystem sandbox only)');
     console.log(`[agent-runner] Coder start script: ${CODER_START_SCRIPT}`);
     console.log(`[agent-runner] Agent start script: ${agentStartPath}`);
     console.log(`[agent-runner] Agent script: ${agentPath}`);

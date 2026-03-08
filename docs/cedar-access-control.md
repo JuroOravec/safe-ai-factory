@@ -160,18 +160,6 @@ Custom policies are useful when you want to tighten the default (e.g. restrict n
 
 ---
 
-## Disabling Cedar — `--no-leash`
-
-`--no-leash` skips Leash entirely. The agent runs directly on the host with filesystem-only isolation (rsync sandbox). There is no Cedar enforcement.
-
-```bash
-pnpm agents feat:run --no-leash
-```
-
-Use this only for local development and debugging. Never use `--no-leash` in CI or production environments.
-
----
-
 ## See Also
 
 - [Sandbox profiles](./sandbox-profiles.md)
