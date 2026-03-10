@@ -12,7 +12,8 @@ import { resolve } from 'node:path';
 
 import { defineCommand, runMain } from 'citty';
 
-import { DEFAULT_INDEXER_PROFILE, resolveIndexerProfile } from '../../indexer-profiles/index.js';
+import { resolveIndexerProfile } from '../../indexer-profiles/index.js';
+import { indexerArg, openspecDirArg, projectDirArg } from '../args.js';
 import { parseOpenspecDir, parseProjectDir, resolveProjectName } from '../utils.js';
 
 const initCommand = defineCommand({
@@ -31,18 +32,9 @@ const initCommand = defineCommand({
       alias: 'p',
       description: 'Project name override (default: package.json "name")',
     },
-    'openspec-dir': {
-      type: 'string',
-      description: 'Path to openspec directory (default: openspec)',
-    },
-    'project-dir': {
-      type: 'string',
-      description: 'Project directory (default: process.cwd())',
-    },
-    indexer: {
-      type: 'string',
-      description: `Indexer profile to use (default: ${DEFAULT_INDEXER_PROFILE.id})`,
-    },
+    'openspec-dir': openspecDirArg,
+    'project-dir': projectDirArg,
+    indexer: indexerArg,
   },
   async run({ args }) {
     const force = args.force === true;

@@ -4,6 +4,7 @@ import { defineCommand, runMain } from 'citty';
 import cacheCommand from './commands/cache.js';
 import featCommand from './commands/feat.js';
 import initCommand from './commands/init.js';
+import runCommand from './commands/run.js';
 
 const main = defineCommand({
   meta: {
@@ -16,6 +17,7 @@ const main = defineCommand({
     feat: featCommand,
     feature: featCommand,
     init: initCommand,
+    run: runCommand,
   },
 });
 

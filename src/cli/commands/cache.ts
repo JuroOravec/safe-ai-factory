@@ -13,6 +13,7 @@ import { rm as rmAsync } from 'node:fs/promises';
 import { defineCommand, runMain } from 'citty';
 
 import { DEFAULT_SANDBOX_BASE_DIR } from '../../orchestrator/sandbox.js';
+import { projectDirArg, sandboxBaseDirArg } from '../args.js';
 import { parseProjectDir, parseSandboxBaseDir, resolveProjectName } from '../utils.js';
 
 const listCommand = defineCommand({
@@ -23,14 +24,8 @@ const listCommand = defineCommand({
   args: {
     all: { type: 'boolean', description: 'List entries for all projects' },
     project: { type: 'string', alias: 'p', description: 'Project name override' },
-    'project-dir': {
-      type: 'string',
-      description: 'Project directory (default: current working directory)',
-    },
-    'sandbox-base-dir': {
-      type: 'string',
-      description: `Sandbox base directory (default: ${DEFAULT_SANDBOX_BASE_DIR})`,
-    },
+    'project-dir': projectDirArg,
+    'sandbox-base-dir': sandboxBaseDirArg,
   },
   async run({ args }) {
     const sandboxBase = parseSandboxBaseDir(args);

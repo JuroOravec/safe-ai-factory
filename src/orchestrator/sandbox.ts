@@ -32,6 +32,8 @@ import type { TestCatalog } from '../design-tests/schema.js';
 export interface SandboxPaths {
   /** /tmp/factory-sandbox/{proj}-{feat}-{runId} */
   sandboxBasePath: string;
+  /** Run ID suffix used in the sandbox directory name */
+  runId: string;
   /** sandboxBasePath/code — rsync copy of the repo */
   codePath: string;
   /** sandboxBasePath/gate.sh — inner gate script; mounted :ro at /factory/gate.sh in the container */
@@ -269,7 +271,16 @@ export function createSandbox(opts: CreateSandboxOpts): SandboxPaths {
   chmodSync(stagePath, 0o755);
   console.log(`[sandbox] Stage script written to ${stagePath}`);
 
-  return { sandboxBasePath, codePath, gatePath, startupPath, agentStartPath, agentPath, stagePath };
+  return {
+    sandboxBasePath,
+    codePath,
+    gatePath,
+    startupPath,
+    agentStartPath,
+    agentPath,
+    stagePath,
+    runId,
+  };
 }
 
 /**

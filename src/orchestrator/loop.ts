@@ -1,6 +1,6 @@
 /**
  * Iterative agent loop and related utilities.
- * Used by modes 'start' and 'continue'.
+ * Used by mode 'start' (and 'resume' via runStartCore).
  */
 
 import { execSync } from 'node:child_process';
@@ -38,7 +38,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /**
- * Options used by runIterativeLoop (modes 'start' and 'continue').
+ * Options used by runIterativeLoop (modes 'start' and 'resume').
  */
 export interface IterativeLoopOpts {
   /** Sandbox profile id (e.g. 'node-pnpm-python'). Used to resolve Dockerfile.stage for the staging container when tests.json does not specify build.dockerfile. */
@@ -48,11 +48,6 @@ export interface IterativeLoopOpts {
   projectDir: string;
   /** Max full pipeline runs before giving up. Default: 5 */
   maxRuns: number;
-  /**
-   * When true, the sandbox directory is preserved after a max-attempt failure
-   * so the user can resume with mode='continue'.
-   */
-  keepSandbox: boolean;
   /**
    * CLI-level LLM overrides (--model, --agent-model, --base-url, --agent-base-url).
    *
@@ -166,7 +161,7 @@ export interface IterativeLoopOpts {
   testProfile: TestProfile;
   /**
    * How many times to re-run the full test suite on failed tests. Useful for flaky test environments.
-   * Applies to modes 'fail2pass', 'start', 'continue', and 'test'.
+   * Applies to modes 'fail2pass', 'start', 'resume', and 'test'.
    * Default: 1 (run once; no retries).
    */
   testRetries: number;
@@ -181,11 +176,20 @@ export interface IterativeLoopOpts {
 export interface OrchestratorResult {
   success: boolean;
   attempts: number;
-  /** Path to the sandbox (preserved when keepSandbox=true and !success) */
-  sandboxPath?: string;
+  /** Run ID for resuming (run state saved to .saif/runs/) */
+  runId?: string;
   /** Path to the winning patch.diff if success=true */
   patchPath?: string;
   message: string;
+}
+
+export interface RunStorageContext {
+  /** Part to re-create the base state of the feature branch - last commit SHA */
+  baseCommitSha: string;
+  /** Part to re-create the base state of the feature branch - unstaged + staged diff */
+  basePatchDiff?: string;
+  /** Mutable: set by loop for save-on-Ctrl+C */
+  lastErrorFeedback?: string;
 }
 
 export async function runIterativeLoop(
@@ -197,7 +201,6 @@ export async function runIterativeLoop(
     changeName,
     projectDir,
     maxRuns,
-    keepSandbox,
     overrides,
     openspecDir,
     projectName,
@@ -300,7 +303,7 @@ export async function runIterativeLoop(
 
       while (testAttempts < testRetries) {
         testAttempts++;
-        lastRunId = `${extractRunId(sandbox.sandboxBasePath)}-r${attempts}-t${testAttempts}`;
+        lastRunId = `${sandbox.runId}-${attempts}-${testAttempts}`;
         console.log(
           `\n[orchestrator] Test attempt ${testAttempts}/${testRetries} (outer attempt ${attempts}/${maxRuns})`,
         );
@@ -409,25 +412,13 @@ export async function runIterativeLoop(
     // Max attempts reached
     console.error(`\n[orchestrator] Max runs (${maxRuns}) reached without success.`);
 
-    if (keepSandbox) {
-      console.log(`[orchestrator] Sandbox preserved at: ${sandbox.sandboxBasePath}`);
-      console.log(
-        `[orchestrator] Resume with: pnpm saif feat continue --sandbox-path ${sandbox.sandboxBasePath}`,
-      );
-      sandboxDestroyed = true; // Don't destroy in finally
-    }
-
     return {
       success: false,
       attempts,
-      sandboxPath: keepSandbox ? sandbox.sandboxBasePath : undefined,
+      runId,
       message: `Failed after ${maxRuns} runs. Last error:\n${errorFeedback}`,
     };
-  } finally {
-    if (!sandboxDestroyed) {
-      destroySandbox(sandbox.sandboxBasePath);
-    }
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -912,10 +903,4 @@ export function getTestRunnerOpts({
   console.log(`[orchestrator] test.sh written to ${testScriptPath}`);
 
   return { testsDir, reportDir: sandboxBasePath, testScriptPath };
-}
-
-/** Extracts the runId suffix from a sandbox base path */
-export function extractRunId(sandboxBasePath: string): string {
-  const parts = sandboxBasePath.split('-');
-  return parts[parts.length - 1] ?? 'run';
 }

@@ -29,11 +29,25 @@ import { getChangeDirAbsolute, getChangeDirRelative } from '../../constants.js';
 import { runDesignTests } from '../../design-tests/design.js';
 import { generateTests } from '../../design-tests/write.js';
 import { DEFAULT_DESIGNER_PROFILE } from '../../designer-profiles/index.js';
-import { DEFAULT_INDEXER_PROFILE } from '../../indexer-profiles/index.js';
 import type { ModelOverrides } from '../../llm-config.js';
 import { runDebug, runFail2Pass, runStart } from '../../orchestrator/modes.js';
-import { DEFAULT_SANDBOX_BASE_DIR } from '../../orchestrator/sandbox.js';
 import { readSandboxGateScript } from '../../sandbox-profiles/index.js';
+import {
+  featRunArgs,
+  featTestsArgs,
+  indexerArg,
+  modelOverrideArgs,
+  nameArg,
+  openspecDirArg,
+  profileArg,
+  projectArg,
+  projectDirArg,
+  sandboxBaseDirArg,
+  stageScriptArg,
+  startupScriptArg,
+  testProfileArg,
+} from '../args.js';
+import type { ParsedArgsFromCommand } from '../types.js';
 import {
   type FeatRunArgs,
   getFeatNameFromArgs,
@@ -58,6 +72,7 @@ import {
   parseProjectDir,
   parsePush,
   parseResolveAmbiguity,
+  parseRunStorage,
   parseSandboxBaseDir,
   parseSandboxProfile,
   parseStageScript,
@@ -74,196 +89,20 @@ import {
 /////////////////////////////////////////////
 
 // Shared feat args — spread into subcommands, override individual attrs as needed
-const nameArg = {
-  type: 'string' as const,
-  alias: 'n' as const,
-  description: 'Feature name (kebab-case). Prompts with a list if omitted.',
-};
 const yesArg = {
   type: 'boolean' as const,
   alias: 'y' as const,
   description:
     'Non-interactive mode. Requires --name/-n. Omits description prompt (defaults to empty).',
 };
-const openspecDirArg = {
-  type: 'string' as const,
-  description: 'Path to openspec directory (default: openspec)',
-};
-const projectDirArg = {
-  type: 'string' as const,
-  description: 'Project directory (default: process.cwd())',
-};
 const designerArg = {
   type: 'string' as const,
   description: `Designer profile for spec generation (default: ${DEFAULT_DESIGNER_PROFILE.id}).`,
-};
-const indexerArg = {
-  type: 'string' as const,
-  description: `Indexer profile for codebase search (default: ${DEFAULT_INDEXER_PROFILE.id}). Pass 'none' to disable.`,
-};
-const projectArg = {
-  type: 'string' as const,
-  alias: 'p',
-  description: 'Project name override for the indexer (default: package.json "name")',
 };
 const forceArg = {
   type: 'boolean' as const,
   alias: 'f' as const,
   description: null,
-};
-const sandboxBaseDirArg = {
-  type: 'string' as const,
-  description: `Base directory for sandbox entries (default: ${DEFAULT_SANDBOX_BASE_DIR})`,
-};
-const profileArg = {
-  type: 'string' as const,
-  description:
-    'Sandbox profile for the project. Sets defaults for startup-script and stage-script.',
-};
-const startupScriptArg = {
-  type: 'string' as const,
-  description:
-    'Path to a shell script run once to install workspace deps (pnpm install, pip install, etc.).',
-};
-const stageScriptArg = {
-  type: 'string' as const,
-  description:
-    'Path to a shell script mounted into the staging container. Must handle app startup.',
-};
-const testProfileArg = {
-  type: 'string' as const,
-  description: 'Test profile id (default: node-vitest).',
-};
-const testScriptArg = {
-  type: 'string' as const,
-  description: 'Path to a shell script that overrides test.sh inside the Test Runner container.',
-};
-const testImageArg = {
-  type: 'string' as const,
-  description: 'Test runner Docker image tag (default: factory-test-<profile>:latest).',
-};
-
-// Tests-only args — used by design-fail2pass, test (staging + test runner, no coder agent)
-const featTestsArgs = {
-  'sandbox-base-dir': sandboxBaseDirArg,
-  profile: profileArg,
-  'test-script': testScriptArg,
-  'test-image': testImageArg,
-  'startup-script': startupScriptArg,
-  'stage-script': stageScriptArg,
-};
-
-// Agent args — used by run, continue (coder container). NOT used by design-fail2pass.
-const featAgentArgs = {
-  'gate-script': {
-    type: 'string' as const,
-    description:
-      'Path to a shell script run inside the Leash container after each round. Defaults to profile gate.',
-  },
-  agent: {
-    type: 'string' as const,
-    description: 'Agent profile (default: openhands). Used for gate script resolution.',
-  },
-  'agent-script': {
-    type: 'string' as const,
-    description: 'Path to the coding agent script. Overrides profile default.',
-  },
-  'agent-start-script': {
-    type: 'string' as const,
-    description: 'Path to the agent startup script. Overrides profile default.',
-  },
-};
-
-// Full orchestrator args — featTestsArgs + featAgentArgs. Used by run, continue when migrated.
-export const featOrchestratorArgs = {
-  ...featTestsArgs,
-  ...featAgentArgs,
-};
-
-// Run-specific args (feat run)
-const featRunExtraArgs = {
-  'max-runs': {
-    type: 'string' as const,
-    description: 'Max full pipeline runs before giving up (default: 5).',
-  },
-  'keep-sandbox': {
-    type: 'boolean' as const,
-    description: 'Preserve sandbox dir on failure for later resume.',
-  },
-  'test-retries': {
-    type: 'string' as const,
-    description: 'How many times to retry when the tests fail (default: 1).',
-  },
-  'resolve-ambiguity': {
-    type: 'string' as const,
-    description:
-      'How to handle test failures caused by ambiguous specs failures. "ai" (use AI for clarification) | "prompt" (ask human for clarification) | "off" (all failures treated as genuine) (default: ai).',
-  },
-  'dangerous-debug': {
-    type: 'boolean' as const,
-    description:
-      'Skip Leash; run OpenHands directly on the host. Use only for development/debugging.',
-  },
-  cedar: {
-    type: 'string' as const,
-    description: 'Absolute path to Cedar policy file for Leash (default: leash-policy.cedar).',
-  },
-  'coder-image': {
-    type: 'string' as const,
-    description: 'Docker image for the coder container (default: from --profile).',
-  },
-  'gate-retries': {
-    type: 'string' as const,
-    description: 'Max gate retries per run (default: 10).',
-  },
-  env: {
-    type: 'string' as const,
-    description: 'Extra env var for the agent container. Format: KEY=VALUE. Repeatable.',
-  },
-  'env-file': {
-    type: 'string' as const,
-    description: 'Path to .env file with extra env vars for the agent container.',
-  },
-  'agent-log-format': {
-    type: 'string' as const,
-    description: 'How to parse agent stdout. openhands | raw (default: from agent profile).',
-  },
-  push: {
-    type: 'string' as const,
-    description:
-      'Push feature branch after success. Accepts Git URL, slug (owner/repo), or remote name.',
-  },
-  pr: {
-    type: 'boolean' as const,
-    description: 'Open a Pull Request after pushing. Requires --push and provider token env var.',
-  },
-  'git-provider': {
-    type: 'string' as const,
-    description:
-      'Git hosting provider for push/PR. github | gitlab | bitbucket | azure | gitea (default: github).',
-  },
-};
-
-// Shared model override args — spread into any subcommand that calls LLMs.
-const modelOverrideArgs = {
-  model: {
-    type: 'string' as const,
-    description:
-      'LLM model for all agents, e.g. anthropic/claude-3-5-sonnet-latest or openai/gpt-4o.',
-  },
-  'base-url': {
-    type: 'string' as const,
-    description: 'Base URL for all agents (only needed for custom/local endpoints).',
-  },
-  'agent-model': {
-    type: 'string' as const,
-    description:
-      'Per-agent model override, repeatable. Format: name=provider/model (e.g. tests-planner=openai/gpt-4o).',
-  },
-  'agent-base-url': {
-    type: 'string' as const,
-    description: 'Per-agent base URL override, repeatable. Format: name=url.',
-  },
 };
 
 /////////////////////////////////////////////
@@ -715,17 +554,6 @@ const featDebugArgs = {
 // run: Start new iterative OpenHands loop until tests pass
 // ---------------------------------------------------------------------------
 
-const featRunArgs = {
-  name: nameArg,
-  'openspec-dir': openspecDirArg,
-  'project-dir': projectDirArg,
-  project: projectArg,
-  'test-profile': testProfileArg,
-  ...featOrchestratorArgs,
-  ...featRunExtraArgs,
-  ...modelOverrideArgs,
-};
-
 const runCommand = defineCommand({
   meta: {
     name: 'run',
@@ -733,105 +561,111 @@ const runCommand = defineCommand({
   },
   args: featRunArgs,
   async run({ args }) {
-    const projectDir = parseProjectDir(args);
-    const featName = await getFeatNameOrPrompt(args, projectDir);
-    const runArgs = args as FeatRunArgs;
-
-    const maxRuns = parseMaxRuns(runArgs);
-    const keepSandbox = runArgs['keep-sandbox'] === true;
-    const overrides = parseModelOverrides(args);
-    const openspecDir = parseOpenspecDir(args);
-    const sandboxBaseDir = parseSandboxBaseDir(args);
-    const projectName = resolveProjectName(args, projectDir);
-    const testProfile = parseTestProfile(args);
-    const testImage = parseTestImage(runArgs, testProfile.id);
-    const resolveAmbiguity = parseResolveAmbiguity(runArgs);
-    const testRetries = parseTestRetries(runArgs);
-    const dangerousDebug = parseDangerousDebug(runArgs);
-    const cedarPolicyPath = parseCedarPolicyPath(runArgs);
-    const coderImage = parseCoderImage(runArgs);
-    const sandboxProfile = parseSandboxProfile(runArgs);
-    const agentProfile = parseAgentProfile(runArgs);
-
-    const [startupScript, gateScript, { agentStartScript, agentScript }, stageScript, testScript] =
-      await Promise.all([
-        parseStartupScript({ args: runArgs, projectDir }),
-        parseGateScript({ args: runArgs, projectDir }),
-        parseAgentScripts({ args: runArgs, projectDir }),
-        parseStageScript({ args: runArgs, projectDir }),
-        parseTestScript({ args: runArgs, projectDir, profileId: testProfile.id }),
-      ]);
-
-    const gateRetries = parseGateRetries(runArgs);
-    const agentEnv = parseAgentEnv({ args: runArgs, projectDir });
-    const agentLogFormat = parseAgentLogFormat(runArgs, agentProfile);
-    const push = parsePush(runArgs);
-    const pr = parsePr(runArgs);
-    const gitProvider = parseGitProvider(runArgs);
-
-    console.log(`\nStarting iterative loop: ${featName}`);
-    console.log(`  Max runs: ${maxRuns}`);
-    console.log(`  Test retries: ${testRetries}`);
-    console.log(`  Spec ambiguity resolution: ${resolveAmbiguity}`);
-    console.log(`  Test image: ${testImage}`);
-    if (dangerousDebug) {
-      console.log('  Leash: disabled (host execution)');
-    } else {
-      console.log(`  Leash: enabled (image: ${coderImage})`);
-      console.log(`  Cedar policy: ${cedarPolicyPath}`);
-    }
-    console.log(`  Startup script: ${sandboxProfile.id} profile default`);
-    console.log(`  Gate script: ${sandboxProfile.id} profile default`);
-    console.log(`  Agent: ${agentProfile.displayName} (profile: ${agentProfile.id})`);
-    console.log(`  Stage script: ${sandboxProfile.id} profile default`);
-    console.log('  Test script: built-in (test-default.sh)');
-    console.log(`  Agent log format: ${agentLogFormat}`);
-    console.log(`  Agent env vars: ${Object.keys(agentEnv).join(', ') || 'none'}`);
-    console.log(`  Gate retries: ${gateRetries}`);
-    if (keepSandbox) console.log('  Sandbox will be preserved on failure');
-    if (push) console.log(`  Push: ${push}${pr ? ` (+ PR via ${gitProvider.id})` : ''}`);
-
+    const runArgs = await parseRunArgs(args);
     const result = await runStart({
-      sandboxProfileId: sandboxProfile.id,
-      changeName: featName,
-      projectDir,
-      maxRuns,
-      keepSandbox,
-      overrides,
-      openspecDir,
-      sandboxBaseDir,
-      projectName,
-      testImage,
-      resolveAmbiguity,
-      testRetries,
-      dangerousDebug,
-      cedarPolicyPath,
-      coderImage,
-      startupScript,
-      gateScript,
-      agentStartScript,
-      agentScript,
-      stageScript,
-      testScript,
-      testProfile,
-      agentEnv,
-      agentLogFormat,
-      gateRetries,
-      push,
-      pr,
-      gitProvider,
-      patchPath: null,
-      sandboxPath: null,
+      ...runArgs,
+      resume: null,
     });
 
     console.log(`\n${result.message}`);
-    if (result.sandboxPath) {
+    if (result.runId) {
       console.log(`\nResume with:`);
-      console.log(`  pnpm saif feat continue --sandbox-path ${result.sandboxPath} -n ${featName}`);
+      console.log(`  saif run resume ${result.runId}`);
     }
     if (!result.success) process.exit(1);
   },
 });
+
+export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand>) => {
+  const projectDir = parseProjectDir(args);
+  const featName = await getFeatNameOrPrompt(args, projectDir);
+  const runArgs = args as FeatRunArgs;
+
+  const maxRuns = parseMaxRuns(runArgs);
+  const overrides = parseModelOverrides(args);
+  const openspecDir = parseOpenspecDir(args);
+  const sandboxBaseDir = parseSandboxBaseDir(args);
+  const projectName = resolveProjectName(args, projectDir);
+  const testProfile = parseTestProfile(args);
+  const testImage = parseTestImage(runArgs, testProfile.id);
+  const resolveAmbiguity = parseResolveAmbiguity(runArgs);
+  const testRetries = parseTestRetries(runArgs);
+  const dangerousDebug = parseDangerousDebug(runArgs);
+  const cedarPolicyPath = parseCedarPolicyPath(runArgs);
+  const coderImage = parseCoderImage(runArgs);
+  const sandboxProfile = parseSandboxProfile(runArgs);
+  const agentProfile = parseAgentProfile(runArgs);
+
+  const [startupScript, gateScript, { agentStartScript, agentScript }, stageScript, testScript] =
+    await Promise.all([
+      parseStartupScript({ args: runArgs, projectDir }),
+      parseGateScript({ args: runArgs, projectDir }),
+      parseAgentScripts({ args: runArgs, projectDir }),
+      parseStageScript({ args: runArgs, projectDir }),
+      parseTestScript({ args: runArgs, projectDir, profileId: testProfile.id }),
+    ]);
+
+  const gateRetries = parseGateRetries(runArgs);
+  const agentEnv = parseAgentEnv({ args: runArgs, projectDir });
+  const agentLogFormat = parseAgentLogFormat(runArgs, agentProfile);
+  const push = parsePush(runArgs);
+  const pr = parsePr(runArgs);
+  const gitProvider = parseGitProvider(runArgs);
+  const runStorage = parseRunStorage(runArgs, projectDir);
+
+  console.log(`\nStarting iterative loop: ${featName}`);
+  console.log(`  Max runs: ${maxRuns}`);
+  console.log(`  Test retries: ${testRetries}`);
+  console.log(`  Spec ambiguity resolution: ${resolveAmbiguity}`);
+  console.log(`  Test image: ${testImage}`);
+  if (dangerousDebug) {
+    console.log('  Leash: disabled (host execution)');
+  } else {
+    console.log(`  Leash: enabled (image: ${coderImage})`);
+    console.log(`  Cedar policy: ${cedarPolicyPath}`);
+  }
+  console.log(`  Startup script: ${sandboxProfile.id} profile default`);
+  console.log(`  Gate script: ${sandboxProfile.id} profile default`);
+  console.log(`  Agent: ${agentProfile.displayName} (profile: ${agentProfile.id})`);
+  console.log(`  Stage script: ${sandboxProfile.id} profile default`);
+  console.log('  Test script: built-in (test-default.sh)');
+  console.log(`  Agent log format: ${agentLogFormat}`);
+  console.log(`  Agent env vars: ${Object.keys(agentEnv).join(', ') || 'none'}`);
+  console.log(`  Gate retries: ${gateRetries}`);
+  if (push) console.log(`  Push: ${push}${pr ? ` (+ PR via ${gitProvider.id})` : ''}`);
+
+  return {
+    sandboxProfileId: sandboxProfile.id,
+    changeName: featName,
+    projectDir,
+    maxRuns,
+    overrides,
+    openspecDir,
+    sandboxBaseDir,
+    projectName,
+    testImage,
+    resolveAmbiguity,
+    testRetries,
+    dangerousDebug,
+    cedarPolicyPath,
+    coderImage,
+    startupScript,
+    gateScript,
+    agentStartScript,
+    agentScript,
+    stageScript,
+    testScript,
+    testProfile,
+    agentEnv,
+    agentLogFormat,
+    gateRetries,
+    push,
+    pr,
+    gitProvider,
+    runStorage,
+    resume: null,
+  };
+};
 
 // ---------------------------------------------------------------------------
 // debug: Spin up staging container, stream logs

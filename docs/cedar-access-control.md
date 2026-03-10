@@ -151,7 +151,7 @@ Pass `--cedar` to supply your own policy file:
 
 ```bash
 saif feat run --cedar ./my-policy.cedar
-pnpm agents feat:continue --cedar ./my-policy.cedar
+saif run resume <runId> --cedar ./my-policy.cedar
 ```
 
 The path must be absolute or relative to the repo root. The file is read at run time — no rebuild needed.

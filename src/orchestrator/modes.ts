@@ -3,46 +3,38 @@
  *
  *  1. fail2pass  — Verify at least one feature test fails on current codebase (sanity check; partial overlap OK)
  *  2. start      — Create a fresh sandbox and run the iterative agent loop
- *  3. continue   — Resume an existing sandbox (skip rsync) and continue the loop
+ *  3. resume     — Resume a failed run from storage then calls start
  *  4. test       — Apply a candidate patch to a fresh sandbox and run mutual verification
  */
 
-import { chmodSync, existsSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import type { RunStorage } from '../run-storage/types.js';
 import { CleanupRegistry, removeImageByTag, removeNetwork } from '../utils/docker.js';
 import { createSandboxNetwork } from './docker/network.js';
 import { debugStagingContainer, getStagingImageTag } from './docker/staging.js';
 import { hasFeatureTestFailures, runTeststWithContainers } from './docker/test-runner.js';
 import {
   applyPatchToHost,
-  extractRunId,
   getTestRunnerOpts,
   type IterativeLoopOpts,
   loadCatalog,
   type OrchestratorResult,
   runIterativeLoop,
   runResultsJudgeForFailure,
+  type RunStorageContext,
 } from './loop.js';
-import { applyPatch, createSandbox, destroySandbox, type SandboxPaths } from './sandbox.js';
-
-/** Writes (or overwrites) gate.sh at the given path with the provided content. */
-function writeGateScript(gatePath: string, gateScript: string): void {
-  writeFileSync(gatePath, gateScript, 'utf8');
-  chmodSync(gatePath, 0o755);
-}
+import {
+  captureBaseGitState,
+  cleanupResumeWorkspace,
+  createResumeWorktree,
+  mergeResumeOpts,
+  saveRunOnError,
+} from './resume.js';
+import { applyPatch, createSandbox, destroySandbox } from './sandbox.js';
 
 export interface OrchestratorOpts extends IterativeLoopOpts {
-  /**
-   * Required for mode='continue': path to an existing sandbox created by a
-   * previous 'start' run (e.g. /tmp/factory-sandbox/my-feat-abc1234).
-   */
-  sandboxPath: string | null;
-  /**
-   * Required for mode='test': path to a patch file to apply before tests.
-   * (e.g. /path/to/patch.diff)
-   */
-  patchPath: string | null;
   /**
    * Base directory where sandbox entries are created.
    */
@@ -97,6 +89,21 @@ export interface OrchestratorOpts extends IterativeLoopOpts {
    * the profile's stage script is used.
    */
   stageScript: string;
+  /**
+   * Run storage for persisting failed runs. Resolved by CLI via parseRunStorage.
+   * Default: local (.saif/runs/) when --storage is omitted. Set to null for --storage runs=none.
+   */
+  runStorage: RunStorage | null;
+  /**
+   * When set, runStartCore operates in resume mode: use sandboxSourceDir for createSandbox,
+   * skip base git capture, and pass initialErrorFeedback to the loop.
+   * Only used when runResumeCore delegates to runStartCore.
+   */
+  resume: {
+    sandboxSourceDir: string;
+    runContext: RunStorageContext;
+    initialErrorFeedback?: string;
+  } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,6 +117,9 @@ function withCleanupRegistry<T, R>(
     const registry = new CleanupRegistry();
     let isCleaningUp = false;
 
+    // This function is called when the user hits Ctrl+C or the process is terminated.
+    // It cleans up the containers and networks created during the run.
+    // It also saves the run state to runStorage so the user can resume later.
     const onSignal = (sig: string) => {
       if (isCleaningUp) return;
       isCleaningUp = true;
@@ -153,7 +163,7 @@ function withCleanupRegistry<T, R>(
 
 export const runFail2Pass = withCleanupRegistry(runFail2PassCore);
 export const runStart = withCleanupRegistry(runStartCore);
-export const runContinue = withCleanupRegistry(runContinueCore);
+export const runResume = withCleanupRegistry(runResumeCore);
 export const runTests = withCleanupRegistry(runTestsCore);
 
 // ---------------------------------------------------------------------------
@@ -228,7 +238,6 @@ async function runFail2PassCore(
   });
 
   try {
-    const runId = extractRunId(sandbox.sandboxBasePath);
     const result = await runTeststWithContainers({
       sandboxProfileId,
       codePath: sandbox.codePath,
@@ -239,7 +248,7 @@ async function runFail2PassCore(
       testRunnerOpts,
       registry,
       testImage,
-      runId,
+      runId: sandbox.runId,
       startupPath: sandbox.startupPath,
       stagePath: sandbox.stagePath,
       reportPath: join(sandbox.sandboxBasePath, 'results.xml'),
@@ -306,13 +315,34 @@ async function runStartCore(
     agentStartScript,
     agentScript,
     stageScript,
+    runStorage,
   } = opts;
 
   console.log(`\n[orchestrator] MODE: start — ${changeName}`);
 
+  // ─── Sandbox source directory ─────────────────────────────────────────────
+  // Where createSandbox rsyncs FROM:
+  // - Start:  The main project directory as-is
+  // - Resume: A worktree with recreated state in `.saif/worktrees/resume-<runId>` (see runResumeCore)
+  const sandboxSourceDir = opts.resume?.sandboxSourceDir ?? projectDir;
+
+  // ─── Run context (for save-on-Ctrl+C / save-on-failure) ────────────────────
+  // Capture all the relevant state so that we can resume the run later.
+  // Thus, if `runIterativeLoop` throws or user aborts with CTRL+C, the loop
+  // will persist an artifact with all the relevant state so the user can
+  // resume later with `saif run resume <runId>`.
+  let runContext: RunStorageContext;
+  if (opts.resume) {
+    // Resume: use the context from the stored artifact
+    runContext = opts.resume.runContext;
+  } else {
+    // Start: capture the current git state so we can reconstruct it when resuming
+    runContext = captureBaseGitState(projectDir);
+  }
+
   const sandbox = createSandbox({
     changeName,
-    projectDir,
+    projectDir: sandboxSourceDir,
     openspecDir,
     projectName,
     sandboxBaseDir,
@@ -322,86 +352,94 @@ async function runStartCore(
     agentScript,
     stageScript,
   });
-  return runIterativeLoop(sandbox, { ...opts, openspecDir, registry });
+
+  // ─── Save run artifact (on Ctrl+C / failure) ───────────────────────────────
+  // This runs before teardown. If the agent produced any diff (patch.diff exists and is non-empty),
+  // we persist an artifact to runStorage so the user can resume later with `saif run resume <runId>`.
+  if (runStorage) {
+    registry.setBeforeCleanup(async () => {
+      await saveRunOnError({
+        sandbox,
+        runContext,
+        opts: opts as IterativeLoopOpts & {
+          gitProvider: { id: string };
+          testProfile: { id: string };
+        },
+        runStorage,
+        openspecDir,
+      });
+    });
+  }
+
+  return runIterativeLoop(sandbox, {
+    ...opts,
+    openspecDir,
+    registry,
+    runStorage,
+    runContext,
+    initialErrorFeedback: opts.resume?.initialErrorFeedback ?? null,
+  });
 }
 
 // ---------------------------------------------------------------------------
-// Mode 3: continue
+// Mode 3: resume (from storage)
 // ---------------------------------------------------------------------------
 
+interface ResumeOpts extends OrchestratorOpts {
+  runId: string;
+  runStorage: RunStorage;
+}
+
 /**
- * Resumes an existing sandbox (created by a previous 'start' run that hit maxRuns).
- * Skips rsync and git init — uses the preserved sandbox as-is.
+ * Resumes a run from storage. Fetches the artifact, prepares workspace from
+ * baseCommitSha + diffs, creates a fresh sandbox, and runs the loop.
+ * Delegates to runStartCore with resume opts.
  */
-async function runContinueCore(
-  opts: OrchestratorOpts,
+async function runResumeCore(
+  opts: ResumeOpts,
   registry: CleanupRegistry,
 ): Promise<OrchestratorResult> {
-  const {
-    changeName,
-    sandboxPath,
-    openspecDir,
-    gateScript,
-    startupScript,
-    agentStartScript,
-    agentScript,
-    stageScript,
-  } = opts;
+  const { runId, projectDir, runStorage, overrides } = opts;
 
-  if (!sandboxPath) {
-    throw new Error(
-      "mode='continue' requires --sandbox-path pointing to an existing sandbox directory.",
-    );
+  const artifact = await runStorage.getRun(runId);
+  if (!artifact) {
+    throw new Error(`Run not found: ${runId}. List runs with: saif run ls`);
   }
 
-  if (!existsSync(sandboxPath)) {
-    throw new Error(`Sandbox not found at ${sandboxPath}`);
+  console.log(`\n[orchestrator] MODE: resume — ${artifact.config.changeName} (run ${runId})`);
+
+  // Create temp worktree in `.saif/worktrees/resume-<runId>`
+  // to reconstruct the state of the workspace at the time of the run (+ agent's changes)
+  const { worktreePath, branchName } = createResumeWorktree({
+    projectDir,
+    runId,
+    baseCommitSha: artifact.baseCommitSha,
+    basePatchDiff: artifact.basePatchDiff,
+    runPatchDiff: artifact.runPatchDiff,
+  });
+
+  // Load the original opts from the stored artifact and merge them with the CLI opts.
+  // User gets all original settings by default but can override via CLI.
+  // E.g. if user wants to keep all the same options except for the model, they can do:
+  // `saif run resume <runId> --model anthropic/claude-3-5-sonnet-latest`
+  //
+  // NOTE: This also sets `resume.sandboxSourceDir` to `worktreePath`. Thus, telling
+  // runStartCore to use the worktree as the sandbox source directory.
+  const mergedOpts = mergeResumeOpts({
+    artifact,
+    opts,
+    overrides,
+    worktreePath,
+  });
+
+  try {
+    // Finally, run the same flow as when we run `saif feat start <changeName>`
+    return await runStartCore(mergedOpts, registry);
+  } finally {
+    cleanupResumeWorkspace({ worktreePath, projectDir, branchName }, () => {
+      // Best-effort cleanup
+    });
   }
-
-  console.log(`\n[orchestrator] MODE: continue — ${changeName}`);
-  console.log(`[orchestrator] Resuming sandbox: ${sandboxPath}`);
-
-  const codePath = join(sandboxPath, 'code');
-  const gatePath = join(sandboxPath, 'gate.sh');
-  const startupPath = join(sandboxPath, 'startup.sh');
-  const agentStartPath = join(sandboxPath, 'agent-start.sh');
-  const agentPath = join(sandboxPath, 'agent.sh');
-  const stagePath = join(sandboxPath, 'stage.sh');
-
-  if (!existsSync(codePath)) {
-    throw new Error(`Expected 'code' directory not found inside sandbox: ${codePath}`);
-  }
-
-  // Re-write gate.sh so the user can supply a different gate script when resuming.
-  writeGateScript(gatePath, gateScript);
-
-  // Re-write startup.sh on resume so the user can change it between runs.
-  writeFileSync(startupPath, startupScript, 'utf8');
-  chmodSync(startupPath, 0o755);
-
-  // Re-write agent-start.sh on resume so the user can change the agent setup between runs.
-  writeFileSync(agentStartPath, agentStartScript, 'utf8');
-  chmodSync(agentStartPath, 0o755);
-
-  // Re-write agent.sh on resume so the user can change the agent between runs.
-  writeFileSync(agentPath, agentScript, 'utf8');
-  chmodSync(agentPath, 0o755);
-
-  // Re-write stage.sh on resume so the user can change the staging script between runs.
-  writeFileSync(stagePath, stageScript, 'utf8');
-  chmodSync(stagePath, 0o755);
-
-  const sandbox: SandboxPaths = {
-    sandboxBasePath: sandboxPath,
-    codePath,
-    gatePath,
-    startupPath,
-    agentStartPath,
-    agentPath,
-    stagePath,
-  };
-
-  return runIterativeLoop(sandbox, { ...opts, openspecDir, registry });
 }
 
 // ---------------------------------------------------------------------------
@@ -413,7 +451,6 @@ type TestOpts = Pick<
   | 'sandboxProfileId'
   | 'changeName'
   | 'projectDir'
-  | 'patchPath'
   | 'testRetries'
   | 'openspecDir'
   | 'projectName'
@@ -431,7 +468,13 @@ type TestOpts = Pick<
   | 'pr'
   | 'gitProvider'
   | 'overrides'
->;
+> & {
+  /**
+   * Required for mode='test': path to a patch file to apply before tests.
+   * (e.g. /path/to/patch.diff)
+   */
+  patchPath: string | null;
+};
 
 /**
  * Applies a candidate patch to a fresh sandbox and runs Mutual Verification.
@@ -508,7 +551,7 @@ async function runTestsCore(
       attempts++;
       console.log(`\n[orchestrator] Test attempt ${attempts}/${testRetries}`);
 
-      const runId = `${extractRunId(sandbox.sandboxBasePath)}-a${attempts}`;
+      const runId = `${sandbox.runId}-${attempts}`;
 
       const result = await runTeststWithContainers({
         sandboxProfileId,
@@ -585,7 +628,6 @@ async function runTestsCore(
     return {
       success: false,
       attempts,
-      sandboxPath: sandbox.sandboxBasePath,
       message: `Tests failed after ${testRetries} attempt(s). Last stderr:\n${lastStderr}`,
     };
   } finally {
@@ -649,7 +691,7 @@ export async function runDebug(
     stageScript,
   });
   const catalog = loadCatalog({ projectDir, changeName, openspecDir });
-  const runId = extractRunId(sandbox.sandboxBasePath);
+  const runId = sandbox.runId;
 
   const net = await createSandboxNetwork({ projectName, changeName, runId });
 

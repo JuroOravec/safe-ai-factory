@@ -13,17 +13,17 @@ export interface CreateNetworkOpts {
  * This allows `docker clear` to scope network cleanup by project.
  *
  * How runId is built:
- * - runId = {sandboxSuffix}-r{attempts} (iterative loop: feat:start, feat:continue)
+ * - runId = {sandboxSuffix}-r{attempts} (iterative loop: "saif feat run", "saif run resume")
  *   or {sandboxSuffix}-a{attempts} (test mode)
  * - sandboxSuffix comes from the last segment of the sandbox path, e.g. xcc87d8
  *   from /tmp/factory-sandbox/agents-greet-cmd-xcc87d8
  * - attempts is the run counter (1..maxRuns) within a single process
  *
  * On network name conflict, we delete old network and create new one because:
- * - feat:continue starts a fresh process; the first iteration uses attempts=1,
+ * - "saif run resume" starts a fresh process; the first iteration uses attempts=1,
  *   hence runId = xcc87d8-r1. If a prior run crashed or was interrupted before
  *   removeNetwork() in its finally block ran, that network is still present.
- * - The next feat:continue call also uses attempts=1 → same runId → same
+ * - The next "saif run resume" call also uses attempts=1 → same runId → same
  *   network name. Docker.createNetwork() then returns 409 "already exists".
  * - Rather than failing the run, we remove the stale network and recreate it,
  *   so the user can resume without manually cleaning up Docker.

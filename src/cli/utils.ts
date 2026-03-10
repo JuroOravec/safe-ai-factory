@@ -29,6 +29,12 @@ import {
 } from '../indexer-profiles/index.js';
 import { type ModelOverrides } from '../llm-config.js';
 import { DEFAULT_SANDBOX_BASE_DIR } from '../orchestrator/sandbox.js';
+import { createRunStorage } from '../run-storage/index.js';
+import {
+  type RunStorage,
+  type StorageOverrides,
+  SUPPORTED_STORAGE_KEYS,
+} from '../run-storage/types.js';
 import {
   DEFAULT_SANDBOX_PROFILE,
   readSandboxGateScript,
@@ -54,7 +60,97 @@ export function parseSandboxBaseDir(args: { 'sandbox-base-dir'?: string }): stri
   return typeof raw === 'string' && raw.trim() ? raw.trim() : DEFAULT_SANDBOX_BASE_DIR;
 }
 
-/** Args shape for orchestrator commands (design-fail2pass, run, continue, test, etc.) */
+/** Only treat part as key=value if it matches ^\\w+= (avoids parsing query params in URLs). */
+const KEY_EQ_PATTERN = /^\w+=/;
+
+/**
+ * Parses --storage into StorageOverrides (mirrors ModelOverrides).
+ *
+ * Formats:
+ *   Single global: local | s3 | s3://bucket/prefix
+ *   DB-specific: runs=local | runs=s3,tasks=s3://bucket/prefix
+ *   Mixed: s3,runs=local | runs=s3,s3://bucket/prefix?profile=x
+ *
+ * A part is treated as key=value ONLY if it matches ^\w+=, so URLs with query
+ * params (s3://b/p?region=us) are correctly treated as bare values (global).
+ *
+ * Errors: duplicate global, duplicate keys, unknown keys.
+ */
+export function parseStorageOverrides(args: { storage?: string }): StorageOverrides {
+  const raw = typeof args.storage === 'string' ? args.storage : '';
+  if (!raw.trim()) return {};
+
+  const parts = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const result: StorageOverrides = {};
+  let hasGlobal = false;
+  const seenKeys = new Set<string>();
+
+  const exitStorageError = (msg: string): never => {
+    console.error(`Error: --storage ${msg}`);
+    process.exit(1);
+  };
+
+  for (const part of parts) {
+    if (KEY_EQ_PATTERN.test(part)) {
+      const eqIdx = part.indexOf('=');
+      const key = part.slice(0, eqIdx).trim().toLowerCase();
+      const value = part.slice(eqIdx + 1).trim();
+      if (!value) continue;
+
+      if (seenKeys.has(key)) {
+        exitStorageError(`duplicate key "${key}". Each key may appear only once.`);
+      }
+      const allowed = new Set(SUPPORTED_STORAGE_KEYS.map((k) => k.toLowerCase()));
+      if (!allowed.has(key)) {
+        exitStorageError(`unknown key "${key}". Supported: ${SUPPORTED_STORAGE_KEYS.join(', ')}.`);
+      }
+
+      seenKeys.add(key);
+      result.dbStorages = result.dbStorages ?? {};
+      result.dbStorages[key] = value;
+    } else {
+      if (hasGlobal) {
+        exitStorageError(
+          'global value specified multiple times. Use key=value for per-DB overrides.',
+        );
+      }
+      hasGlobal = true;
+      result.storage = part;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Parses --storage and returns a RunStorage instance for runs.
+ */
+export function parseRunStorage(args: { storage?: string }, projectDir: string): RunStorage | null {
+  const overrides = parseStorageOverrides(args);
+  const uri = overrides.dbStorages?.['runs'] ?? overrides.storage ?? 'local';
+  return createRunStorage(uri, projectDir);
+}
+
+/**
+ * Parses run ID from args (runId or first positional).
+ * Exits with an error message if missing or empty.
+ */
+export function parseRunId(args: { runId?: string; _?: string[] }): string {
+  // Fallback to first positional argument if runId is not provided.
+  const runIdRaw = args.runId ?? args._?.[0];
+  const runId = typeof runIdRaw === 'string' ? runIdRaw.trim() : '';
+  if (!runId) {
+    console.error('Error: run ID is required.');
+    process.exit(1);
+  }
+  return runId;
+}
+
+/** Args shape for orchestrator commands (design-fail2pass, run, test, etc.) */
 export interface OrchestratorArgs {
   profile?: string;
   'test-script'?: string;
@@ -455,12 +551,12 @@ export function parseModelOverrides(args: {
   return overrides;
 }
 
-// ── Feat run/continue parsers (used by saif feat run) ────────────────────────
+// ── Feat run parsers (used by saif feat run) ────────────────────────
 
 /** Args shape for feat run. Extends OrchestratorArgs with run-specific flags. */
 export interface FeatRunArgs extends OrchestratorArgs {
+  storage?: string;
   'max-runs'?: string;
-  'keep-sandbox'?: boolean;
   'test-retries'?: string;
   'resolve-ambiguity'?: string;
   'dangerous-debug'?: boolean;

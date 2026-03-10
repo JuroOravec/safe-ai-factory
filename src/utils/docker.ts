@@ -300,6 +300,12 @@ export class CleanupRegistry {
   private containers: ContainerHandle[] = [];
   private networks: string[] = [];
   private images: string[] = [];
+  private beforeCleanupHook?: () => Promise<void>;
+
+  /** Optional hook run before teardown (e.g. save run state on Ctrl+C) */
+  setBeforeCleanup(hook: () => Promise<void>): void {
+    this.beforeCleanupHook = hook;
+  }
 
   registerContainers(handles: ContainerHandle[]): void {
     this.containers.push(...handles);
@@ -329,6 +335,13 @@ export class CleanupRegistry {
   }
 
   async cleanup(): Promise<void> {
+    if (this.beforeCleanupHook) {
+      try {
+        await this.beforeCleanupHook();
+      } catch (err) {
+        console.warn('[orchestrator] Before-cleanup hook error:', err);
+      }
+    }
     const containersToStop = [...this.containers];
     const networksToRemove = [...this.networks];
     const imagesToRemove = [...this.images];

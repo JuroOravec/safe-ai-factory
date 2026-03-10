@@ -148,11 +148,11 @@ Omit `--pr`. The branch is pushed; you create the PR manually in the UI or with 
 
 `--push` and `--pr` work on these subcommands:
 
-| Command         | When push/PR happens                       |
-| --------------- | ------------------------------------------ |
-| `saif feat run` | After agent succeeds and all tests pass    |
-| `feat:continue` | After resume completes successfully        |
-| `feat:test`     | After the candidate patch passes all tests |
+| Command           | When push/PR happens                       |
+| ----------------- | ------------------------------------------ |
+| `saif feat run`   | After agent succeeds and all tests pass    |
+| `saif feat test`  | After the candidate patch passes all tests |
+| `saif run resume` | After resume completes successfully        |
 
 Push and PR happen at the end of a successful run. If the agent hits `--max-runs` or you interrupt, nothing is pushed.
 

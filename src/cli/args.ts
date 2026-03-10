@@ -1,0 +1,201 @@
+/**
+ * Shared CLI argument definitions used across feat and run commands.
+ */
+
+import { DEFAULT_INDEXER_PROFILE } from '../indexer-profiles/index.js';
+import { DEFAULT_SANDBOX_BASE_DIR } from '../orchestrator/sandbox.js';
+import { SUPPORTED_STORAGE_KEYS } from '../run-storage/types.js';
+
+/** Project directory (default: process.cwd() / current working directory) */
+export const projectDirArg = {
+  type: 'string' as const,
+  description: 'Project directory (default: current working directory)',
+};
+
+export const projectArg = {
+  type: 'string' as const,
+  alias: 'p' as const,
+  description: 'Project name override for the indexer (default: package.json "name")',
+};
+
+export const testProfileArg = {
+  type: 'string' as const,
+  description: 'Test profile id (default: node-vitest).',
+};
+
+/** Run storage. Single global, DB-specific (key=val), or mixed. Comma-separated. */
+export const storageArg = {
+  type: 'string' as const,
+  description: `Storage: local | s3 | s3://bucket/prefix (global) or runs=local,tasks=s3 (per-DB) or mixed. Comma-separated. Duplicate keys/global invalid. Supported keys: ${SUPPORTED_STORAGE_KEYS.join(', ')}.`,
+};
+
+/** Sandbox base directory (default: from sandbox profile) */
+export const sandboxBaseDirArg = {
+  type: 'string' as const,
+  description: `Sandbox base directory (default: ${DEFAULT_SANDBOX_BASE_DIR})`,
+};
+
+export const indexerArg = {
+  type: 'string' as const,
+  description: `Indexer profile to use (default: ${DEFAULT_INDEXER_PROFILE.id})`,
+};
+
+export const nameArg = {
+  type: 'string' as const,
+  alias: 'n' as const,
+  description: 'Feature name (kebab-case). Prompts with a list if omitted.',
+};
+
+export const openspecDirArg = {
+  type: 'string' as const,
+  description: 'Path to openspec directory (default: openspec)',
+};
+
+const testScriptArg = {
+  type: 'string' as const,
+  description: 'Path to a shell script that overrides test.sh inside the Test Runner container.',
+};
+const testImageArg = {
+  type: 'string' as const,
+  description: 'Test runner Docker image tag (default: factory-test-<profile>:latest).',
+};
+
+export const profileArg = {
+  type: 'string' as const,
+  description:
+    'Sandbox profile for the project. Sets defaults for startup-script and stage-script.',
+};
+
+export const startupScriptArg = {
+  type: 'string' as const,
+  description:
+    'Path to a shell script run once to install workspace deps (pnpm install, pip install, etc.).',
+};
+export const stageScriptArg = {
+  type: 'string' as const,
+  description:
+    'Path to a shell script mounted into the staging container. Must handle app startup.',
+};
+
+// Shared model override args — spread into any subcommand that calls LLMs.
+export const modelOverrideArgs = {
+  model: {
+    type: 'string' as const,
+    description:
+      'LLM model for all agents, e.g. anthropic/claude-3-5-sonnet-latest or openai/gpt-4o.',
+  },
+  'base-url': {
+    type: 'string' as const,
+    description: 'Base URL for all agents (only needed for custom/local endpoints).',
+  },
+  'agent-model': {
+    type: 'string' as const,
+    description:
+      'Per-agent model override, repeatable. Format: name=provider/model (e.g. tests-planner=openai/gpt-4o).',
+  },
+  'agent-base-url': {
+    type: 'string' as const,
+    description: 'Per-agent base URL override, repeatable. Format: name=url.',
+  },
+};
+
+// Tests-only args — used by design-fail2pass, test (staging + test runner, no coder agent)
+export const featTestsArgs = {
+  'sandbox-base-dir': sandboxBaseDirArg,
+  profile: profileArg,
+  'test-script': testScriptArg,
+  'test-image': testImageArg,
+  'startup-script': startupScriptArg,
+  'stage-script': stageScriptArg,
+};
+
+// Agent args — used by run, resume (coder container).
+export const featAgentArgs = {
+  'gate-script': {
+    type: 'string' as const,
+    description:
+      'Path to a shell script run inside the Leash container after each round. Defaults to profile gate.',
+  },
+  agent: {
+    type: 'string' as const,
+    description: 'Agent profile (default: openhands). Used for gate script resolution.',
+  },
+  'agent-script': {
+    type: 'string' as const,
+    description: 'Path to the coding agent script. Overrides profile default.',
+  },
+  'agent-start-script': {
+    type: 'string' as const,
+    description: 'Path to the agent startup script. Overrides profile default.',
+  },
+};
+
+// Run-specific args (run, resume)
+export const featRunArgs = {
+  name: nameArg,
+  'openspec-dir': openspecDirArg,
+  'project-dir': projectDirArg,
+  project: projectArg,
+  'test-profile': testProfileArg,
+  ...featTestsArgs,
+  ...featAgentArgs,
+  ...modelOverrideArgs,
+
+  'max-runs': {
+    type: 'string' as const,
+    description: 'Max full pipeline runs before giving up (default: 5).',
+  },
+  'test-retries': {
+    type: 'string' as const,
+    description: 'How many times to retry when the tests fail (default: 1).',
+  },
+  'resolve-ambiguity': {
+    type: 'string' as const,
+    description:
+      'How to handle test failures caused by ambiguous specs failures. "ai" (use AI for clarification) | "prompt" (ask human for clarification) | "off" (all failures treated as genuine) (default: ai).',
+  },
+  'dangerous-debug': {
+    type: 'boolean' as const,
+    description:
+      'Skip Leash; run OpenHands directly on the host. Use only for development/debugging.',
+  },
+  cedar: {
+    type: 'string' as const,
+    description: 'Absolute path to Cedar policy file for Leash (default: leash-policy.cedar).',
+  },
+  'coder-image': {
+    type: 'string' as const,
+    description: 'Docker image for the coder container (default: from --profile).',
+  },
+  'gate-retries': {
+    type: 'string' as const,
+    description: 'Max gate retries per run (default: 10).',
+  },
+  env: {
+    type: 'string' as const,
+    description: 'Extra env var for the agent container. Format: KEY=VALUE. Repeatable.',
+  },
+  'env-file': {
+    type: 'string' as const,
+    description: 'Path to .env file with extra env vars for the agent container.',
+  },
+  'agent-log-format': {
+    type: 'string' as const,
+    description: 'How to parse agent stdout. openhands | raw (default: from agent profile).',
+  },
+  storage: storageArg,
+  push: {
+    type: 'string' as const,
+    description:
+      'Push feature branch after success. Accepts Git URL, slug (owner/repo), or remote name.',
+  },
+  pr: {
+    type: 'boolean' as const,
+    description: 'Open a Pull Request after pushing. Requires --push and provider token env var.',
+  },
+  'git-provider': {
+    type: 'string' as const,
+    description:
+      'Git hosting provider for push/PR. github | gitlab | bitbucket | azure | gitea (default: github).',
+  },
+};
