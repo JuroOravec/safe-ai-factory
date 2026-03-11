@@ -180,9 +180,9 @@ export const runTests = withCleanupRegistry(runTestsCore);
 type Fail2PassOpts = Pick<
   OrchestratorOpts,
   | 'sandboxProfileId'
-  | 'changeName'
+  | 'featureName'
   | 'projectDir'
-  | 'openspecDir'
+  | 'saifDir'
   | 'projectName'
   | 'sandboxBaseDir'
   | 'testImage'
@@ -200,9 +200,9 @@ async function runFail2PassCore(
 ): Promise<OrchestratorResult> {
   const {
     sandboxProfileId,
-    changeName,
+    featureName,
     projectDir,
-    openspecDir,
+    saifDir,
     projectName,
     sandboxBaseDir,
     testImage,
@@ -214,12 +214,12 @@ async function runFail2PassCore(
     testScript,
   } = opts;
 
-  console.log(`\n[orchestrator] MODE: fail2pass — ${changeName}`);
+  console.log(`\n[orchestrator] MODE: fail2pass — ${featureName}`);
 
   const sandbox = createSandbox({
-    changeName,
+    featureName,
     projectDir,
-    openspecDir,
+    saifDir,
     projectName,
     sandboxBaseDir,
     startupScript,
@@ -228,11 +228,11 @@ async function runFail2PassCore(
     agentScript,
     stageScript,
   });
-  const catalog = loadCatalog({ projectDir, changeName, openspecDir });
+  const catalog = loadCatalog({ projectDir, featureName, saifDir });
   const testRunnerOpts = getTestRunnerOpts({
     projectDir,
-    changeName,
-    openspecDir,
+    featureName,
+    saifDir,
     sandboxBasePath: sandbox.sandboxBasePath,
     testScript,
   });
@@ -242,7 +242,7 @@ async function runFail2PassCore(
       sandboxProfileId,
       codePath: sandbox.codePath,
       projectDir,
-      changeName,
+      featureName,
       projectName,
       catalog,
       testRunnerOpts,
@@ -305,9 +305,9 @@ async function runStartCore(
   registry: CleanupRegistry,
 ): Promise<OrchestratorResult> {
   const {
-    changeName,
+    featureName,
     projectDir,
-    openspecDir,
+    saifDir,
     projectName,
     sandboxBaseDir,
     gateScript,
@@ -318,7 +318,7 @@ async function runStartCore(
     runStorage,
   } = opts;
 
-  console.log(`\n[orchestrator] MODE: start — ${changeName}`);
+  console.log(`\n[orchestrator] MODE: start — ${featureName}`);
 
   // ─── Sandbox source directory ─────────────────────────────────────────────
   // Where createSandbox rsyncs FROM:
@@ -341,9 +341,9 @@ async function runStartCore(
   }
 
   const sandbox = createSandbox({
-    changeName,
+    featureName,
     projectDir: sandboxSourceDir,
-    openspecDir,
+    saifDir,
     projectName,
     sandboxBaseDir,
     gateScript,
@@ -366,14 +366,14 @@ async function runStartCore(
           testProfile: { id: string };
         },
         runStorage,
-        openspecDir,
+        saifDir,
       });
     });
   }
 
   return runIterativeLoop(sandbox, {
     ...opts,
-    openspecDir,
+    saifDir,
     registry,
     runStorage,
     runContext,
@@ -406,7 +406,7 @@ async function runResumeCore(
     throw new Error(`Run not found: ${runId}. List runs with: saif run ls`);
   }
 
-  console.log(`\n[orchestrator] MODE: resume — ${artifact.config.changeName} (run ${runId})`);
+  console.log(`\n[orchestrator] MODE: resume — ${artifact.config.featureName} (run ${runId})`);
 
   // Create temp worktree in `.saif/worktrees/resume-<runId>`
   // to reconstruct the state of the workspace at the time of the run (+ agent's changes)
@@ -433,7 +433,7 @@ async function runResumeCore(
   });
 
   try {
-    // Finally, run the same flow as when we run `saif feat start <changeName>`
+    // Finally, run the same flow as when we run `saif feat start <featureName>`
     return await runStartCore(mergedOpts, registry);
   } finally {
     cleanupResumeWorkspace({ worktreePath, projectDir, branchName }, () => {
@@ -449,10 +449,10 @@ async function runResumeCore(
 type TestOpts = Pick<
   OrchestratorOpts,
   | 'sandboxProfileId'
-  | 'changeName'
+  | 'featureName'
   | 'projectDir'
   | 'testRetries'
-  | 'openspecDir'
+  | 'saifDir'
   | 'projectName'
   | 'sandboxBaseDir'
   | 'testImage'
@@ -487,11 +487,11 @@ async function runTestsCore(
 ): Promise<OrchestratorResult> {
   const {
     sandboxProfileId,
-    changeName,
+    featureName,
     projectDir,
     patchPath,
     testRetries,
-    openspecDir,
+    saifDir,
     projectName,
     sandboxBaseDir,
     testImage,
@@ -516,13 +516,13 @@ async function runTestsCore(
     throw new Error(`Patch file not found: ${patchPath}`);
   }
 
-  console.log(`\n[orchestrator] MODE: test — ${changeName}`);
+  console.log(`\n[orchestrator] MODE: test — ${featureName}`);
   console.log(`[orchestrator] Patch: ${patchPath}`);
 
   const sandbox = createSandbox({
-    changeName,
+    featureName,
     projectDir,
-    openspecDir,
+    saifDir,
     projectName,
     sandboxBaseDir,
     startupScript,
@@ -531,11 +531,11 @@ async function runTestsCore(
     agentScript,
     stageScript,
   });
-  const catalog = loadCatalog({ projectDir, changeName, openspecDir });
+  const catalog = loadCatalog({ projectDir, featureName, saifDir });
   const testRunnerOpts = getTestRunnerOpts({
     projectDir,
-    changeName,
-    openspecDir,
+    featureName,
+    saifDir,
     sandboxBasePath: sandbox.sandboxBasePath,
     testScript,
   });
@@ -557,7 +557,7 @@ async function runTestsCore(
         sandboxProfileId,
         codePath: sandbox.codePath,
         projectDir,
-        changeName,
+        featureName,
         projectName,
         catalog,
         testRunnerOpts,
@@ -583,12 +583,12 @@ async function runTestsCore(
         await applyPatchToHost({
           codePath: sandbox.codePath,
           projectDir,
-          changeName,
+          featureName,
           runId,
           push,
           pr,
           gitProvider,
-          openspecDir,
+          saifDir,
           overrides,
         });
         return {
@@ -604,8 +604,8 @@ async function runTestsCore(
       if (resolveAmbiguity !== 'off' && result.testSuites) {
         const resultsJudgeResult = await runResultsJudgeForFailure({
           projectDir,
-          changeName,
-          openspecDir,
+          featureName,
+          saifDir,
           patchPath,
           testSuites: result.testSuites,
           resolveAmbiguity,
@@ -650,9 +650,9 @@ export async function runDebug(
   opts: Pick<
     OrchestratorOpts,
     | 'sandboxProfileId'
-    | 'changeName'
+    | 'featureName'
     | 'projectDir'
-    | 'openspecDir'
+    | 'saifDir'
     | 'projectName'
     | 'sandboxBaseDir'
     | 'startupScript'
@@ -664,9 +664,9 @@ export async function runDebug(
 ): Promise<void> {
   const {
     sandboxProfileId,
-    changeName,
+    featureName,
     projectDir,
-    openspecDir,
+    saifDir,
     projectName,
     sandboxBaseDir,
     startupScript,
@@ -676,12 +676,12 @@ export async function runDebug(
     stageScript,
   } = opts;
 
-  console.log(`\n[orchestrator] DEBUG MODE — ${changeName}`);
+  console.log(`\n[orchestrator] DEBUG MODE — ${featureName}`);
 
   const sandbox = createSandbox({
-    changeName,
+    featureName,
     projectDir,
-    openspecDir,
+    saifDir,
     projectName,
     sandboxBaseDir,
     startupScript,
@@ -690,10 +690,10 @@ export async function runDebug(
     agentScript,
     stageScript,
   });
-  const catalog = loadCatalog({ projectDir, changeName, openspecDir });
+  const catalog = loadCatalog({ projectDir, featureName, saifDir });
   const runId = sandbox.runId;
 
-  const net = await createSandboxNetwork({ projectName, changeName, runId });
+  const net = await createSandboxNetwork({ projectName, featureName, runId });
 
   // pnpm forwards SIGTERM immediately after Ctrl+C. Ignore both signals while
   // the finally block is running so Docker API calls aren't cut short.
@@ -706,7 +706,7 @@ export async function runDebug(
       sandboxProfileId,
       codePath: sandbox.codePath,
       projectDir,
-      changeName,
+      featureName,
       projectName,
       catalog,
       networkName: net.networkName,
@@ -716,7 +716,7 @@ export async function runDebug(
     });
   } finally {
     await removeNetwork(net.networkName);
-    const stagingImageTagD = getStagingImageTag(catalog, { projectName, changeName, runId });
+    const stagingImageTagD = getStagingImageTag(catalog, { projectName, featureName, runId });
     if (stagingImageTagD) {
       console.log(`[debug] Removing staging image: ${stagingImageTagD}`);
       await removeImageByTag({ imageTag: stagingImageTagD, missingOk: true });

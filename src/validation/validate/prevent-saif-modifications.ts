@@ -24,23 +24,23 @@ export default async function preventSpecModifications() {
 
   const lines = statusOutput.split('\n').filter((line) => line.trim().length > 0);
 
-  // If any uncommitted change touches the specs/ directory
-  const specModifications = lines.filter((line) => line.includes('specs/'));
+  // If any uncommitted change touches the saif/ directory
+  const saifModifications = lines.filter((line) => line.includes('saif/'));
 
-  if (specModifications.length > 0) {
+  if (saifModifications.length > 0) {
     console.error(
-      '❌ CRITICAL SECURITY BREACH: The Coder sidecar attempted to modify files in the specs/ directory.',
+      '❌ CRITICAL SECURITY BREACH: The Coder sidecar attempted to modify files in the saif/ directory.',
     );
-    console.error('   Uncommitted changes detected in specs/:');
-    for (const file of specModifications) {
+    console.error('   Uncommitted changes detected in saif/:');
+    for (const file of saifModifications) {
       console.error(`     - ${file.trim()}`);
     }
     console.error(
-      '   Hint: The specs/ directory contains authoritative ground-truth constraints and is strictly READ-ONLY for AI workers.',
+      '   Hint: The saif/ directory contains authoritative ground-truth constraints and is strictly READ-ONLY for AI workers.',
     );
     console.error(
-      '   You must implement the logic in src/ or scripts/ to satisfy the specs, not modify the specs themselves.',
+      '   You must implement the logic in src/ or scripts/ to satisfy the saif, not modify the saif themselves.',
     );
-    throw new Error('AI Agent attempted to modify read-only specs/ directory.');
+    throw new Error('AI Agent attempted to modify read-only saif/ directory.');
   }
 }

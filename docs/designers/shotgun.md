@@ -73,7 +73,7 @@ export OPENAI_API_KEY=sk-or-...   # your OpenRouter key
 
 ## What it produces
 
-Running `saif feat design` with the Shotgun designer writes four files into `openspec/changes/<feature>/`:
+Running `saif feat design` with the Shotgun designer writes four files into `saif/features/<feature>/`:
 
 | File               | Purpose                                                                          |
 | ------------------ | -------------------------------------------------------------------------------- |
@@ -88,7 +88,7 @@ These files are consumed downstream by the when planning and writing tests.
 
 ## How it works
 
-1. **Read the proposal** — Shotgun reads your `openspec/changes/<feature>/proposal.md`. One paragraph is enough; if the file is missing, Shotgun runs a generic research pass.
+1. **Read the proposal** — Shotgun reads your `saif/features/<feature>/proposal.md`. One paragraph is enough; if the file is missing, Shotgun runs a generic research pass.
 
 2. **Research the codebase** — Shotgun's internal research agents query your repo using [tree-sitter](https://tree-sitter.github.io) and (optionally) Context7, finding existing patterns, file structures, and conventions relevant to your feature.
 

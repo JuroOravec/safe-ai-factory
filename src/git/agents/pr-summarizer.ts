@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { Agent } from '@mastra/core/agent';
 import { z } from 'zod';
 
-import { getChangeDirAbsolute } from '../../constants.js';
 import { type ModelOverrides, resolveAgentModel } from '../../llm-config.js';
+import { getFeatureDirAbsolute } from '../../specs/discover.js';
 
 /** Maximum diff size (bytes) to pass verbatim; larger diffs are summarised to file headers only. */
 const MAX_DIFF_BYTES = 100_000;
@@ -28,12 +28,12 @@ export type PRSummary = z.infer<typeof PRSummarySchema>;
 
 const PR_SUMMARIZER_INSTRUCTIONS = `You are a technical writer for a software engineering team.
 
-Given an OpenSpec feature specification and a git diff, write a concise, informative GitHub Pull Request title and body.
+Given a feature specification and a git diff, write a concise, informative GitHub Pull Request title and body.
 
 Title rules:
 - Follow Conventional Commits format: type(scope): short description
 - Type must be one of: feat, fix, chore, refactor, docs, test
-- Scope is the changeName (e.g. greet-cmd)
+- Scope is the featureName (e.g. greet-cmd)
 - Keep the title ≤ 72 characters
 - Use imperative mood ("add", "fix", "remove" — not "added", "fixes")
 
@@ -63,15 +63,15 @@ function createPRSummarizerAgent(overrides: ModelOverrides = {}) {
 }
 
 function buildPRSummaryPrompt(opts: {
-  changeName: string;
+  featureName: string;
   specContent: string;
   proposalContent: string;
   tasksContent: string;
   diffContent: string;
 }): string {
-  const { changeName, specContent, proposalContent, tasksContent, diffContent } = opts;
+  const { featureName, specContent, proposalContent, tasksContent, diffContent } = opts;
 
-  const sections: string[] = [`## Change: \`${changeName}\``];
+  const sections: string[] = [`## Feature: \`${featureName}\``];
 
   if (proposalContent) {
     sections.push(`### Proposal\n\n${proposalContent}`);
@@ -120,14 +120,14 @@ function trimDiff(diff: string): string {
 }
 
 export interface GeneratePRSummaryOpts {
-  /** The OpenSpec change name, e.g. "greet-cmd". */
-  changeName: string;
+  /** The feature name, e.g. "greet-cmd". */
+  featureName: string;
   /**
-   * Absolute path to the openspec directory root (e.g. "openspec").
-   * The agent reads <openspecDir>/changes/<changeName>/specification.md etc.
+   * Absolute path to the saif directory root (e.g. "saif").
+   * The agent reads <saifDir>/features/<featureName>/specification.md etc.
    */
-  openspecDir: string;
-  /** Absolute path to the project directory (used to resolve openspecDir when relative). */
+  saifDir: string;
+  /** Absolute path to the project directory (used to resolve saifDir when relative). */
   projectDir: string;
   /** Absolute path to the patch.diff file written by extractPatch. */
   patchFile: string;
@@ -142,25 +142,25 @@ export interface GeneratePRSummaryOpts {
  * if the diff file is missing or the agent fails, the caller should use generic strings.
  */
 export async function generatePRSummary(opts: GeneratePRSummaryOpts): Promise<PRSummary> {
-  const { changeName, openspecDir, projectDir, patchFile, overrides = {} } = opts;
+  const { featureName, saifDir, projectDir, patchFile, overrides = {} } = opts;
   const prSummarizerAgent = createPRSummarizerAgent(overrides);
 
-  const changeDir = getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName });
+  const featureDir = getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName });
 
-  const specContent = readFileSafe(join(changeDir, 'specification.md'));
-  const proposalContent = readFileSafe(join(changeDir, 'proposal.md'));
-  const tasksContent = readFileSafe(join(changeDir, 'tasks.md'));
+  const specContent = readFileSafe(join(featureDir, 'specification.md'));
+  const proposalContent = readFileSafe(join(featureDir, 'proposal.md'));
+  const tasksContent = readFileSafe(join(featureDir, 'tasks.md'));
 
   let diffContent = readFileSafe(patchFile);
   if (!diffContent) {
-    // patchFile might not exist (e.g. pure archive commit); fall back to empty
+    // patchFile might not exist (e.g. empty commit); fall back to empty
     diffContent = '(no diff available)';
   } else {
     diffContent = trimDiff(diffContent);
   }
 
   const prompt = buildPRSummaryPrompt({
-    changeName,
+    featureName,
     specContent,
     proposalContent,
     tasksContent,

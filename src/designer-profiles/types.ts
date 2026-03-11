@@ -8,16 +8,16 @@
  *                  for a given feature directory (used to prompt "Redo?")
  *   2. `run`     — executing the design phase: reading the proposal + any existing
  *                  files in <feat>, querying the codebase if needed, and writing
- *                  the output files to openspec/changes/<feat>/
+ *                  the output files to saif/features/<feat>/
  *
  * Contract:
  *   Input  (read from disk by the profile):
- *     - openspec/changes/<feat>/proposal.md      (optional, but strongly recommended)
+ *     - saif/features/<feat>/proposal.md      (optional, but strongly recommended)
  *     - any other existing files under <feat>/   (research, notes, etc.)
  *   Output (written to disk by the profile):
- *     - openspec/changes/<feat>/plan.md          (REQUIRED — consumed by downstream agents)
- *     - openspec/changes/<feat>/specification.md (REQUIRED — consumed by tests design)
- *     - openspec/changes/<feat>/<others>         (optional, e.g. research.md, tasks.md)
+ *     - saif/features/<feat>/plan.md          (REQUIRED — consumed by downstream agents)
+ *     - saif/features/<feat>/specification.md (REQUIRED — consumed by tests design)
+ *     - saif/features/<feat>/<others>         (optional, e.g. research.md, tasks.md)
  *
  * Environment variables required by each profile should be documented in the profile
  * file (not enforced programmatically here), following the same convention used by
@@ -31,8 +31,8 @@ export interface DesignerBaseOpts {
   cwd: string;
   /** Feature/change name (kebab-case), e.g. "add-login". */
   featName: string;
-  /** Openspec directory name relative to repo root (e.g. "openspec"). */
-  openspecDir: string;
+  /** Saif directory name relative to repo root (e.g. "saif"). */
+  saifDir: string;
 }
 
 export interface DesignerRunOpts extends DesignerBaseOpts {

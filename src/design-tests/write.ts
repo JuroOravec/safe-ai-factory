@@ -2,7 +2,7 @@
  * Write tests — Phase 2 of the tests design workflow.
  *
  * Reads tests.json, then writes the tests files into the
- * change's tests/ directory:
+ * feature's tests/ directory:
  *   - helpers.<ext>    — shared transport helpers (execSidecar, httpRequest, baseUrl)
  *   - infra.<ext>      — sidecar health checks (always present for CLI projects)
  *   - public/<test_name>.<ext>, hidden/<test_name>.<ext> — AI-generated spec files for each entrypoint
@@ -14,8 +14,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { getChangeDirAbsolute, getSaifRoot } from '../constants.js';
+import { getSaifRoot } from '../constants.js';
 import { type ModelOverrides } from '../llm-config.js';
+import { getFeatureDirAbsolute } from '../specs/discover.js';
 import { type TestProfile } from '../test-profiles/index.js';
 import type { DrainableChunk } from '../utils/drain-stream.js';
 import { runTestsWriterAgent } from './agents/tests-writer.js';
@@ -29,12 +30,12 @@ function readTemplate(profileId: string, filename: string): string {
 }
 
 export interface GenerateTestsOpts {
-  /** Feature/change name — matches <openspecDir>/changes/<changeName>/ */
-  changeName: string;
+  /** Feature name — matches <saifDir>/features/<featureName>/ */
+  featureName: string;
   /** Absolute path to the project directory */
   projectDir: string;
-  /** Openspec directory name relative to project directory (e.g. 'openspec'). Resolved by caller. */
-  openspecDir: string;
+  /** Saif directory name relative to project directory (e.g. 'saif'). Resolved by caller. */
+  saifDir: string;
   /**
    * When true, overwrite existing spec files (helpers, infra, and all entrypoint
    * files). Existing files are preserved by default so human edits are not lost.
@@ -77,9 +78,9 @@ export interface GenerateTestsResult {
  */
 export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTestsResult> {
   const {
-    changeName,
+    featureName,
     projectDir,
-    openspecDir,
+    saifDir,
     force = false,
     testProfile,
     overrides = {},
@@ -88,15 +89,12 @@ export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTe
     abortSignal,
   } = opts;
 
-  const testsDir = join(
-    getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
-    'tests',
-  );
+  const testsDir = join(getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName }), 'tests');
   const catalogPath = join(testsDir, 'tests.json');
 
   if (!existsSync(catalogPath)) {
     throw new Error(
-      `tests.json not found at ${catalogPath}. Run 'saif feat design -n ${changeName}' first.`,
+      `tests.json not found at ${catalogPath}. Run 'saif feat design -n ${featureName}' first.`,
     );
   }
 

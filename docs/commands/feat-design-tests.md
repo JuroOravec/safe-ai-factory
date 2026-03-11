@@ -24,7 +24,7 @@ saif feature design-tests [options]
 | `--base-url`       | —     | string  | LLM base URL override for all agents (e.g. `http://localhost:11434/v1` for Ollama).                                                         |
 | `--agent-model`    | —     | string  | Per-agent model override. Format: `<agent>=<provider/model>`. Can be repeated. See [models.md](../models.md) for agent names.               |
 | `--agent-base-url` | —     | string  | Per-agent base URL override. Format: `<agent>=<url>`. Can be repeated.                                                                      |
-| `--openspec-dir`   | —     | string  | Path to openspec directory (default: `openspec`)                                                                                            |
+| `--saif-dir`       | —     | string  | Path to saif directory (default: `saif`)                                                                                                    |
 | `--project-dir`    | —     | string  | Project directory (default: current working directory)                                                                                      |
 | `--test-profile`   | —     | string  | Test profile id (default: node-vitest)                                                                                                      |
 | `--indexer`        | —     | string  | Indexer profile for codebase search (default: shotgun). Pass `none` to disable.                                                             |
@@ -102,6 +102,6 @@ saif feat design-tests \
 - [feat design-specs](feat-design-specs.md) — Spec gen only (first step)
 - [feat design-fail2pass](feat-design-fail2pass.md) — Tests validation only (third step)
 - [feat run](feat-run.md) — Implement specs with the agent loop (run after design)
-- [feat new](feat-new.md) — Create a new change
+- [feat new](feat-new.md) — Create a new feature
 - [Test profiles](../test-profiles.md)
 - [Indexer](../indexer/README.md)

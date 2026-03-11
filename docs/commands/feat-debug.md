@@ -16,18 +16,18 @@ saif feature debug [options]
 ## Requirements
 
 - **Docker daemon** — Starts the staging container and any sidecars from `tests.json`
-- **OpenSpec change** — Must have run `saif feat design` first (or at least have `tests.json` in the change dir)
+  — Must have run `saif feat design` first (or at least have `tests.json` in the feature dir)
 
 ## Arguments
 
-| Argument               | Alias | Type   | Description                                                                                  |
-| ---------------------- | ----- | ------ | -------------------------------------------------------------------------------------------- |
-| `--name`               | `-n`  | string | Feature name (kebab-case). Prompts with a list if omitted.                                   |
-| `--openspec-dir`       | —     | string | Path to openspec directory (default: `openspec`)                                             |
-| `--project-dir`        | —     | string | Project directory (default: current working directory)                                       |
-| `--project`            | `-p`  | string | Project name override (default: package.json "name")                                         |
-| `--sandbox-base-dir`   | —     | string | Base directory for sandbox entries (default: `/tmp/factory-sandbox`)                         |
-| `--profile`          | —     | string | Sandbox profile. Sets defaults for startup-script and stage-script.                           |
+| Argument             | Alias | Type   | Description                                                                                  |
+| -------------------- | ----- | ------ | -------------------------------------------------------------------------------------------- |
+| `--name`             | `-n`  | string | Feature name (kebab-case). Prompts with a list if omitted.                                   |
+| `--saif-dir`         | —     | string | Path to saif directory (default: `saif`)                                                     |
+| `--project-dir`      | —     | string | Project directory (default: current working directory)                                       |
+| `--project`          | `-p`  | string | Project name override (default: package.json "name")                                         |
+| `--sandbox-base-dir` | —     | string | Base directory for sandbox entries (default: `/tmp/factory-sandbox`)                         |
+| `--profile`          | —     | string | Sandbox profile. Sets defaults for startup-script and stage-script.                          |
 | `--startup-script`   | —     | string | Path to a shell script run once to install workspace deps (pnpm install, pip install, etc.). |
 | `--stage-script`     | —     | string | Path to a shell script mounted into the staging container. Must handle app startup.          |
 

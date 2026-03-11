@@ -89,8 +89,6 @@ saif feat run \
   --stage-script ./my-start.sh
 ```
 
-See [openspec/specs/software-factory/swf-comp-d-sandbox.md](../openspec/specs/software-factory/swf-comp-d-sandbox.md) for the sandbox contract.
-
 ---
 
 ## Commands by profile

@@ -11,7 +11,7 @@
  *     code/                  ← rsync copy of repo; workspace for OpenHands; build context/mount
  *                              for staging container (Container A) during tests
  *       .git/                ← fresh git repo for diffing
- *       openspec/changes/{feat}/tests/
+ *       saif/features/{feat}/tests/
  *         tests.json         ← test catalog (public cases only; hidden/ dir stripped)
  *         public/            ← public spec files (from rsync, unchanged)
  *         helpers.ts         ← shared transport helpers
@@ -21,12 +21,18 @@
  */
 
 import { execSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 
 import { minimatch } from 'minimatch';
 
-import { getChangeDirAbsolute } from '../constants.js';
 import type { TestCatalog } from '../design-tests/schema.js';
 
 export interface SandboxPaths {
@@ -68,7 +74,7 @@ export interface SandboxPaths {
 export const DEFAULT_SANDBOX_BASE_DIR = '/tmp/factory-sandbox';
 
 export interface CreateSandboxOpts {
-  changeName: string;
+  featureName: string;
   /** Absolute path to the project directory */
   projectDir: string;
   /**
@@ -80,9 +86,9 @@ export interface CreateSandboxOpts {
   /** Caller-supplied runId; defaults to a random short id */
   runId?: string;
   /**
-   * Path to the openspec directory, relative to project directory.
+   * Path to the saif directory, relative to project directory.
    */
-  openspecDir: string;
+  saifDir: string;
   /**
    * Base directory where sandbox entries are created.
    * Defaults to `/tmp/factory-sandbox`.
@@ -158,9 +164,9 @@ export interface CreateSandboxOpts {
  */
 export function createSandbox(opts: CreateSandboxOpts): SandboxPaths {
   const {
-    changeName,
+    featureName,
     projectDir,
-    openspecDir,
+    saifDir,
     projectName,
     sandboxBaseDir,
     gateScript,
@@ -171,7 +177,7 @@ export function createSandbox(opts: CreateSandboxOpts): SandboxPaths {
   } = opts;
   const runId = opts.runId ?? Math.random().toString(36).substring(2, 9);
 
-  const dirName = `${projectName}-${changeName}-${runId}`;
+  const dirName = `${projectName}-${featureName}-${runId}`;
   const sandboxBasePath = `${sandboxBaseDir}/${dirName}`;
   const codePath = join(sandboxBasePath, 'code');
   const gatePath = join(sandboxBasePath, 'gate.sh');
@@ -190,30 +196,32 @@ export function createSandbox(opts: CreateSandboxOpts): SandboxPaths {
 
   // Read the test catalog to discover which tests are hidden.
   const testsJsonPath = join(
-    getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
+    getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName }),
     'tests',
     'tests.json',
   );
   if (!existsSync(testsJsonPath)) {
     throw new Error(
-      `tests.json not found at ${testsJsonPath}. Run 'saif feat design -n ${changeName}' first.`,
+      `tests.json not found at ${testsJsonPath}. Run 'saif feat design -n ${featureName}' first.`,
     );
   }
   const catalog = JSON.parse(readFileSync(testsJsonPath, 'utf8')) as TestCatalog;
 
-  // Remove the hidden/ subdirectory, so the agent cannot see holdout tests
-  // or their metadata (paths, names, descriptions).
-  const inCodeTestsDir = join(
-    getChangeDirAbsolute({ cwd: codePath, openspecDir, changeName }),
-    'tests',
-  );
-  const inCodeHiddenDir = join(inCodeTestsDir, 'hidden');
-  if (existsSync(inCodeHiddenDir)) {
-    execSync(`rm -rf "${inCodeHiddenDir}"`);
-    console.log(`[sandbox] Removed hidden/ from code copy (agent cannot see holdout tests)`);
+  // Remove ALL hidden/ dirs from saif/features so the agent
+  // cannot see holdout tests from any feature (current or others).
+  const saifBase = join(codePath, saifDir);
+  const featuresHidden = removeAllHiddenDirs(join(saifBase, 'features'));
+  if (featuresHidden > 0) {
+    console.log(
+      `[sandbox] Removed ${featuresHidden} hidden/ dir(s) from code copy (agent cannot see holdout tests)`,
+    );
   }
 
-  // Overwrite tests.json to contain only public tests for the same reason.
+  // Overwrite the current feature's tests.json to contain only public tests.
+  const inCodeTestsDir = join(
+    getFeatureDirAbsolute({ cwd: codePath, saifDir, featureName }),
+    'tests',
+  );
   const publicCatalog: TestCatalog = {
     ...catalog,
     testCases: catalog.testCases.filter((tc) => tc.visibility === 'public'),
@@ -300,7 +308,7 @@ export type PatchExcludeRule =
 export interface ExtractPatchOpts {
   /**
    * File sections whose path matches any rule are stripped from the patch.
-   * Paths are relative to the repo root (e.g. "openspec/changes/foo/tests/tests.json").
+   * Paths are relative to the repo root (e.g. "saif/features/foo/tests/tests.json").
    * Glob patterns are matched with minimatch; regex patterns are tested directly.
    */
   exclude?: PatchExcludeRule[];

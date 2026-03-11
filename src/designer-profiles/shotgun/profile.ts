@@ -15,8 +15,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getChangeDirAbsolute, getChangeDirRelative } from '../../constants.js';
 import { runShotgunCli } from '../../indexer-profiles/shotgun/shotgun.js';
+import { getFeatureDirAbsolute, getFeatureDirRelative } from '../../specs/discover.js';
 import type { DesignerBaseOpts, DesignerProfile, DesignerRunOpts } from '../types.js';
 
 const REQUIRED_FILES = ['plan.md', 'research.md', 'specification.md', 'tasks.md'] as const;
@@ -26,16 +26,16 @@ export const shotgunDesignerProfile: DesignerProfile = {
   displayName: 'Shotgun',
 
   // We assume that shotgun designer has run when the required files are present.
-  hasRun({ cwd, featName, openspecDir }: DesignerBaseOpts): boolean {
-    const changeDir = getChangeDirAbsolute({ cwd, openspecDir, changeName: featName });
-    return REQUIRED_FILES.every((f) => existsSync(join(changeDir, f)));
+  hasRun({ cwd, featName, saifDir }: DesignerBaseOpts): boolean {
+    const featureDir = getFeatureDirAbsolute({ cwd, saifDir, featureName: featName });
+    return REQUIRED_FILES.every((f) => existsSync(join(featureDir, f)));
   },
 
   // Calls shotgun-sh to generate the spec files.
-  run({ cwd, featName, openspecDir, model, prompt }: DesignerRunOpts): void {
-    const specDir = getChangeDirRelative({ openspecDir, changeName: featName });
+  run({ cwd, featName, saifDir, model, prompt }: DesignerRunOpts): void {
+    const specDir = getFeatureDirRelative({ cwd, saifDir, featureName: featName });
     const proposalPath = join(
-      getChangeDirAbsolute({ cwd, openspecDir, changeName: featName }),
+      getFeatureDirAbsolute({ cwd, saifDir, featureName: featName }),
       'proposal.md',
     );
 
@@ -43,7 +43,7 @@ export const shotgunDesignerProfile: DesignerProfile = {
       prompt ??
       (existsSync(proposalPath)
         ? `Based on the following proposal, run the full research, specify, plan, and tasks flow:\n\n${readFileSync(proposalPath, 'utf8')}`
-        : 'Run the full research, specify, plan, and tasks flow for this change.');
+        : 'Run the full research, specify, plan, and tasks flow for this feature.');
 
     const runArgs = ['-n', proposalPrompt];
     if (model?.trim()) runArgs.splice(0, 0, '--model', model.trim());

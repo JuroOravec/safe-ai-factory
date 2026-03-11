@@ -2,7 +2,7 @@
  * Unit tests for generatePRSummary (pr-summarizer.ts).
  *
  * Verifies:
- *   - The agent is called with a prompt containing changeName, spec, proposal, tasks, and diff.
+ *   - The agent is called with a prompt containing featureName, spec, proposal, tasks, and diff.
  *   - The structured output (title + body) is returned correctly.
  *   - Missing spec files are handled gracefully (omitted from prompt, no crash).
  *   - Large diffs are truncated to file-header-only summary.
@@ -29,6 +29,14 @@ const mockFs = vi.hoisted(() => ({
 }));
 vi.mock('node:fs', () => mockFs);
 
+// Mock discover so getFeatureDirAbsolute resolves without requiring real saif/features/ on disk.
+vi.mock('../../specs/discover.js', () => ({
+  getFeatureDirAbsolute: vi.fn(
+    (opts: { cwd: string; saifDir: string; featureName: string }) =>
+      `${opts.cwd}/${opts.saifDir}/features/${opts.featureName}`,
+  ),
+}));
+
 function makeSummary(title: string, body: string): PRSummary {
   return { title, body };
 }
@@ -44,8 +52,8 @@ describe('generatePRSummary', () => {
   });
 
   const baseOpts = {
-    changeName: 'greet-cmd',
-    openspecDir: 'openspec',
+    featureName: 'greet-cmd',
+    saifDir: 'saif',
     projectDir: '/repo',
     patchFile: '/sandbox/patch.diff',
     overrides: { model: 'openai/gpt-4o' as const },
@@ -81,7 +89,7 @@ describe('generatePRSummary', () => {
     expect(options).toHaveProperty('structuredOutput.schema');
   });
 
-  it('includes changeName and diff content in the prompt', async () => {
+  it('includes featureName and diff content in the prompt', async () => {
     mockFs.existsSync.mockImplementation((p: unknown) => p === baseOpts.patchFile);
     mockFs.readFileSync.mockImplementation((p: unknown) => {
       if (p === baseOpts.patchFile) return 'diff --git a/foo.ts b/foo.ts\n+const x = 1;';

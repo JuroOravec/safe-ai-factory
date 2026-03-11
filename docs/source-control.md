@@ -160,7 +160,7 @@ Push and PR happen at the end of a successful run. If the agent hits `--max-runs
 
 ## Branch and Base
 
-- **Feature branch:** Automatically created from your change name (e.g. `feat/my-feature-abc123`).
+- **Feature branch:** Automatically created from your feature name (e.g. `feat/my-feature-abc123`).
 - **Base branch:** The branch you had checked out when the command started. The PR targets that branch.
 
 ---
@@ -203,4 +203,3 @@ saif feat run --push myorg/myproject/myrepo --pr --git-provider azure
 
 - [commands](commands/README.md) — Commands.
 - [env-vars.md](env-vars.md) — Env vars.
-- [swf-git-provider.md](../openspec/specs/software-factory/swf-git-provider.md) — Provider implementation details and custom providers.

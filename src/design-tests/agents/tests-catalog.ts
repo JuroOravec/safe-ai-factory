@@ -56,7 +56,7 @@ export function createTestsCatalogAgent(indexerTool?: Tool, overrides: ModelOver
 
 /** Options for running the catalog agent. */
 export interface RunCatalogAgentOpts {
-  changeName: string;
+  featureName: string;
   specDir: string;
   specFiles: Record<string, string>;
   testPlan: string;
@@ -77,7 +77,7 @@ export interface RunCatalogAgentOpts {
  */
 export async function runCatalogAgent(opts: RunCatalogAgentOpts) {
   const {
-    changeName,
+    featureName,
     specDir,
     specFiles,
     testPlan,
@@ -111,7 +111,7 @@ Example entrypoints: "${examplePublic}", "${exampleHidden}"`;
 Output a single JSON object (no markdown fences). Shape:
 {
   "version": "1.0",
-  "changeName": "<feature>",
+  "featureName": "<feature>",
   "specDir": "<path>",
   "containers": { "staging": { "sidecarPort": 8080, "sidecarPath": "/exec" }, "additional": [] },
   "testCases": [
@@ -129,7 +129,7 @@ Output a single JSON object (no markdown fences). Shape:
 
 IMPORTANT: Every test case MUST have an "entrypoint" field following the naming rule above. Group logically related tests into the same file.`;
 
-  const prompt = `Feature: ${changeName}
+  const prompt = `Feature: ${featureName}
 Spec directory: ${specDir}
 ${testProfileSection}
 

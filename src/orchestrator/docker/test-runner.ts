@@ -81,7 +81,7 @@ export interface StartTestRunnerContainerOpts {
    * container exits (see FACTORY_OUTPUT_FILE for the filename inside the container).
    */
   reportDir: string;
-  changeName: string;
+  featureName: string;
   /**
    * Project name (from package.json "name" or --project flag).
    * Embedded in the test runner container name so `docker clear` can scope
@@ -125,7 +125,7 @@ export interface StartTestRunnerContainerOpts {
  * Environment variables passed to the container:
  *   FACTORY_TARGET_URL   — URL of the application under test
  *   FACTORY_SIDECAR_URL  — URL of the HTTP sidecar (CLI exec wrapper)
- *   FACTORY_CHANGE_NAME  — OpenSpec change name
+ *   FACTORY_FEATURE_NAME — Saif feature name
  *   FACTORY_TESTS_DIR    — absolute path to the mounted tests directory inside the container
  *   FACTORY_OUTPUT_FILE  — absolute path where the container must write the JUnit XML report
  */
@@ -135,7 +135,7 @@ export async function startTestRunnerContainer(
   const {
     testsDir: hostTestsDir,
     reportDir,
-    changeName,
+    featureName,
     projectName,
     onStarted,
     catalog,
@@ -204,7 +204,7 @@ export async function startTestRunnerContainer(
     Env: [
       `FACTORY_TARGET_URL=${targetUrl}`,
       `FACTORY_SIDECAR_URL=${sidecarUrl}`,
-      `FACTORY_CHANGE_NAME=${changeName}`,
+      `FACTORY_FEATURE_NAME=${featureName}`,
       `FACTORY_TESTS_DIR=${containerTestsDir}`,
       `FACTORY_OUTPUT_FILE=${containerOutputFile}`,
     ],
@@ -282,7 +282,7 @@ export interface RunTeststWithContainersOpts {
   sandboxProfileId: SupportedSandboxProfileId;
   codePath: string;
   projectDir: string;
-  changeName: string;
+  featureName: string;
   projectName: string;
   catalog: TestCatalog;
   testRunnerOpts: Pick<StartTestRunnerContainerOpts, 'testsDir' | 'reportDir' | 'testScriptPath'>;
@@ -306,7 +306,7 @@ export async function runTeststWithContainers({
   sandboxProfileId,
   codePath,
   projectDir,
-  changeName,
+  featureName,
   projectName,
   catalog,
   testRunnerOpts,
@@ -321,12 +321,12 @@ export async function runTeststWithContainers({
   let networkName = '';
 
   try {
-    const net = await createSandboxNetwork({ projectName, changeName, runId });
+    const net = await createSandboxNetwork({ projectName, featureName, runId });
     networkName = net.networkName;
     registry.registerNetwork(networkName);
 
     // Pre-register before the build starts so SIGINT during docker build still cleans up.
-    const stagingImageTag = getStagingImageTag(catalog, { projectName, changeName, runId });
+    const stagingImageTag = getStagingImageTag(catalog, { projectName, featureName, runId });
     if (stagingImageTag) registry.registerImage(stagingImageTag);
 
     const { testRunnerHandle, all } = await startContainers({
@@ -334,7 +334,7 @@ export async function runTeststWithContainers({
         sandboxProfileId,
         codePath,
         projectDir,
-        changeName,
+        featureName,
         projectName,
         catalog,
         networkName,
@@ -342,7 +342,7 @@ export async function runTeststWithContainers({
         startupPath,
         stagePath,
       },
-      testRunner: { ...testRunnerOpts, changeName, projectName, catalog, networkName, runId },
+      testRunner: { ...testRunnerOpts, featureName, projectName, catalog, networkName, runId },
       registry,
       testImage,
     });
@@ -354,7 +354,7 @@ export async function runTeststWithContainers({
     registry.deregisterContainers(containers);
     await removeNetwork(networkName);
     registry.deregisterNetwork(networkName);
-    const stagingImageTag = getStagingImageTag(catalog, { projectName, changeName, runId });
+    const stagingImageTag = getStagingImageTag(catalog, { projectName, featureName, runId });
     if (stagingImageTag) {
       await removeImageByTag({ imageTag: stagingImageTag, missingOk: true });
       registry.deregisterImage(stagingImageTag);

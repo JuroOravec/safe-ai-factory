@@ -9,7 +9,7 @@
 #
 #   FACTORY_TARGET_URL    URL of the application under test (web server or sidecar).
 #   FACTORY_SIDECAR_URL   URL of the HTTP sidecar that wraps CLI command execution.
-#   FACTORY_CHANGE_NAME   Name of the OpenSpec change being tested.
+#   FACTORY_FEATURE_NAME  Name of the Saif feature being tested.
 #   FACTORY_TESTS_DIR     Absolute path inside the container where test files are mounted.
 #                         Default: /tests
 #                         Subdirectories:
@@ -29,7 +29,7 @@ set -e
 
 echo "[test-runner] FACTORY_TARGET_URL:   ${FACTORY_TARGET_URL}"
 echo "[test-runner] FACTORY_SIDECAR_URL:  ${FACTORY_SIDECAR_URL}"
-echo "[test-runner] FACTORY_CHANGE_NAME:  ${FACTORY_CHANGE_NAME}"
+echo "[test-runner] FACTORY_FEATURE_NAME: ${FACTORY_FEATURE_NAME}"
 echo "[test-runner] FACTORY_TESTS_DIR:    ${FACTORY_TESTS_DIR}"
 echo "[test-runner] FACTORY_OUTPUT_FILE:  ${FACTORY_OUTPUT_FILE}"
 

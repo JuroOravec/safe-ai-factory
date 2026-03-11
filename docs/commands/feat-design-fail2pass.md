@@ -22,7 +22,7 @@ saif feature design-fail2pass [options]
 | Argument             | Alias | Type   | Description                                                                                     |
 | -------------------- | ----- | ------ | ----------------------------------------------------------------------------------------------- |
 | `--name`             | `-n`  | string | Feature name (kebab-case). Prompts with a list if omitted.                                      |
-| `--openspec-dir`     | —     | string | Path to openspec directory (default: `openspec`)                                                |
+| `--saif-dir`         | —     | string | Path to saif directory (default: `saif`)                                                        |
 | `--project-dir`      | —     | string | Project directory (default: current working directory)                                          |
 | `--project`          | `-p`  | string | Project name override (default: package.json "name")                                            |
 | `--sandbox-base-dir` | —     | string | Base directory for sandbox entries (default: `/tmp/factory-sandbox`)                            |
@@ -74,4 +74,4 @@ If all tests pass, the command exits with an error. Either the feature is alread
 - [feat run](feat-run.md) — Implement specs with the agent loop (run after design)
 - [feat design-specs](feat-design-specs.md) — Spec gen only (first step)
 - [feat design-tests](feat-design-tests.md) — Generate tests from specs (second step)
-- [feat new](feat-new.md) — Create a new change
+- [feat new](feat-new.md) — Create a new feature

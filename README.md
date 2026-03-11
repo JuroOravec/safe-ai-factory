@@ -48,7 +48,7 @@ pnpm install
 ## Usage
 
 ```bash
-# 0. One-time setup (OpenSpec + Shotgun + codebase index)
+# 0. One-time setup (Shotgun + codebase index)
 saif init
 
 # 1. Scaffold proposal.md and edit it
@@ -59,11 +59,9 @@ saif feat design
 
 # 3. Run coding agent in sandbox until tests pass
 saif feat run
-# Prefer Aider?
-# saif feat run --agent aider
 
-# 5. Mark this change as done and create a PR
-pnpm agents feat:finish --push origin --pr
+# Or run with different agent and create a PR when done.
+saif feat run --agent aider --push origin --pr
 ```
 
 ## Prerequisites
@@ -181,14 +179,14 @@ flowchart LR
         direction TB
         E[5. Coder agent iterates until tests pass]
         F[6. Black box testing]
-        G[7. PR + archive]
+        G[7. PR]
         E --> F --> G
     end
     style Prepare fill:none,stroke:none
     style Exec fill:none,stroke:none
 ```
 
-Full design: [openspec/specs/software-factory/](openspec/specs/software-factory/).
+Full design: [docs/development/v0/](docs/development/v0/).
 
 ## Usage in depth
 
@@ -332,7 +330,7 @@ _NOTE: Currently Shotgun is the only supported option. If you want to add your t
 
 ## Access control with Cedar
 
-By default the factory restricts the agent's filesystem access using a [Cedar](https://www.cedarpolicy.com/) policy enforced by [Leash](https://github.com/strongdm/leash). The agent can read and write anywhere in the workspace — except `openspec/` (reward-hacking prevention) and `.git/` (sandbox-escape prevention).
+By default the factory restricts the agent's filesystem access using a [Cedar](https://www.cedarpolicy.com/) policy enforced by [Leash](https://github.com/strongdm/leash). The agent can read and write anywhere in the workspace — except `saif/` (reward-hacking prevention) and `.git/` (sandbox-escape prevention).
 
 Override with `--cedar` to supply your own policy:
 

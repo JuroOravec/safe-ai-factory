@@ -38,7 +38,7 @@ saif feature design [options]
 | `--base-url`         | —     | string  | LLM base URL override for all agents (e.g. `http://localhost:11434/v1` for Ollama).                                                         |
 | `--agent-model`      | —     | string  | Per-agent model override. Format: `<agent>=<provider/model>`. Can be repeated. See [models.md](../models.md) for agent names.               |
 | `--agent-base-url`   | —     | string  | Per-agent base URL override. Format: `<agent>=<url>`. Can be repeated.                                                                      |
-| `--openspec-dir`     | —     | string  | Path to openspec directory (default: `openspec`)                                                                                            |
+| `--saif-dir`         | —     | string  | Path to saif directory (default: `saif`)                                                                                                    |
 | `--project-dir`      | —     | string  | Project directory (default: current working directory)                                                                                      |
 | `--project`          | `-p`  | string  | Project name override for the indexer (default: package.json "name")                                                                        |
 | `--test-profile`     | —     | string  | Test profile id (default: node-vitest)                                                                                                      |
@@ -52,7 +52,7 @@ saif feature design [options]
 
 ## Examples
 
-Design a feature (prompts for name if multiple changes exist):
+Design a feature (prompts for name if multiple features exist):
 
 ```bash
 saif feat design
@@ -106,7 +106,7 @@ saif feat design-fail2pass --test-profile go-gotest
 
 ## What it does
 
-1. Runs `feat design-specs`: Runs Shotgun to enrich the specs in `openspec/changes/<name>/`.
+1. Runs `feat design-specs`: Runs Shotgun to enrich the specs in `saif/features/<name>/`.
 2. Runs `feat design-tests`: reads the specs and generates a test plan (`tests.md`) and catalog (`tests.json`), then implements the tests (e.g. `*.spec.ts`).
 3. Runs `feat design-fail2pass`: verifies at least one feature test fails on the current codebase (Docker required).
 
@@ -119,7 +119,7 @@ To run only spec + test generation without Docker, use `feat design-specs` and `
 - [feat design-specs](feat-design-specs.md) — Spec gen only (first step; use when going step by step)
 - [feat design-tests](feat-design-tests.md) — Generate tests from existing specs (second step of design workflow)
 - [feat design-fail2pass](feat-design-fail2pass.md) — Verify tests only (third step)
-- [feat new](feat-new.md) — Create a new change
+- [feat new](feat-new.md) — Create a new feature
 - [Designers](../designers/README.md)
 - [Indexer](../indexer/README.md)
 - [Test profiles](../test-profiles.md)

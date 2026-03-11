@@ -95,7 +95,7 @@ The factory ships `src/orchestrator/leash-policy.cedar`. This is default policy 
 //
 // Security model:
 //   - Filesystem writes are restricted to /workspace (the mounted sandbox copy).
-//   - Writes to /workspace/openspec/ are explicitly DENIED — belt-and-suspenders
+//   - Writes to /workspace/saif/ are explicitly DENIED — belt-and-suspenders
 //     on top of the patch filter in sandbox.ts (reward-hacking prevention).
 //   - Network is unrestricted. The agent needs to reach LLM APIs, npm/PyPI
 //     registries, GitHub, and arbitrary CDNs during normal operation. The
@@ -115,11 +115,11 @@ permit (
     resource in Directory::"/workspace"
 );
 
-// … except the openspec directory (reward-hacking prevention).
+// … except the saif directory (reward-hacking prevention).
 forbid (
     principal,
     action == Action::"WriteFile",
-    resource in Directory::"/workspace/openspec"
+    resource in Directory::"/workspace/saif"
 );
 
 // … and except the .git directory (sandbox-escape prevention).
@@ -137,7 +137,7 @@ permit (
 );
 ```
 
-**Why openspec writes are forbidden:** The agent must never modify specs or tests — that's reward hacking. The `openspec/` directory contains the test suite and spec files. The Cedar `forbid` is a second layer on top of the patch filter in `sandbox.ts`.
+**Why saif writes are forbidden:** The agent must never modify specs or tests — that's reward hacking. The `saif/` directory contains the test suite and spec files. The Cedar `forbid` is a second layer on top of the patch filter in `sandbox.ts`.
 
 **Why `.git` writes are forbidden:** If the agent rewrites `.git/config` (e.g. `core.fsmonitor`, `diff.external`), those hooks run on the host when the orchestrator calls `git add` / `git diff` to extract the patch — giving the agent arbitrary command execution outside the Leash container.
 

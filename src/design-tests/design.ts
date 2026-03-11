@@ -4,7 +4,7 @@
  * Step 1a: Planner agent reads spec files → produces tests.md (Markdown CoT)
  * Step 1b: Catalog agent reads tests.md + spec files → produces tests.json
  *
- * Outputs are written to openspec/changes/<changeName>/tests/
+ * Outputs are written to saif/features/<featureName>/tests/
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -12,9 +12,9 @@ import { join } from 'node:path';
 
 import type { Tool } from '@mastra/core/tools';
 
-import { getChangeDirAbsolute, getChangeDirRelative } from '../constants.js';
 import type { IndexerProfile } from '../indexer-profiles/index.js';
 import { type ModelOverrides } from '../llm-config.js';
+import { getFeatureDirAbsolute, getFeatureDirRelative } from '../specs/discover.js';
 import { type TestProfile } from '../test-profiles/index.js';
 import { type DrainableChunk, drainFullStream } from '../utils/drain-stream.js';
 import { runCatalogAgent } from './agents/tests-catalog.js';
@@ -22,12 +22,12 @@ import { buildPlannerPrompt, createTestsPlannerAgent } from './agents/tests-plan
 import type { TestCatalog } from './schema.js';
 
 export interface RunTestsDesignOpts {
-  /** Feature/change name — matches <openspecDir>/changes/<changeName>/ */
-  changeName: string;
+  /** Feature name — matches <saifDir>/features/<featureName>/ */
+  featureName: string;
   /** Absolute path to the project directory */
   projectDir: string;
-  /** Openspec directory name relative to repo root (e.g. 'openspec'). Resolved by caller. */
-  openspecDir: string;
+  /** Saif directory name relative to repo root (e.g. 'saif'). Resolved by caller. */
+  saifDir: string;
   /** Optional extra instruction for refinement (e.g. --prompt "Add holdout tests for DB") */
   extraPrompt?: string;
   /**
@@ -59,7 +59,7 @@ export interface RunTestsDesignResult {
 }
 
 /**
- * Reads all spec files from the change directory (recursively, text files only).
+ * Reads all spec files from the feature directory (recursively, text files only).
  * Returns a map of relative path → file content.
  */
 function readSpecFiles(specDir: string): Record<string, string> {
@@ -121,14 +121,14 @@ function guardIndexerTool(raw: unknown, indexerProfile: IndexerProfile): asserts
  * Runs the full two-step tests design pipeline for a feature.
  *
  * Produces:
- *   openspec/changes/<changeName>/tests/tests.md
- *   openspec/changes/<changeName>/tests/tests.json
+ *   saif/features/<featureName>/tests/tests.md
+ *   saif/features/<featureName>/tests/tests.json
  */
 export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTestsDesignResult> {
   const {
-    changeName,
+    featureName,
     projectDir,
-    openspecDir,
+    saifDir,
     extraPrompt,
     indexerProfile,
     projectName,
@@ -149,17 +149,21 @@ export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTests
     indexerTool = undefined;
   }
 
-  const changeDir = getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName });
-  const testsDir = join(changeDir, 'tests');
-  const specDirRelative = getChangeDirRelative({ openspecDir, changeName });
+  const featureDir = getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName });
+  const testsDir = join(featureDir, 'tests');
+  const specDirRelative = getFeatureDirRelative({
+    cwd: projectDir,
+    saifDir,
+    featureName,
+  });
 
-  console.log(`[design-tests:plan] Reading spec files from ${changeDir}`);
-  const specFiles = readSpecFiles(changeDir);
+  console.log(`[design-tests:plan] Reading spec files from ${featureDir}`);
+  const specFiles = readSpecFiles(featureDir);
 
   if (Object.keys(specFiles).length === 0) {
     throw new Error(
-      `No spec files found in ${changeDir}. ` +
-        `Run 'pnpm shotgun' first or ensure the change directory exists.`,
+      `No spec files found in ${featureDir}. ` +
+        `Run 'pnpm shotgun' first or ensure the feature directory exists.`,
     );
   }
 
@@ -213,7 +217,7 @@ export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTests
   try {
     // Step 1b: Catalog agent → structured JSON catalog
     catalog = await runCatalogAgent({
-      changeName,
+      featureName,
       specDir: specDirRelative,
       specFiles,
       testPlan,

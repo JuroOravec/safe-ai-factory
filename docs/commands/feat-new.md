@@ -2,7 +2,7 @@
 
 Create scaffolding for a new feature.
 
-Creates an OpenSpec change directory (e.g. `openspec/changes/add-login/`) and optionally writes a `proposal.md` with your description.
+Creates an feature directory (e.g. `saif/features/add-login/`) and optionally writes a `proposal.md` with your description.
 
 Use this as the first step in the feature workflow before running [feat design](feat-design.md), [feat run](feat-run.md), etc.
 
@@ -22,7 +22,7 @@ saif feature new [options]
 | `--name`         | `-n`  | string  | Feature name (kebab-case, e.g. add-greeting-cmd). When omitted, prompts interactively.          |
 | `--desc`         | `-d`  | string  | Brief description. When omitted, prompts interactively.                                         |
 | `--yes`          | `-y`  | boolean | Non-interactive mode. Requires `--name`/`-n`. Skips all prompts; description defaults to empty. |
-| `--openspec-dir` | —     | string  | Path to openspec directory (default: `openspec`)                                                |
+| `--saif-dir` | —     | string  | Path to saif directory (default: `saif`)                                                |
 | `--project-dir`  | —     | string  | Project directory (default: current working directory)                                          |
 
 ## Examples
@@ -52,10 +52,10 @@ saif feat new -y -n add-login
 saif feat new -y -n add-login -d "Add login endpoint"
 ```
 
-Custom openspec directory:
+Custom saif directory:
 
 ```bash
-saif feat new --openspec-dir ./my-openspec
+saif feat new --saif-dir ./my-saif
 ```
 
 Custom project directory (e.g. when running from a parent monorepo):
@@ -66,9 +66,8 @@ saif feat new --project-dir ./packages/my-app
 
 ## What it does
 
-1. Runs `pnpm openspec new change` to create the change directory.
-2. Creates `proposal.md` in the change dir with given name / description
+1. Creates `proposal.md` in the feature dir with given name / description
 
 ## Next steps
 
-After creating a change, run [feat design](feat-design.md) to generate the specs and tests, then [feat run](feat-run.md) to implement. See [Commands](README.md) for the full workflow.
+After creating a feature, run [feat design](feat-design.md) to generate the specs and tests, then [feat run](feat-run.md) to implement. See [Commands](README.md) for the full workflow.

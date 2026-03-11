@@ -13,9 +13,8 @@
  *   Alias: saif feature
  */
 
-import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import { cancel, confirm, intro, isCancel, outro, text } from '@clack/prompts';
 import { defineCommand, runMain } from 'citty';
@@ -25,23 +24,23 @@ import {
   resolveAgentScriptPath,
   resolveAgentStartScriptPath,
 } from '../../agent-profiles/index.js';
-import { getChangeDirAbsolute, getChangeDirRelative } from '../../constants.js';
 import { runDesignTests } from '../../design-tests/design.js';
 import { generateTests } from '../../design-tests/write.js';
 import { DEFAULT_DESIGNER_PROFILE } from '../../designer-profiles/index.js';
 import type { ModelOverrides } from '../../llm-config.js';
 import { runDebug, runFail2Pass, runStart } from '../../orchestrator/modes.js';
 import { readSandboxGateScript } from '../../sandbox-profiles/index.js';
+import { getFeatureDirRelative } from '../../specs/discover.js';
 import {
   featRunArgs,
   featTestsArgs,
   indexerArg,
   modelOverrideArgs,
   nameArg,
-  openspecDirArg,
   profileArg,
   projectArg,
   projectDirArg,
+  saifDirArg,
   sandboxBaseDirArg,
   stageScriptArg,
   startupScriptArg,
@@ -67,12 +66,12 @@ import {
   parseIndexerProfile,
   parseMaxRuns,
   parseModelOverrides,
-  parseOpenspecDir,
   parsePr,
   parseProjectDir,
   parsePush,
   parseResolveAmbiguity,
   parseRunStorage,
+  parseSaifDir,
   parseSandboxBaseDir,
   parseSandboxProfile,
   parseStageScript,
@@ -121,7 +120,7 @@ const newCommand = defineCommand({
       description: 'Feature name (kebab-case, e.g. add-greeting-cmd)',
     },
     yes: yesArg,
-    'openspec-dir': openspecDirArg,
+    'saif-dir': saifDirArg,
     'project-dir': projectDirArg,
     desc: {
       type: 'string',
@@ -143,7 +142,7 @@ const newCommand = defineCommand({
     if (nonInteractive) {
       featName = namePreFill!;
     } else {
-      intro('New feature change');
+      intro('New feature');
       const nameResult = await text({
         message: 'Feature name (kebab-case, e.g. add-greeting-cmd)',
         initialValue: namePreFill,
@@ -178,19 +177,18 @@ const newCommand = defineCommand({
       description = typeof descResult === 'string' ? descResult.trim() : undefined;
     }
 
-    if (!nonInteractive) outro('Creating change…');
+    if (!nonInteractive) outro('Creating feature…');
 
-    const openspecDir = parseOpenspecDir(args);
-
-    execSync(`npx openspec new change ${featName}`, { stdio: 'inherit', cwd: projectDir });
-    const changeDir = getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName: featName });
+    const saifDir = parseSaifDir(args);
+    const featureDir = join(projectDir, saifDir, 'features', featName);
+    mkdirSync(featureDir, { recursive: true });
     if (description) {
-      const proposalPath = resolve(changeDir, 'proposal.md');
+      const proposalPath = resolve(featureDir, 'proposal.md');
       writeFileSync(proposalPath, `## What Changes\n\n${description}\n`, 'utf8');
-      console.log(`\nCreated: ${changeDir}`);
+      console.log(`\nCreated: ${featureDir}`);
       console.log(`  proposal.md: ${description}`);
     } else {
-      console.log(`\nCreated: ${changeDir}`);
+      console.log(`\nCreated: ${featureDir}`);
     }
   },
 });
@@ -208,7 +206,7 @@ const designSpecsArgs = {
   },
   ...modelOverrideArgs,
   designer: designerArg,
-  'openspec-dir': openspecDirArg,
+  'saif-dir': saifDirArg,
   'project-dir': projectDirArg,
 };
 
@@ -221,7 +219,7 @@ async function _runDesignSpecs(args: {
   'agent-model'?: string | string[];
   'agent-base-url'?: string | string[];
   designer?: string;
-  'openspec-dir'?: string;
+  'saif-dir'?: string;
   'project-dir'?: string;
   [key: string]: unknown;
 }) {
@@ -233,11 +231,11 @@ async function _runDesignSpecs(args: {
     process.exit(1);
   }
   const featName = await getFeatNameOrPrompt(args, projectDir);
-  const openspecDir = parseOpenspecDir(args);
+  const saifDir = parseSaifDir(args);
   const designerProfile = parseDesignerProfile(args);
 
-  const specDir = getChangeDirRelative({ openspecDir, changeName: featName });
-  const designerBaseOpts = { cwd: projectDir, featName, openspecDir };
+  const specDir = getFeatureDirRelative({ cwd: projectDir, saifDir, featureName: featName });
+  const designerBaseOpts = { cwd: projectDir, featName, saifDir };
 
   // 1. Generate full specs and plan from user's proposal.
   // 1a. Check if the designer has already run
@@ -272,7 +270,7 @@ async function _runDesignSpecs(args: {
   }
 
   const overrides = parseModelOverrides(args);
-  return { featName, projectDir, openspecDir, overrides };
+  return { featName, projectDir, saifDir, overrides };
 }
 
 const designSpecsCommand = defineCommand({
@@ -289,7 +287,7 @@ const designSpecsCommand = defineCommand({
 
 const designTestsArgs = {
   name: nameArg,
-  'openspec-dir': openspecDirArg,
+  'saif-dir': saifDirArg,
   'project-dir': projectDirArg,
   'test-profile': testProfileArg,
   indexer: indexerArg,
@@ -309,7 +307,7 @@ const designTestsArgs = {
 interface DesignTestsOptions {
   featName: string;
   projectDir: string;
-  openspecDir: string;
+  saifDir: string;
   skipCatalog: boolean;
   force: boolean;
   overrides: ModelOverrides;
@@ -324,7 +322,7 @@ interface DesignTestsOptions {
 async function _runDesignTests({
   featName,
   projectDir,
-  openspecDir,
+  saifDir,
   skipCatalog,
   force,
   overrides,
@@ -341,9 +339,9 @@ async function _runDesignTests({
       console.log(`  Indexer: ${indexerProfile.displayName} (project: ${projectName})`);
     }
     const designResult = await runDesignTests({
-      changeName: featName,
+      featureName: featName,
       projectDir,
-      openspecDir,
+      saifDir,
       testProfile,
       indexerProfile,
       projectName,
@@ -358,9 +356,9 @@ async function _runDesignTests({
   // 2b. Write actual tests from the test plan.
   console.log(`\nGenerating spec files from catalog...`);
   const implResult = await generateTests({
-    changeName: featName,
+    featureName: featName,
     projectDir,
-    openspecDir,
+    saifDir,
     force,
     testProfile,
     overrides,
@@ -395,7 +393,7 @@ const designTestsCommand = defineCommand({
   async run({ args }) {
     const projectDir = parseProjectDir(args);
     const featName = await getFeatNameOrPrompt(args, projectDir);
-    const openspecDir = parseOpenspecDir(args);
+    const saifDir = parseSaifDir(args);
     const overrides = parseModelOverrides(args);
 
     const skipCatalog = args['skip-catalog'] === true;
@@ -403,7 +401,7 @@ const designTestsCommand = defineCommand({
     await _runDesignTests({
       featName,
       projectDir,
-      openspecDir,
+      saifDir,
       skipCatalog,
       force,
       overrides,
@@ -420,7 +418,7 @@ const designTestsCommand = defineCommand({
 
 const designFail2passArgs = {
   name: nameArg,
-  'openspec-dir': openspecDirArg,
+  'saif-dir': saifDirArg,
   'project-dir': projectDirArg,
   project: projectArg,
   'test-profile': testProfileArg,
@@ -436,10 +434,10 @@ type DesignFail2passArgs = OrchestratorArgs & {
 async function _runDesignFail2pass(opts: {
   featName: string;
   projectDir: string;
-  openspecDir: string;
+  saifDir: string;
   args: DesignFail2passArgs;
 }): Promise<void> {
-  const { featName, projectDir, openspecDir, args } = opts;
+  const { featName, projectDir, saifDir, args } = opts;
   const sandboxBaseDir = parseSandboxBaseDir(args);
 
   const projectName = resolveProjectName(args, projectDir);
@@ -459,9 +457,9 @@ async function _runDesignFail2pass(opts: {
   console.log(`\nFail2Pass verification: ${featName}`);
   const result = await runFail2Pass({
     sandboxProfileId: sandboxProfile.id,
-    changeName: featName,
+    featureName: featName,
     projectDir,
-    openspecDir,
+    saifDir,
     sandboxBaseDir,
     projectName,
     testImage,
@@ -487,11 +485,11 @@ const designFail2passCommand = defineCommand({
   async run({ args }) {
     const projectDir = parseProjectDir(args);
     const featName = await getFeatNameOrPrompt(args, projectDir);
-    const openspecDir = parseOpenspecDir(args);
+    const saifDir = parseSaifDir(args);
     await _runDesignFail2pass({
       featName,
       projectDir,
-      openspecDir,
+      saifDir,
       args: args as DesignFail2passArgs,
     });
     console.log('\nDone.');
@@ -513,12 +511,12 @@ const designCommand = defineCommand({
   },
   async run({ args }) {
     // 1. Generate specs
-    const { featName, projectDir, openspecDir, overrides } = await _runDesignSpecs(args);
+    const { featName, projectDir, saifDir, overrides } = await _runDesignSpecs(args);
     // 2. Generate tests
     await _runDesignTests({
       featName,
       projectDir,
-      openspecDir,
+      saifDir,
       skipCatalog: false,
       force: !!args.force,
       overrides,
@@ -528,7 +526,7 @@ const designCommand = defineCommand({
     await _runDesignFail2pass({
       featName,
       projectDir,
-      openspecDir,
+      saifDir,
       args: args as DesignFail2passArgs,
     });
     console.log('\nDone.');
@@ -541,7 +539,7 @@ const designCommand = defineCommand({
 
 const featDebugArgs = {
   name: nameArg,
-  'openspec-dir': openspecDirArg,
+  'saif-dir': saifDirArg,
   'project-dir': projectDirArg,
   project: projectArg,
   'sandbox-base-dir': sandboxBaseDirArg,
@@ -583,7 +581,7 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
 
   const maxRuns = parseMaxRuns(runArgs);
   const overrides = parseModelOverrides(args);
-  const openspecDir = parseOpenspecDir(args);
+  const saifDir = parseSaifDir(args);
   const sandboxBaseDir = parseSandboxBaseDir(args);
   const projectName = resolveProjectName(args, projectDir);
   const testProfile = parseTestProfile(args);
@@ -636,11 +634,11 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
 
   return {
     sandboxProfileId: sandboxProfile.id,
-    changeName: featName,
+    featureName: featName,
     projectDir,
     maxRuns,
     overrides,
-    openspecDir,
+    saifDir,
     sandboxBaseDir,
     projectName,
     testImage,
@@ -681,7 +679,7 @@ const debugCommand = defineCommand({
   async run({ args }) {
     const projectDir = parseProjectDir(args);
     const featName = await getFeatNameOrPrompt(args, projectDir);
-    const openspecDir = parseOpenspecDir(args);
+    const saifDir = parseSaifDir(args);
     const sandboxBaseDir = parseSandboxBaseDir(args);
     const projectName = resolveProjectName(args, projectDir);
     const sandboxProfile = parseSandboxProfile(args);
@@ -703,9 +701,9 @@ const debugCommand = defineCommand({
 
     await runDebug({
       sandboxProfileId: sandboxProfile.id,
-      changeName: featName,
+      featureName: featName,
       projectDir,
-      openspecDir,
+      saifDir,
       sandboxBaseDir,
       projectName,
       startupScript,

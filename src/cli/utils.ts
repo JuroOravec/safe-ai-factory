@@ -2,7 +2,6 @@
  * Shared CLI helpers used across command implementations.
  */
 
-import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -43,6 +42,7 @@ import {
   resolveSandboxProfile,
   type SandboxProfile,
 } from '../sandbox-profiles/index.js';
+import { discoverCurrentFeatures } from '../specs/discover.js';
 import {
   DEFAULT_PROFILE,
   resolveTestProfile,
@@ -163,15 +163,20 @@ export interface OrchestratorArgs {
   'agent-start-script'?: string;
 }
 
+/** Path segment: kebab-case or (group) */
+const FEATURE_PATH_SEGMENT = /(?:[a-z0-9]+(?:-[a-z0-9]+)*|\([a-z0-9]+(?:-[a-z0-9]+)*\))/;
+
 /**
- * Validates that a change/feature name is safe (kebab-case).
- * Exits with an error message if invalid.
+ * Validates that a feature name is safe.
+ * Accepts flat (add-login) or path-based ((auth)/login) IDs.
  */
-export function validateChangeName(name: string): void {
-  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) {
+export function validateFeatureName(name: string): void {
+  const pathRegex = new RegExp(
+    `^${FEATURE_PATH_SEGMENT.source}(?:/${FEATURE_PATH_SEGMENT.source})*$`,
+  );
+  if (!pathRegex.test(name)) {
     console.error(
-      `Invalid feature name: "${name}". ` +
-        `Names must be kebab-case (lowercase letters, digits, and hyphens only, e.g. "add-login").`,
+      `Invalid feature name: "${name}". Use kebab-case (add-login) or path (auth)/login.`,
     );
     process.exit(1);
   }
@@ -188,11 +193,11 @@ export function parseProjectDir(args: { 'project-dir'?: string }): string {
 }
 
 /**
- * Resolves the openspec directory from --openspec-dir. Returns 'openspec' when omitted or empty.
+ * Resolves the saif directory from --saif-dir. Returns 'saif' when omitted or empty.
  */
-export function parseOpenspecDir(args: { 'openspec-dir'?: string }): string {
-  const raw = args['openspec-dir'];
-  return typeof raw === 'string' && raw.trim() ? raw.trim() : 'openspec';
+export function parseSaifDir(args: { 'saif-dir'?: string }): string {
+  const raw = args['saif-dir'];
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : 'saif';
 }
 
 /**
@@ -226,41 +231,37 @@ export function resolveProjectName(opts: { project?: string }, projectDir: strin
  */
 export function getFeatNameFromArgs(args: { name?: string }): string | undefined {
   const name = typeof args.name === 'string' ? args.name.trim() : undefined;
-  if (name) validateChangeName(name);
+  if (name) validateFeatureName(name);
   return name || undefined;
 }
 
 /**
- * Resolves feature name from args or prompts the user to select from OpenSpec changes.
- * Exits if no changes exist or user cancels.
+ * Resolves feature name from args or prompts the user to select from features.
+ * Exits if no features exist or user cancels.
+ * Uses our own discovery (supports Next.js-style (group) dirs); no dependency on saif list.
  */
 export async function getFeatNameOrPrompt(
-  args: { name?: string },
+  args: { name?: string; 'saif-dir'?: string },
   projectDir: string,
 ): Promise<string> {
   const fromArgs = getFeatNameFromArgs(args);
   if (fromArgs) return fromArgs;
 
-  const raw = execSync('npx openspec list --json', { encoding: 'utf-8', cwd: projectDir });
-  let changes: { name: string }[];
-  try {
-    const data = JSON.parse(raw) as { changes?: { name: string }[] };
-    changes = data?.changes ?? [];
-  } catch {
-    changes = [];
-  }
+  const saifDir = parseSaifDir(args);
+  const featuresMap = discoverCurrentFeatures(projectDir, saifDir);
+  const features = [...featuresMap.keys()];
 
-  if (changes.length === 0) {
-    console.error('No OpenSpec changes found. Run `saif feat new` first.');
+  if (features.length === 0) {
+    console.error('No features found. Run `saif feat new` first.');
     process.exit(1);
   }
 
-  changes.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  features.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
   intro('Select feature');
   const result = await select({
-    message: 'Feature / change',
-    options: changes.map((c) => ({ value: c.name, label: c.name })),
+    message: 'Feature',
+    options: features.map((f) => ({ value: f, label: f })),
   });
   outro('');
   if (isCancel(result)) {

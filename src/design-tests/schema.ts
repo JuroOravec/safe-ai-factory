@@ -79,7 +79,7 @@ const AdditionalContainerSchema = z.object({
 
 export const TestCatalogSchema = z.object({
   version: z.string().default('1.0'),
-  changeName: z.string().describe('Name of the change/feature (matches openspec/changes/<name>)'),
+  featureName: z.string().describe('Name of the feature (matches saif/features/<name>)'),
   specDir: z.string().describe('Path to spec directory relative to repo root'),
   containers: z.object({
     staging: StagingContainerSchema,

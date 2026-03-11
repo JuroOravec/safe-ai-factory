@@ -2,14 +2,14 @@ import { ensureCreateNetwork } from '../../utils/docker';
 
 export interface CreateNetworkOpts {
   projectName: string;
-  changeName: string;
+  featureName: string;
   runId: string;
 }
 
 /**
  * Creates a dedicated Docker network for isolating a single verification run.
  *
- * Format: factory-net-{projectName}-{changeName}-{runId}
+ * Format: factory-net-{projectName}-{featureName}-{runId}
  * This allows `docker clear` to scope network cleanup by project.
  *
  * How runId is built:
@@ -33,7 +33,7 @@ export interface CreateNetworkOpts {
 export async function createSandboxNetwork(
   opts: CreateNetworkOpts,
 ): Promise<{ networkId: string; networkName: string }> {
-  const { projectName, changeName, runId } = opts;
-  const networkName = `factory-net-${projectName}-${changeName}-${runId}`;
+  const { projectName, featureName, runId } = opts;
+  const networkName = `factory-net-${projectName}-${featureName}-${runId}`;
   return await ensureCreateNetwork(networkName);
 }

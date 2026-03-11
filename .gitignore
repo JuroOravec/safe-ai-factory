@@ -2,12 +2,12 @@ node_modules/
 .venv/
 dist/
 coverage/
+out/
 *.tsbuildinfo
 .pnpm-store/
 
-# Shotgun (codebase index and spec output)
+# Shotgun (codebase index)
 .shotgun/
-.tmp-openspec/
 
 # Cursor
 .cursor/debug.log

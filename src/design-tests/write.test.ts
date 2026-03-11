@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getChangeDirAbsolute } from '../constants.js';
+import { getFeatureDirAbsolute } from '../specs/discover.js';
 import { DEFAULT_PROFILE } from '../test-profiles/index.js';
 import { generateTests } from './write.js';
 
@@ -40,8 +40,8 @@ function makeTempDir(): string {
 function imperativeCatalog(extra: object = {}): string {
   return JSON.stringify({
     version: '1.0',
-    changeName: 'test-change',
-    specDir: 'openspec/changes/test-change',
+    featureName: 'test-feature',
+    specDir: 'saif/features/test-feature',
     containers: {
       staging: { sidecarPort: 8080, sidecarPath: '/exec' },
       additional: [],
@@ -76,24 +76,23 @@ function imperativeCatalog(extra: object = {}): string {
 
 describe('generateTests', () => {
   let projectDir: string;
-  const openspecDir = 'openspec';
-  const changeName = 'test-change';
+  const saifDir = 'saif';
+  const featureName = 'test-feature';
 
   beforeEach(() => {
     projectDir = makeTempDir();
-    const testsDir = join(
-      getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
-      'tests',
-    );
+    const featureDir = join(projectDir, saifDir, 'features', featureName);
+    mkdirSync(featureDir, { recursive: true });
+    const testsDir = join(featureDir, 'tests');
     mkdirSync(testsDir, { recursive: true });
     writeFileSync(join(testsDir, 'tests.json'), imperativeCatalog(), 'utf8');
   });
 
   it('writes helpers.ts', async () => {
     const result = await generateTests({
-      changeName,
+      featureName,
       projectDir,
-      openspecDir,
+      saifDir,
       testProfile: DEFAULT_PROFILE,
     });
     const helpersPath = join(result.testsDir, 'helpers.ts');
@@ -105,9 +104,9 @@ describe('generateTests', () => {
 
   it('writes infra.spec.ts', async () => {
     const result = await generateTests({
-      changeName,
+      featureName,
       projectDir,
-      openspecDir,
+      saifDir,
       testProfile: DEFAULT_PROFILE,
     });
     const infraPath = join(result.testsDir, 'infra.spec.ts');
@@ -118,9 +117,9 @@ describe('generateTests', () => {
 
   it('generates spec files for each unique entrypoint', async () => {
     const result = await generateTests({
-      changeName,
+      featureName,
       projectDir,
-      openspecDir,
+      saifDir,
       testProfile: DEFAULT_PROFILE,
     });
 
@@ -133,9 +132,9 @@ describe('generateTests', () => {
 
   it('reports generated and skipped files', async () => {
     const result = await generateTests({
-      changeName,
+      featureName,
       projectDir,
-      openspecDir,
+      saifDir,
       testProfile: DEFAULT_PROFILE,
     });
     expect(result.generatedFiles).toContain('public/happy.spec.ts');
@@ -145,7 +144,7 @@ describe('generateTests', () => {
 
   it('does not overwrite an existing spec file', async () => {
     const testsDir = join(
-      getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
+      getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName }),
       'tests',
     );
     const existingPath = join(testsDir, 'public', 'happy.spec.ts');
@@ -153,9 +152,9 @@ describe('generateTests', () => {
     writeFileSync(existingPath, '// custom content', 'utf8');
 
     const result = await generateTests({
-      changeName,
+      featureName,
       projectDir,
-      openspecDir,
+      saifDir,
       testProfile: DEFAULT_PROFILE,
     });
 
@@ -166,16 +165,16 @@ describe('generateTests', () => {
 
   it('does not overwrite helpers.ts when it already exists', async () => {
     const testsDir = join(
-      getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
+      getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName }),
       'tests',
     );
     const helpersPath = join(testsDir, 'helpers.ts');
     writeFileSync(helpersPath, '// custom helpers', 'utf8');
 
     await generateTests({
-      changeName,
+      featureName,
       projectDir,
-      openspecDir,
+      saifDir,
       testProfile: DEFAULT_PROFILE,
     });
 
@@ -184,9 +183,9 @@ describe('generateTests', () => {
 
   it('returns correct testCaseCount', async () => {
     const result = await generateTests({
-      changeName,
+      featureName,
       projectDir,
-      openspecDir,
+      saifDir,
       testProfile: DEFAULT_PROFILE,
     });
     expect(result.testCaseCount).toBe(2);
@@ -194,13 +193,13 @@ describe('generateTests', () => {
 
   it('always writes infra.spec.ts (even for web-only containers)', async () => {
     const testsDir = join(
-      getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
+      getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName }),
       'tests',
     );
     const webCatalog = JSON.stringify({
       version: '1.0',
-      changeName,
-      specDir: 'openspec/changes/test-change',
+      featureName,
+      specDir: 'saif/features/test-feature',
       containers: {
         staging: { baseUrl: 'http://staging:3000' },
         additional: [],
@@ -220,9 +219,9 @@ describe('generateTests', () => {
     writeFileSync(join(testsDir, 'tests.json'), webCatalog, 'utf8');
 
     const result = await generateTests({
-      changeName,
+      featureName,
       projectDir,
-      openspecDir,
+      saifDir,
       testProfile: DEFAULT_PROFILE,
     });
     expect(existsSync(join(result.testsDir, 'infra.spec.ts'))).toBe(true);
@@ -236,11 +235,13 @@ describe('generateTests', () => {
 describe('generateTests (error cases)', () => {
   it('throws when tests.json does not exist', async () => {
     const projectDir = makeTempDir();
+    const featureDir = join(projectDir, 'saif', 'features', 'missing');
+    mkdirSync(featureDir, { recursive: true });
     await expect(
       generateTests({
-        changeName: 'missing',
+        featureName: 'missing',
         projectDir,
-        openspecDir: 'openspec',
+        saifDir: 'saif',
         testProfile: DEFAULT_PROFILE,
       }),
     ).rejects.toThrow(/tests.json not found/);
@@ -248,17 +249,16 @@ describe('generateTests (error cases)', () => {
 
   it('throws when tests.json fails schema validation', async () => {
     const projectDir = makeTempDir();
-    const testsDir = join(
-      getChangeDirAbsolute({ cwd: projectDir, openspecDir: 'openspec', changeName: 'bad-change' }),
-      'tests',
-    );
+    const featureDir = join(projectDir, 'saif', 'features', 'bad-feature');
+    mkdirSync(featureDir, { recursive: true });
+    const testsDir = join(featureDir, 'tests');
     mkdirSync(testsDir, { recursive: true });
     writeFileSync(join(testsDir, 'tests.json'), '{"invalid": true}', 'utf8');
     await expect(
       generateTests({
-        changeName: 'bad-change',
+        featureName: 'bad-feature',
         projectDir,
-        openspecDir: 'openspec',
+        saifDir: 'saif',
         testProfile: DEFAULT_PROFILE,
       }),
     ).rejects.toThrow(/schema validation/);

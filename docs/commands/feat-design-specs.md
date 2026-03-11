@@ -4,7 +4,7 @@ Generate specs from a feature's proposal — the first step of `feat design` onl
 
 Runs the designer (e.g. Shotgun) to produce spec files from `proposal.md`. Use this when you want spec generation only, without proceeding to tests generation. The full `feat design` command runs this step first, then continues automatically.
 
-When `--name`/`-n` is omitted, prompts interactively with a list of existing changes.
+When `--name`/`-n` is omitted, prompts interactively with a list of existing features.
 
 ## Usage
 
@@ -25,7 +25,7 @@ saif feature design-specs [options]
 | `--base-url`       | —     | string  | LLM base URL override for all agents (e.g. `http://localhost:11434/v1` for Ollama).                                                         |
 | `--agent-model`    | —     | string  | Per-agent model override. Format: `<agent>=<provider/model>`. Can be repeated. See [models.md](../models.md) for agent names.               |
 | `--agent-base-url` | —     | string  | Per-agent base URL override. Format: `<agent>=<url>`. Can be repeated.                                                                      |
-| `--openspec-dir`   | —     | string  | Path to openspec directory (default: `openspec`)                                                                                            |
+| `--saif-dir`       | —     | string  | Path to saif directory (default: `saif`)                                                                                                    |
 | `--project-dir`    | —     | string  | Project directory (default: current working directory)                                                                                      |
 
 ## Examples
@@ -86,8 +86,8 @@ saif feat design-specs --project-dir ./packages/my-app
 
 ## What it does
 
-1. Checks if the designer has already run for this change; prompts to redo if so (skipped with `--yes`).
-2. Runs the designer (e.g. Shotgun) to research your codebase and produce enriched spec files in `openspec/changes/<name>/`.
+1. Checks if the designer has already run for this feature; prompts to redo if so (skipped with `--yes`).
+2. Runs the designer (e.g. Shotgun) to research your codebase and produce enriched spec files in `saif/features/<name>/`.
 
 ## Next steps
 
@@ -100,5 +100,5 @@ To continue to test planning and scaffolding, run `saif feat design` (which incl
 - [feat design-tests](feat-design-tests.md) — tests planning + test generation only (second step)
 - [feat design-fail2pass](feat-design-fail2pass.md) — Test validation only (third step)
 - [feat run](feat-run.md) — Implement specs with the agent loop (run after design)
-- [feat new](feat-new.md) — Create a new change
+- [feat new](feat-new.md) — Create a new feature
 - [Designers](../designers/README.md)

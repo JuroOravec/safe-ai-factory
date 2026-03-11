@@ -9,7 +9,6 @@ import { join } from 'node:path';
 
 import { isCancel, text } from '@clack/prompts';
 
-import { getChangeDirAbsolute } from '../constants.js';
 import { runDesignTests } from '../design-tests/design.js';
 import { TestCatalogSchema } from '../design-tests/schema.js';
 import { generateTests } from '../design-tests/write.js';
@@ -18,6 +17,7 @@ import type { GitProvider } from '../git/types.js';
 import { type ModelOverrides, resolveAgentLlmConfig } from '../llm-config.js';
 import { runResultsJudge } from '../mastra/agents/results-judge.js';
 import type { SupportedSandboxProfileId } from '../sandbox-profiles/types.js';
+import { getFeatureDirAbsolute } from '../specs/discover.js';
 import type { TestProfile } from '../test-profiles/types.js';
 import type { CleanupRegistry } from '../utils/docker.js';
 import { runAgent } from './agent-runner.js';
@@ -43,7 +43,7 @@ import {
 export interface IterativeLoopOpts {
   /** Sandbox profile id (e.g. 'node-pnpm-python'). Used to resolve Dockerfile.stage for the staging container when tests.json does not specify build.dockerfile. */
   sandboxProfileId: SupportedSandboxProfileId;
-  changeName: string;
+  featureName: string;
   /** Absolute path to the project directory */
   projectDir: string;
   /** Max full pipeline runs before giving up. Default: 5 */
@@ -59,10 +59,10 @@ export interface IterativeLoopOpts {
    */
   overrides: ModelOverrides;
   /**
-   * Openspec directory name relative to repo root (e.g. 'openspec').
-   * Resolved by caller (e.g. agents CLI parseOpenspecDir).
+   * Saif directory name relative to repo root (e.g. 'saif').
+   * Resolved by caller (e.g. agents CLI parseSaifDir).
    */
-  openspecDir: string;
+  saifDir: string;
   /**
    * Project name prefix for sandbox directory names (e.g. 'crawlee-one').
    * Resolved by caller (e.g. agents CLI parseProjectName from -p/--project or package.json).
@@ -167,7 +167,7 @@ export interface IterativeLoopOpts {
   testRetries: number;
   /**
    * Additional file sections to strip from the extracted patch before it is
-   * applied to the host repo. The openspecDir/ glob is always prepended
+   * applied to the host repo. The saifDir/ glob is always prepended
    * automatically — passing rules here adds to that, not replaces it.
    */
   patchExclude?: PatchExcludeRule[];
@@ -198,11 +198,11 @@ export async function runIterativeLoop(
 ): Promise<OrchestratorResult> {
   const {
     sandboxProfileId,
-    changeName,
+    featureName,
     projectDir,
     maxRuns,
     overrides,
-    openspecDir,
+    saifDir,
     projectName,
     registry,
     testImage,
@@ -224,23 +224,23 @@ export async function runIterativeLoop(
   // Resolve the coder agent's LLM config once per loop.
   // The resolved config is injected into the Leash container as LLM_* env vars.
   const coderLlmConfig = resolveAgentLlmConfig('coder', overrides);
-  // Always exclude openspec/ and .git/hooks/ regardless of any additional caller-supplied rules.
-  // openspec/: reward-hacking prevention (agent must not modify its own test specs).
+  // Always exclude saif/ and .git/hooks/ regardless of any additional caller-supplied rules.
+  // saif/: reward-hacking prevention (agent must not modify its own test specs).
   // .git/hooks/: prevents a malicious patch from installing hooks that execute on the host
   //   when the orchestrator runs `git commit` in applyPatchToHost.
-  const openspecExclude: PatchExcludeRule = { type: 'glob', pattern: `${openspecDir}/**` };
+  const saifExclude: PatchExcludeRule = { type: 'glob', pattern: `${saifDir}/**` };
   const gitHooksExclude: PatchExcludeRule = { type: 'glob', pattern: '.git/hooks/**' };
   const patchExclude: PatchExcludeRule[] = [
-    openspecExclude,
+    saifExclude,
     gitHooksExclude,
     ...(opts.patchExclude ?? []),
   ];
 
-  const catalog = loadCatalog({ projectDir, changeName, openspecDir });
+  const catalog = loadCatalog({ projectDir, featureName, saifDir });
   const testRunnerOpts = getTestRunnerOpts({
     projectDir,
-    changeName,
-    openspecDir,
+    featureName,
+    saifDir,
     sandboxBasePath: sandbox.sandboxBasePath,
     testScript,
   });
@@ -264,8 +264,8 @@ export async function runIterativeLoop(
         task,
         errorFeedback,
         llmConfig: coderLlmConfig,
-        openspecDir,
-        changeName,
+        saifDir,
+        featureName,
         dangerousDebug,
         cedarPolicyPath,
         coderImage,
@@ -312,7 +312,7 @@ export async function runIterativeLoop(
           sandboxProfileId,
           codePath: sandbox.codePath,
           projectDir,
-          changeName,
+          featureName,
           projectName,
           catalog,
           testRunnerOpts,
@@ -337,12 +337,12 @@ export async function runIterativeLoop(
           await applyPatchToHost({
             codePath: sandbox.codePath,
             projectDir,
-            changeName,
+            featureName,
             runId: lastRunId,
             push,
             pr,
             gitProvider,
-            openspecDir,
+            saifDir,
             overrides,
           });
           destroySandbox(sandbox.sandboxBasePath);
@@ -365,8 +365,8 @@ export async function runIterativeLoop(
           const resultsJudgeResult = await runResultsJudgeForFailure({
             projectName,
             projectDir,
-            changeName,
-            openspecDir,
+            featureName,
+            saifDir,
             patchPath,
             testSuites: result.testSuites,
             resolveAmbiguity,
@@ -429,8 +429,8 @@ interface RunResultsJudgeForFailureOpts {
   projectName: string;
   /** Absolute path to the project directory */
   projectDir: string;
-  changeName: string;
-  openspecDir: string;
+  featureName: string;
+  saifDir: string;
   testProfile: TestProfile;
   /** Content of the extracted patch for this attempt */
   patchPath: string;
@@ -471,8 +471,8 @@ export async function runResultsJudgeForFailure(
 ): Promise<ResultsJudgeForFailureResult> {
   const {
     projectDir,
-    changeName,
-    openspecDir,
+    featureName,
+    saifDir,
     patchPath,
     testSuites,
     resolveAmbiguity,
@@ -482,7 +482,7 @@ export async function runResultsJudgeForFailure(
   } = opts;
 
   const specPath = join(
-    getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
+    getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName }),
     'specification.md',
   );
   const specContent = existsSync(specPath)
@@ -579,14 +579,14 @@ export async function runResultsJudgeForFailure(
   console.log('[results-judge] Regenerating tests with updated spec...');
   try {
     await runDesignTests({
-      changeName,
+      featureName,
       projectDir,
-      openspecDir,
+      saifDir,
       testProfile,
       projectName,
       overrides,
     });
-    await generateTests({ changeName, projectDir, openspecDir, testProfile, overrides });
+    await generateTests({ featureName, projectDir, saifDir, testProfile, overrides });
     console.log('[results-judge] Tests regenerated successfully.');
   } catch (err) {
     console.warn(`[results-judge] Test regeneration failed (non-fatal): ${String(err)}`);
@@ -600,7 +600,7 @@ export async function runResultsJudgeForFailure(
 }
 
 // ---------------------------------------------------------------------------
-// Success path: apply patch via git worktree → commit → archive → push → PR
+// Success path: apply patch via git worktree → commit → push → PR
 // ---------------------------------------------------------------------------
 
 interface ApplyPatchOpts {
@@ -608,9 +608,9 @@ interface ApplyPatchOpts {
   codePath: string;
   /** Absolute path to the project directory */
   projectDir: string;
-  changeName: string;
+  featureName: string;
   /**
-   * Unique run id used to construct the branch name (factory/<changeName>-<runId>),
+   * Unique run id used to construct the branch name (factory/<featureName>-<runId>),
    * ensuring parallel runs for different attempts never collide.
    */
   runId: string;
@@ -621,10 +621,10 @@ interface ApplyPatchOpts {
   /** Git hosting provider. Default: GitHubProvider. */
   gitProvider: GitProvider;
   /**
-   * Path to the openspec directory root (e.g. "openspec"), relative to project directory.
+   * Path to the saif directory root (e.g. "saif"), relative to project directory.
    * Used by the PR summarizer agent to read specification and proposal docs.
    */
-  openspecDir: string;
+  saifDir: string;
   /** CLI-level model overrides forwarded to the PR summarizer agent. */
   overrides: ModelOverrides;
 }
@@ -634,20 +634,28 @@ interface ApplyPatchOpts {
  * the main working tree's checked-out branch is never modified — safe for parallel runs.
  *
  * Flow:
- *   1. Create a temporary worktree at <sandboxBasePath>/worktree on branch factory/<changeName>-<runId>
+ *   1. Create a temporary worktree at <sandboxBasePath>/worktree on branch factory/<featureName>-<runId>
  *   2. Apply patch.diff and commit inside the worktree
- *   3. Run `pnpm openspec archive` inside the worktree and commit any resulting changes
- *   4. Optionally push the branch to the remote target
- *   5. Optionally open a Pull Request via the configured git provider
- *   6. Remove the worktree (branch remains in the main repo's git history)
+ *   3. Optionally push the branch to the remote target
+ *   4. Optionally open a Pull Request via the configured git provider
+ *   5. Remove the worktree (branch remains in the main repo's git history)
  *
  * The worktree lives inside sandboxBasePath so it is cleaned up by destroySandbox after
  * this function returns. The worktree must be deregistered (step 6) before the directory
  * is deleted, otherwise git's internal worktree registry gets stale entries.
  */
 export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
-  const { codePath, projectDir, changeName, runId, push, pr, gitProvider, openspecDir, overrides } =
-    opts;
+  const {
+    codePath,
+    projectDir,
+    featureName,
+    runId,
+    push,
+    pr,
+    gitProvider,
+    saifDir,
+    overrides,
+  } = opts;
 
   // patch.diff is written to sandboxBasePath (parent of codePath) by extractPatch,
   // deliberately outside the git working tree so `git clean -fd` cannot delete it.
@@ -669,7 +677,7 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
     );
   }
 
-  const branchName = `factory/${changeName}-${runId}`;
+  const branchName = `factory/${featureName}-${runId}`;
   const wtPath = join(sandboxBasePath, 'worktree');
 
   const gitEnv = {
@@ -698,42 +706,11 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
     // 2. Apply patch inside the worktree
     execSync(`git apply "${patchFile}"`, { cwd: wtPath, env: gitEnv });
     execSync('git add .', { cwd: wtPath, env: gitEnv });
-    execSync(`git commit -m "feat(${changeName}): auto-generated implementation"`, {
+    execSync(`git commit -m "feat(${featureName}): auto-generated implementation"`, {
       cwd: wtPath,
       env: gitEnv,
     });
     console.log(`[orchestrator] Committed patch on branch ${branchName}`);
-
-    // 3. Archive the OpenSpec change inside the worktree
-    try {
-      // Sandbox vs worktree asymmetry: The agent's sandbox (code/) is created via rsync from
-      // the main working tree and includes untracked and uncommitted files. The worktree,
-      // however, is created with `git worktree add` and only contains the committed state
-      // at HEAD.
-      // Untracked paths like openspec/changes/<name>/ therefore exist in the sandbox
-      // (and the main working tree) but not in the worktree. Since `openspec archive`
-      // requires that directory to move it to archive/ and update specs, we copy
-      // it from projectDir into the worktree before running the command. See swf-git.md
-      // §8 "Sandbox vs. worktree source asymmetry" for details.
-      const srcChangeDir = getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName });
-      const destChangeDir = getChangeDirAbsolute({ cwd: wtPath, openspecDir, changeName });
-      if (existsSync(srcChangeDir) && !existsSync(destChangeDir)) {
-        execSync(`cp -r "${srcChangeDir}" "${destChangeDir}"`, { cwd: projectDir });
-      }
-
-      execSync(`npx openspec archive --yes ${changeName}`, { cwd: wtPath, env: gitEnv });
-      const archiveChanges = execSync('git status --porcelain', { cwd: wtPath }).toString().trim();
-      if (archiveChanges) {
-        execSync('git add .', { cwd: wtPath, env: gitEnv });
-        execSync(`git commit -m "chore(${changeName}): archive completed spec"`, {
-          cwd: wtPath,
-          env: gitEnv,
-        });
-      }
-      console.log('[orchestrator] OpenSpec archive complete');
-    } catch (err) {
-      console.warn(`[orchestrator] OpenSpec archive failed (non-fatal): ${String(err)}`);
-    }
 
     // 4. Push
     if (push) {
@@ -747,13 +724,13 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
         const repoSlug = gitProvider.extractRepoSlug(push, projectDir);
 
         // 5a. Generate AI title + body; fall back to generic strings on any error.
-        let prTitle = `feat(${changeName}): auto-generated implementation`;
-        let prBody = `Automated implementation produced by the Software Factory for change \`${changeName}\`.\n\nRun ID: \`${runId}\``;
+        let prTitle = `feat(${featureName}): auto-generated implementation`;
+        let prBody = `Automated implementation produced by the Software Factory for feature \`${featureName}\`.\n\nRun ID: \`${runId}\``;
         try {
-          console.log(`[orchestrator] Generating AI PR summary for ${changeName}...`);
+          console.log(`[orchestrator] Generating AI PR summary for ${featureName}...`);
           const summary = await generatePRSummary({
-            changeName,
-            openspecDir,
+            featureName,
+            saifDir,
             projectDir,
             patchFile,
             overrides,
@@ -801,19 +778,19 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
 
 interface BuildInitialTaskOpts {
   projectDir: string;
-  changeName: string;
-  openspecDir: string;
+  featureName: string;
+  saifDir: string;
 }
 
 function buildInitialTask(opts: BuildInitialTaskOpts): string {
-  const { projectDir, changeName, openspecDir } = opts;
-  const changeDir = getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName });
-  const planPath = join(changeDir, 'plan.md');
-  const specPath = join(changeDir, 'specification.md');
+  const { projectDir, featureName, saifDir } = opts;
+  const featureDir = getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName });
+  const planPath = join(featureDir, 'plan.md');
+  const specPath = join(featureDir, 'specification.md');
 
   const parts = [
-    `Implement the feature '${changeName}' as described in the plan below.`,
-    `Write code in the /workspace directory. Do NOT modify files in the /${openspecDir}/ directory.`,
+    `Implement the feature '${featureName}' as described in the plan below.`,
+    `Write code in the /workspace directory. Do NOT modify files in the /${saifDir}/ directory.`,
     'When complete, ensure the code compiles and passes linting.',
   ];
 
@@ -834,20 +811,20 @@ function buildInitialTask(opts: BuildInitialTaskOpts): string {
 
 interface LoadCatalogOpts {
   projectDir: string;
-  changeName: string;
-  openspecDir: string;
+  featureName: string;
+  saifDir: string;
 }
 
 export function loadCatalog(opts: LoadCatalogOpts) {
-  const { projectDir, changeName, openspecDir } = opts;
+  const { projectDir, featureName, saifDir } = opts;
   const testsJsonPath = join(
-    getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
+    getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName }),
     'tests',
     'tests.json',
   );
   if (!existsSync(testsJsonPath)) {
     throw new Error(
-      `tests.json not found at ${testsJsonPath}. Run 'saif feat design -n ${changeName}' first.`,
+      `tests.json not found at ${testsJsonPath}. Run 'saif feat design -n ${featureName}' first.`,
     );
   }
   const raw = JSON.parse(readFileSync(testsJsonPath, 'utf8')) as unknown;
@@ -862,8 +839,8 @@ export function loadCatalog(opts: LoadCatalogOpts) {
 
 interface GetTestRunnerOptsArgs {
   projectDir: string;
-  changeName: string;
-  openspecDir: string;
+  featureName: string;
+  saifDir: string;
   /** Sandbox root — the test runner writes results.xml here (via /test-runner-output bind-mount). */
   sandboxBasePath: string;
   /**
@@ -875,9 +852,9 @@ interface GetTestRunnerOptsArgs {
 }
 
 /**
- * Returns test runner container opts for the change.
+ * Returns test runner container opts for the feature.
  *
- * Returns `testsDir` (the tests/ directory for the change), `reportDir` (sandbox root,
+ * Returns `testsDir` (the tests/ directory for the feature), `reportDir` (sandbox root,
  * so that `runTests` can find results.xml at `{sandboxRoot}/results.xml`), and
  * `testScriptPath` (always set — written from DEFAULT_TEST_SCRIPT or a custom override).
  *
@@ -885,18 +862,15 @@ interface GetTestRunnerOptsArgs {
  */
 export function getTestRunnerOpts({
   projectDir,
-  changeName,
-  openspecDir,
+  featureName,
+  saifDir,
   sandboxBasePath,
   testScript,
 }: GetTestRunnerOptsArgs): Pick<
   StartTestRunnerContainerOpts,
   'testsDir' | 'reportDir' | 'testScriptPath'
 > {
-  const testsDir = join(
-    getChangeDirAbsolute({ cwd: projectDir, openspecDir, changeName }),
-    'tests',
-  );
+  const testsDir = join(getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName }), 'tests');
 
   const testScriptPath = join(sandboxBasePath, 'test.sh');
   writeFileSync(testScriptPath, testScript, { encoding: 'utf8', mode: 0o755 });

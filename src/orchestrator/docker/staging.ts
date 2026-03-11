@@ -45,7 +45,7 @@ export interface StartStagingContainerOpts {
   codePath: string;
   /** Absolute path to the project directory (used to resolve build.dockerfile) */
   projectDir: string;
-  changeName: string;
+  featureName: string;
   /**
    * Project name (from package.json "name" or --project flag).
    * Embedded in container/image names so they can be scoped per project
@@ -159,7 +159,7 @@ export async function startStagingContainer(
   const {
     codePath,
     projectDir,
-    changeName,
+    featureName,
     projectName,
     catalog,
     networkName,
@@ -169,12 +169,12 @@ export async function startStagingContainer(
     onStarted,
   } = opts;
   const containerConfig = catalog.containers.staging;
-  const containerName = `factory-stage-${projectName}-${changeName}-${runId}`;
+  const containerName = `factory-stage-${projectName}-${featureName}-${runId}`;
 
   // ── Build the ephemeral staging image ────────────────────────────────────
   // No `build` key or no `dockerfile`: use the sandbox profile's Dockerfile.stage.
   // `build.dockerfile: "path"`: use a custom Dockerfile for non-Node sandboxes.
-  const imageTag = `factory-stage-${projectName}-${changeName}-img-${runId}`;
+  const imageTag = `factory-stage-${projectName}-${featureName}-img-${runId}`;
   await buildStagingImage({
     sandboxProfileId: opts.sandboxProfileId,
     codePath,
@@ -212,7 +212,7 @@ export async function startStagingContainer(
       },
     },
     Env: [
-      `FACTORY_CHANGE_NAME=${changeName}`,
+      `FACTORY_FEATURE_NAME=${featureName}`,
       `FACTORY_SIDECAR_PORT=${containerConfig.sidecarPort}`,
       `FACTORY_SIDECAR_PATH=${containerConfig.sidecarPath}`,
       `FACTORY_STARTUP_SCRIPT=/factory/startup.sh`,
@@ -262,12 +262,12 @@ export async function startStagingContainer(
  * Cleans up containers and network on exit.
  */
 export async function debugStagingContainer(opts: StartStagingContainerOpts): Promise<void> {
-  const { changeName, catalog, networkName } = opts;
+  const { featureName, catalog, networkName } = opts;
   const handles: ContainerHandle[] = [];
 
   const runId = opts.runId;
 
-  console.log(`\n[debug] Starting staging container for "${changeName}" (Ctrl+C to stop)\n`);
+  console.log(`\n[debug] Starting staging container for "${featureName}" (Ctrl+C to stop)\n`);
 
   try {
     const additionalContainers = await startAdditionalContainers({
@@ -367,19 +367,19 @@ function loadSidecarBinary(): Buffer {
 
 interface StagingImageTagOpts {
   projectName: string;
-  changeName: string;
+  featureName: string;
   runId: string;
 }
 
 /**
  * Returns the ephemeral staging image tag for the current run.
  *
- * Format: factory-stage-{projectName}-{changeName}-img-{runId}
+ * Format: factory-stage-{projectName}-{featureName}-img-{runId}
  * This allows `docker clear` to scope cleanup by project or remove all.
  */
 export function getStagingImageTag(catalog: TestCatalog, opts: StagingImageTagOpts): string | null {
   const build = (catalog.containers.staging as { build?: { dockerfile?: string | null } }).build;
   if (build?.dockerfile === null) return null;
-  const { projectName, changeName, runId } = opts;
-  return `factory-stage-${projectName}-${changeName}-img-${runId}`;
+  const { projectName, featureName, runId } = opts;
+  return `factory-stage-${projectName}-${featureName}-img-${runId}`;
 }

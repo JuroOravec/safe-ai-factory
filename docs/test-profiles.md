@@ -39,7 +39,7 @@ Docker pulls the test runner image from GHCR. Nothing to configure. No `docker b
 With `--test-profile python-pytest`, you get the following layout:
 
 ```
-openspec/changes/my-feature/
+saif/features/my-feature/
 └── tests/
     ├── tests.json
     ├── tests.md
@@ -78,7 +78,7 @@ class TestDummyMdContentStructure:
 For comparison, this is the project layout for a TypeScript project:
 
 ```
-openspec/changes/my-feature/
+saif/features/my-feature/
 └── tests/
     ├── tests.json
     ├── tests.md

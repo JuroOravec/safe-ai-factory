@@ -6,7 +6,7 @@ The agent writes code and tests its code against your tests.
 
 ## 0. Initialize (one-time)
 
-> _Set up OpenSpec, Shotgun, and codebase index_
+> _Set up Shotgun, and codebase index_
 
 Before creating features, set an LLM API key and run the init command once:
 
@@ -17,7 +17,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 saif init
 ```
 
-This creates the `openspec/` directory, configures Shotgun, and indexes your codebase.
+This creates configures Shotgun, and indexes your codebase.
 
 See [LLM configuration](models.md) for all supported providers and model override options.
 
@@ -42,15 +42,14 @@ saif feat new
 saif feat new -n add-login -d "Add login to the React website: email/password auth"
 ```
 
-This creates an [Openspec](https://github.com/Fission-AI/OpenSpec) directory:
+This creates a new feature directory:
 
-`openspec/changes/add-login/`
+`saif/features/add-login/`
 
 ```txt
-openspec/
-└─ changes/
+saif/
+└─ features/
    └─ add-login/
-      ├─ .openspec.yaml
       └─ proposal.md
 ```
 
@@ -117,10 +116,9 @@ After a while, we will end up with 4 new files:
 | `tasks.md`         | Task tracking for the agent |
 
 ```txt
-openspec/
-└─ changes/
+saif/
+└─ features/
    └─ add-login/
-      ├─ .openspec.yaml
       ├─ proposal.md
       ├─ research.md       # new!
       ├─ specification.md  # new!
@@ -145,10 +143,9 @@ When you ran the `saif feat design` command, it also generated tests based on th
 You will find the tests in the `tests/` directory:
 
 ```txt
-openspec/
-└─ changes/
+saif/
+└─ features/
    └─ add-login/
-      ├─ .openspec.yaml
       ├─ proposal.md
       ├─ ...
       ├─ tests/            # new!
@@ -290,4 +287,4 @@ After the tests successfully failed, you can start your coding agent.
   1. Genuine - coding agent made an error
   2. Due to ambiguity in the specs
 
-  If specs are ambiguous, the agent updates the specs. See [swf-spec-ambiguity.md](openspec/specs/software-factory/swf-spec-ambiguity.md).
+  If specs are ambiguous, the agent updates the specs. See [`feat run`](commands/feat-run.md).

@@ -181,7 +181,7 @@ export interface CreateSaveRunHandlerParams {
   runContext: RunStorageContext;
   opts: IterativeLoopOpts & { gitProvider: { id: string }; testProfile: { id: string } };
   runStorage: RunStorage;
-  openspecDir: string;
+  saifDir: string;
 }
 
 /**
@@ -190,8 +190,8 @@ export interface CreateSaveRunHandlerParams {
  * if patch.diff exists and is non-empty, so the user can resume with saif run resume.
  */
 export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promise<void> {
-  const { sandbox, runContext, opts, runStorage, openspecDir } = params;
-  const changeName = opts.changeName;
+  const { sandbox, runContext, opts, runStorage, saifDir } = params;
+  const featureName = opts.featureName;
 
   const runId = sandbox.runId;
   const patchPath = join(sandbox.sandboxBasePath, 'patch.diff');
@@ -206,7 +206,7 @@ export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promis
     baseCommitSha: runContext.baseCommitSha,
     basePatchDiff: runContext.basePatchDiff,
     runPatchDiff,
-    specRef: `${openspecDir}/changes/${changeName}`,
+    specRef: `${saifDir}/features/${featureName}`,
     lastFeedback: runContext.lastErrorFeedback,
     status: 'failed',
     opts,

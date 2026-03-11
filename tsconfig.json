@@ -18,7 +18,7 @@
   "include": [
     "src",
     "scripts",
-    "openspec",
+    "saif",
     "tsup.config.ts",
     "eslint.config.js",
     "vitest.config.ts"

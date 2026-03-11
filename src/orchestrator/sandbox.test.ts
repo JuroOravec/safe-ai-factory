@@ -17,10 +17,10 @@ index abc1234..def5678 100644
 @@ -1,3 +1,4 @@
  export const greet = () => 'hello';
 +export const farewell = () => 'bye';
-diff --git a/openspec/changes/foo/tests/tests.json b/openspec/changes/foo/tests/tests.json
+diff --git a/saif/features/foo/tests/tests.json b/saif/features/foo/tests/tests.json
 index 111aaaa..222bbbb 100644
---- a/openspec/changes/foo/tests/tests.json
-+++ b/openspec/changes/foo/tests/tests.json
+--- a/saif/features/foo/tests/tests.json
++++ b/saif/features/foo/tests/tests.json
 @@ -1 +1 @@
 -{}
 +{"testCases":[]}
@@ -32,9 +32,9 @@ describe('filterPatchHunks', () => {
   });
 
   it('strips sections matching a glob exclude rule', () => {
-    const result = filterPatchHunks(PATCH_TWO_FILES, [{ type: 'glob', pattern: 'openspec/**' }]);
+    const result = filterPatchHunks(PATCH_TWO_FILES, [{ type: 'glob', pattern: 'saif/**' }]);
     expect(result).toContain('src/index.ts');
-    expect(result).not.toContain('openspec/changes/foo/tests/tests.json');
+    expect(result).not.toContain('saif/features/foo/tests/tests.json');
   });
 
   it('strips sections matching a regex exclude rule', () => {
@@ -60,8 +60,8 @@ describe('filterPatchHunks', () => {
  * if the format changes, both places must be updated in sync (intentional coupling).
  *
  * Format (from docker.ts):
- *   container:  factory-stage-{projectName}-{changeName}-{runId}
- *   image:      factory-stage-{projectName}-{changeName}-img-{runId}
+ *   container:  factory-stage-{projectName}-{featureName}-{runId}
+ *   image:      factory-stage-{projectName}-{featureName}-img-{runId}
  *   test runner: factory-test-{projectName}-{runId}
  *
  * The `docker clear` command:
@@ -69,11 +69,11 @@ describe('filterPatchHunks', () => {
  *   default  → matches prefix "factory-stage-{projectName}-" and "factory-test-{projectName}-"
  */
 describe('container/image naming convention (documentation)', () => {
-  const buildContainerName = (projectName: string, changeName: string, runId: string) =>
-    `factory-stage-${projectName}-${changeName}-${runId}`;
+  const buildContainerName = (projectName: string, featureName: string, runId: string) =>
+    `factory-stage-${projectName}-${featureName}-${runId}`;
 
-  const buildImageTag = (projectName: string, changeName: string, runId: string) =>
-    `factory-stage-${projectName}-${changeName}-img-${runId}`;
+  const buildImageTag = (projectName: string, featureName: string, runId: string) =>
+    `factory-stage-${projectName}-${featureName}-img-${runId}`;
 
   it('container name starts with factory-stage-', () => {
     expect(buildContainerName('my-project', 'greet-cmd', 'abc1234')).toMatch(/^factory-stage-/);

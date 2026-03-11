@@ -46,9 +46,9 @@ export const nameArg = {
   description: 'Feature name (kebab-case). Prompts with a list if omitted.',
 };
 
-export const openspecDirArg = {
+export const saifDirArg = {
   type: 'string' as const,
-  description: 'Path to openspec directory (default: openspec)',
+  description: 'Path to saif directory (default: saif)',
 };
 
 const testScriptArg = {
@@ -133,7 +133,7 @@ export const featAgentArgs = {
 // Run-specific args (run, resume)
 export const featRunArgs = {
   name: nameArg,
-  'openspec-dir': openspecDirArg,
+  'saif-dir': saifDirArg,
   'project-dir': projectDirArg,
   project: projectArg,
   'test-profile': testProfileArg,

@@ -14,7 +14,7 @@
  *   Leash enforces a Cedar policy that restricts filesystem writes to
  *   /workspace (the mounted sandbox copy) and limits network access to
  *   known package registries and LLM APIs. The agent cannot reach the host
- *   repository or modify openspec/ test files. Any openspec/ changes that
+ *   repository or modify saif/ test files. Any saif/ changes that
  *   slip through are stripped by the patch filter in sandbox.ts.
  *
  * Security (--dangerous-debug mode):
@@ -31,8 +31,9 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getChangeDirAbsolute, getSaifRoot } from '../constants.js';
+import { getSaifRoot } from '../constants.js';
 import { type LlmConfig } from '../llm-config.js';
+import { getFeatureDirAbsolute } from '../specs/discover.js';
 
 /** In-container workspace path that Leash bind-mounts the sandbox into. */
 const CONTAINER_WORKSPACE = '/workspace';
@@ -63,12 +64,12 @@ export interface RunAgentOpts {
    */
   llmConfig: LlmConfig;
   /**
-   * Openspec directory name (relative to codePath), e.g. 'openspec'.
-   * Used to locate plan.md candidates. Resolved by caller (e.g. parseOpenspecDir).
+   * Saif directory name (relative to codePath), e.g. 'saif'.
+   * Used to locate plan.md candidates. Resolved by caller (e.g. parseSaifDir).
    */
-  openspecDir: string;
-  /** The change name — used to locate the plan.md for this specific change. */
-  changeName?: string;
+  saifDir: string;
+  /** The feature name — used to locate the plan.md for this specific feature. */
+  featureName?: string;
   /**
    * When true, skip Leash and run the agent directly on the host.
    * Isolation is filesystem-only (rsync sandbox). No Cedar enforcement.
@@ -221,8 +222,8 @@ export async function runAgent(opts: RunAgentOpts): Promise<RunAgentResult> {
     task,
     errorFeedback,
     llmConfig,
-    openspecDir,
-    changeName,
+    saifDir,
+    featureName,
     dangerousDebug,
     cedarPolicyPath,
     coderImage,
@@ -236,7 +237,7 @@ export async function runAgent(opts: RunAgentOpts): Promise<RunAgentResult> {
 
   const safeAgentEnv = filterAgentEnv(agentEnv);
 
-  const taskPrompt = buildTaskPrompt({ codePath, task, openspecDir, changeName, errorFeedback });
+  const taskPrompt = buildTaskPrompt({ codePath, task, saifDir, featureName, errorFeedback });
 
   // Build the generic LLM_* env vars that agent shell scripts expect.
   // These are a private contract between the orchestrator and Leash containers —
@@ -545,7 +546,7 @@ function printOpenHandsSegment(segment: string): void {
 }
 
 /**
- * Reads plan.md from the change directory (if available) and builds the
+ * Reads plan.md from the feature directory (if available) and builds the
  * full task prompt injected into the agent.
  *
  * Note: paths here are always host paths (codePath on the host). The content
@@ -555,19 +556,19 @@ function printOpenHandsSegment(segment: string): void {
 interface BuildTaskPromptOpts {
   codePath: string;
   task: string;
-  openspecDir: string;
-  changeName: string | undefined;
+  saifDir: string;
+  featureName: string | undefined;
   errorFeedback?: string;
 }
 
 function buildTaskPrompt(opts: BuildTaskPromptOpts): string {
-  const { codePath, task, openspecDir, changeName, errorFeedback } = opts;
+  const { codePath, task, saifDir, featureName, errorFeedback } = opts;
   let planContent = '';
   const planCandidates: string[] = [];
 
-  if (changeName) {
+  if (featureName) {
     planCandidates.push(
-      join(getChangeDirAbsolute({ cwd: codePath, openspecDir, changeName }), 'plan.md'),
+      join(getFeatureDirAbsolute({ cwd: codePath, saifDir, featureName }), 'plan.md'),
     );
   }
   planCandidates.push(join(codePath, 'plan.md'));
@@ -594,7 +595,7 @@ function buildTaskPrompt(opts: BuildTaskPromptOpts): string {
       errorFeedback.trim(),
       '```',
       '',
-      `Analyze the errors above and fix the code. Do NOT modify files in the /${openspecDir}/ directory.`,
+      `Analyze the errors above and fix the code. Do NOT modify files in the /${saifDir}/ directory.`,
     );
   }
 

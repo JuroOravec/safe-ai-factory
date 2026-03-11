@@ -49,7 +49,7 @@ The designer runs as part of `saif feat design`.
 saif feat new
 ```
 
-Edit `openspec/changes/add-login/proposal.md` with what you want to build. One paragraph is enough — the designer figures out the rest.
+Edit `saif/features/add-login/proposal.md` with what you want to build. One paragraph is enough — the designer figures out the rest.
 
 ### 2. Run spec generation — `saif feat design`
 
@@ -59,7 +59,7 @@ saif feat design
 saif feat design --designer shotgun
 ```
 
-The designer reads your `proposal.md`, researches the codebase (via the active indexer), and writes the 4 spec files into `openspec/changes/add-login/`.
+The designer reads your `proposal.md`, researches the codebase (via the active indexer), and writes the 4 spec files into `saif/features/add-login/`.
 
 If the spec files already exist, the CLI asks whether to redo them — so re-running is always safe. Use `-y`/`--yes` with `--name` to skip the prompt and assume redo (non-interactive mode).
 
