@@ -95,6 +95,7 @@ Each provider reads its token from environment variables. Set the one that match
 
 ```bash
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+
 saif feat run --push origin --pr
 ```
 
@@ -103,6 +104,7 @@ saif feat run --push origin --pr
 ```bash
 export GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
 export GITLAB_URL=https://gitlab.mycompany.com
+
 saif feat run --push group/repo --pr --git-provider gitlab
 ```
 
@@ -111,6 +113,7 @@ saif feat run --push group/repo --pr --git-provider gitlab
 ```bash
 export BITBUCKET_TOKEN=your-token
 export BITBUCKET_USERNAME=your-username
+
 saif feat run --push workspace/repo --pr --git-provider bitbucket
 ```
 
@@ -118,6 +121,7 @@ saif feat run --push workspace/repo --pr --git-provider bitbucket
 
 ```bash
 export AZURE_DEVOPS_TOKEN=your-pat
+
 saif feat run --push org/project/repo --pr --git-provider azure
 ```
 
@@ -127,6 +131,7 @@ saif feat run --push org/project/repo --pr --git-provider azure
 export GITEA_TOKEN=your-token
 export GITEA_USERNAME=your-username
 export GITEA_URL=https://gitea.mycompany.com
+
 saif feat run --push owner/repo --pr --git-provider gitea
 ```
 

@@ -1,4 +1,4 @@
-# Test Profiles
+# Test profiles: Configure testing containers
 
 By default tests run in a NodeJS container with Vitest.
 

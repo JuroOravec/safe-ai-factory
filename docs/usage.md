@@ -4,6 +4,32 @@ Remember: You don't write code, you write the feature spec and tests.
 
 The agent writes code and tests its code against your tests.
 
+## The pipeline
+
+```mermaid
+flowchart LR
+    subgraph Prepare
+        direction TB
+        A[1. Write proposal]
+        B[2. Research]
+        C[3. Write black box tests]
+        D[4. Confirm tests fail]
+        A --> B --> C --> D
+    end
+    A ~~~ E
+    subgraph Exec
+        direction TB
+        E[5. Coder agent iterates until tests pass]
+        F[6. Black box testing]
+        G[7. PR]
+        E --> F --> G
+    end
+    style Prepare fill:none,stroke:none
+    style Exec fill:none,stroke:none
+```
+
+Full design: [docs/development/v0/](./development/v0/).
+
 ## 0. Initialize (one-time)
 
 > _Set up Shotgun, and codebase index_
@@ -167,7 +193,9 @@ saif/
 The `tests/` directory contains:
 
 - `public/` - Public tests - Agent can see these. Happy paths, etc..
-- `hidden/` - Hidden tests - Agent never see these. Edge cases, failures, etc.
+- `hidden/` - Hidden tests — Agent never sees these. All `hidden/` dirs under
+  `saif/features/` (across every feature) are stripped from the agent's code copy.
+  Edge cases, failures, etc.
 - `tests.md` - Human-readable summary of generated tests.
 - `tests.json` - Test catalog - metadata of all tests.
 - `helpers.ts` - Helpers to send requests to the test runner container.

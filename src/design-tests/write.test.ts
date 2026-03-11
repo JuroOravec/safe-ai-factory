@@ -41,7 +41,7 @@ function imperativeCatalog(extra: object = {}): string {
   return JSON.stringify({
     version: '1.0',
     featureName: 'test-feature',
-    specDir: 'saif/features/test-feature',
+    featureDir: 'saif/features/test-feature',
     containers: {
       staging: { sidecarPort: 8080, sidecarPath: '/exec' },
       additional: [],
@@ -199,7 +199,7 @@ describe('generateTests', () => {
     const webCatalog = JSON.stringify({
       version: '1.0',
       featureName,
-      specDir: 'saif/features/test-feature',
+      featureDir: 'saif/features/test-feature',
       containers: {
         staging: { baseUrl: 'http://staging:3000' },
         additional: [],

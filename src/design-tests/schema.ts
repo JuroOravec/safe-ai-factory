@@ -80,7 +80,11 @@ const AdditionalContainerSchema = z.object({
 export const TestCatalogSchema = z.object({
   version: z.string().default('1.0'),
   featureName: z.string().describe('Name of the feature (matches saif/features/<name>)'),
-  specDir: z.string().describe('Path to spec directory relative to repo root'),
+  featureDir: z
+    .string()
+    .describe(
+      'Path to feature directory relative to project root (e.g. "saif/features/<featureName>")',
+    ),
   containers: z.object({
     staging: StagingContainerSchema,
     additional: z.array(AdditionalContainerSchema).default([]),

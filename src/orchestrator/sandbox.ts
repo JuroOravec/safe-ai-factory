@@ -16,7 +16,8 @@
  *         public/            ← public spec files (from rsync, unchanged)
  *         helpers.ts         ← shared transport helpers
  *         infra.spec.ts      ← infra health checks
- *         (hidden/ removed)  ← deleted from code copy so agent cannot see holdout tests
+ *         (hidden/ removed)  ← ALL hidden/ dirs under saif/features/ deleted so agent
+ *                             cannot see holdout tests from any feature (current or others)
  *       ...rest of repo...
  */
 
@@ -34,6 +35,26 @@ import { join } from 'node:path';
 import { minimatch } from 'minimatch';
 
 import type { TestCatalog } from '../design-tests/schema.js';
+import { getFeatureDirAbsolute } from '../specs/discover.js';
+
+/** Recursively removes all directories named "hidden" under baseDir. */
+function removeAllHiddenDirs(baseDir: string): number {
+  let removed = 0;
+  if (!existsSync(baseDir)) return removed;
+
+  const entries = readdirSync(baseDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const fullPath = join(baseDir, entry.name);
+    if (entry.name === 'hidden') {
+      execSync(`rm -rf "${fullPath}"`);
+      removed++;
+    } else {
+      removed += removeAllHiddenDirs(fullPath);
+    }
+  }
+  return removed;
+}
 
 export interface SandboxPaths {
   /** /tmp/factory-sandbox/{proj}-{feat}-{runId} */
@@ -154,7 +175,8 @@ export interface CreateSandboxOpts {
  * Creates an isolated sandbox for the feature.
  *
  * 1. rsync repo → sandboxBasePath/code/ (honoring .gitignore)
- * 2. Remove hidden/ from the in-code tests/ dir so the coder agent cannot see holdout tests
+ * 2. Remove ALL hidden/ dirs under saif/features/ so the coder agent cannot see holdout
+ *    tests from any feature (current or others)
  * 3. git init + initial commit inside code/ (clean baseline for diffing)
  * 4. Write gate.sh (user-supplied or default) to sandboxBasePath/gate.sh
  * 5. Write startup.sh (from profile or --startup-script) to sandboxBasePath/startup.sh

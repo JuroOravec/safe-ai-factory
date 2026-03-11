@@ -12,16 +12,16 @@ Without a designer, you hand a feature prompt directly to a coding agent:
 
 The agent guesses. It invents a database schema that doesn't match yours, imports a library you're not using, and structures the code in a way that breaks your existing conventions. You review 400 lines of drift and patch it by hand.
 
-With a designer, a dedicated research-and-spec agent runs first:
+With a designer, a dedicated research-and-spec agent runs first.
 
-> `saif feat design` →
->
-> `plan.md` — Implementation steps grounded in your existing patterns  
-> `specification.md` — Precise behavior contract the agent must satisfy  
-> `research.md` — Codebase findings that informed the spec  
-> `tasks.md` — Broken-down work items, ready to hand to the coding agent
+**What files designers produce?**
 
-The coding agent sees a grounded spec, not a one-liner. It ships closer code on the first attempt.
+- `plan.md` — Implementation steps grounded in your existing patterns
+- `specification.md` — Precise behavior contract the agent must satisfy
+- `research.md` — Codebase findings that informed the spec
+- `tasks.md` — Broken-down work items, ready to hand to the coding agent
+
+The coding agent sees a grounded spec, not a one-liner. It ships better code on the first attempt.
 
 ---
 
@@ -83,16 +83,16 @@ saif feat design --designer none
 
 ## Designer and indexer: how they work together
 
-The designer and indexer are complementary — they both run during `saif feat design`, but they do different things:
+The designer and indexer are complementary — they both run during `saif feat design`, but they do different things.
 
-|            | Indexer                                                    | Designer                                                 |
+The designer uses the indexer to ground its spec in real code.
+
+|      Who      | Indexer                                                    | Designer                                                 |
 | ---------- | ---------------------------------------------------------- | -------------------------------------------------------- |
 | **What**   | Parses your repo into a semantic graph                     | Researches your codebase and writes the spec             |
-| **When**   | Runs at `saif init` (build) and `saif feat design` (query) | Runs at `saif feat design`                               |
+| **When**   | Runs at `saif init` (build index)<br/>and `saif feat design` (query index) | Runs at `saif feat design`                               |
 | **Output** | A queryable codebase index                                 | `plan.md`, `specification.md`, `research.md`, `tasks.md` |
 | **Flag**   | `--indexer`                                                | `--designer`                                             |
-
-The designer uses the indexer to ground its spec in real code. Some designers (like Shotgun) manage their own codebase querying internally — they use the index but don't delegate to the factory's indexer tool.
 
 ---
 

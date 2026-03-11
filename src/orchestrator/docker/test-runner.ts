@@ -36,21 +36,37 @@ import {
   type StartStagingContainerOpts,
 } from './staging.js';
 
-/** One test file entry from vitest's JSON reporter output. */
-export interface VitestSuiteResult {
+/**
+ * One test file entry.
+ *
+ * Originally modelled after vitest's JSON reporter output,
+ * but now used for all test runners.
+ */
+export interface AssertionSuiteResult {
   name: string;
   status: string;
-  assertionResults: VitestAssertionResult[];
+  assertionResults: AssertionResult[];
 }
 
-/** One individual test case from vitest's JSON reporter output. */
-export interface VitestAssertionResult {
+/**
+ * One individual test case result.
+ *
+ * Originally modelled after vitest's JSON reporter output,
+ * but now used for all test runners.
+ */
+export interface AssertionResult {
   title: string;
   fullName: string;
   status: 'passed' | 'failed' | 'pending' | 'todo';
   /** Describe-block ancestry, outermost first. e.g. ['sidecar:health'] or ['shotgun-test'] */
   ancestorTitles: string[];
+  /** Raw failure message/stack — NOT passed to Judge (prompt injection risk). Kept for debugging. */
   failureMessages: string[];
+  /**
+   * Error types from JUnit <failure type="..."> / <error type="...">.
+   * Safe to pass to Judge: set by test runner, not by agent code.
+   */
+  failureTypes: string[];
 }
 
 export interface TestsResult {
@@ -59,17 +75,20 @@ export interface TestsResult {
   stdout: string;
   /**
    * Set when the test runner itself crashed before running any tests (e.g. "No test files
-   * found", missing dependencies, syntax errors in the spec). This is distinct from tests
-   * running and failing — in this case the exit code is non-zero but no meaningful pass/fail
-   * signal was produced.
+   * found", missing dependencies, syntax errors in the spec).
+   *
+   * This is distinct from tests running and failing: in this case the exit code is non-zero
+   * but no meaningful pass/fail signal was produced.
    */
   runnerError?: string;
   /**
-   * Parsed vitest JSON reporter output. Present when the JSON report was successfully
-   * captured from the test runner container. Used by fail2pass to distinguish infra vs
-   * feature test results.
+   * Parsed test runner JSON reporter output.
+   *
+   * Present when the JSON report was successfully captured from the test runner container.
+   *
+   * Used by fail2pass to distinguish infra vs feature test results.
    */
-  testSuites?: VitestSuiteResult[];
+  testSuites?: AssertionSuiteResult[];
 }
 
 export interface StartTestRunnerContainerOpts {
@@ -419,6 +438,7 @@ export async function runTests(
 
 /** A single <failure> or <error> element from JUnit XML. */
 interface JUnitProblem {
+  type?: string;
   message?: string;
   '#text'?: string;
 }
@@ -452,7 +472,7 @@ interface JUnitParsedRoot {
 }
 
 /**
- * Parses a JUnit XML report written by the Test Runner container (`results.xml`) into our VitestSuiteResult[] type.
+ * Parses a JUnit XML report written by the Test Runner container (`results.xml`) into our AssertionSuiteResult[] type.
  *
  * JUnit XML is the universal test output format: every major test runner (Vitest, Jest, pytest,
  * go test, cargo-junit, etc.) can emit it, which means the Orchestrator is decoupled from
@@ -466,7 +486,7 @@ interface JUnitParsedRoot {
  * We force all repeated tags to be arrays via fast-xml-parser's `isArray` callback so
  * the mapping logic is uniform regardless of whether there is one or many suites/cases.
  */
-function parseJUnitXmlFromFile(reportPath: string): VitestSuiteResult[] | undefined {
+function parseJUnitXmlFromFile(reportPath: string): AssertionSuiteResult[] | undefined {
   try {
     const xmlStr = readFileSync(reportPath, 'utf8');
 
@@ -504,7 +524,7 @@ function parseJUnitXmlFromFile(reportPath: string): VitestSuiteResult[] | undefi
     return rawSuites.map((ts) => {
       const suiteName = ts.name ?? 'unknown';
 
-      const assertionResults: VitestAssertionResult[] = (ts.testcase ?? []).map((tc) => {
+      const assertionResults: AssertionResult[] = (ts.testcase ?? []).map((tc) => {
         const title = tc.name ?? 'unknown test';
 
         const ancestorTitles: string[] = [suiteName];
@@ -516,8 +536,9 @@ function parseJUnitXmlFromFile(reportPath: string): VitestSuiteResult[] | undefi
 
         const problems: JUnitProblem[] = [...(tc.failure ?? []), ...(tc.error ?? [])];
 
-        let status: VitestAssertionResult['status'] = 'passed';
+        let status: AssertionResult['status'] = 'passed';
         let failureMessages: string[] = [];
+        let failureTypes: string[] = [];
 
         if (problems.length > 0) {
           status = 'failed';
@@ -525,6 +546,11 @@ function parseJUnitXmlFromFile(reportPath: string): VitestSuiteResult[] | undefi
             const msg = f.message ? `${f.message}\n` : '';
             const text = f['#text'] ?? '';
             return (msg + text).trim() || 'Unknown failure';
+          });
+          failureTypes = problems.map((f) => {
+            // type comes from <failure type="..."> — safe, set by test runner
+            const p = f as JUnitProblem & { '@_type'?: string };
+            return (f.type ?? p['@_type'] ?? 'Unknown').trim() || 'Unknown';
           });
         } else if (tc.skipped !== undefined) {
           status = 'pending';
@@ -536,6 +562,7 @@ function parseJUnitXmlFromFile(reportPath: string): VitestSuiteResult[] | undefi
           status,
           ancestorTitles,
           failureMessages,
+          failureTypes,
         };
       });
 

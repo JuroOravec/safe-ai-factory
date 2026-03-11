@@ -33,7 +33,7 @@ export const shotgunDesignerProfile: DesignerProfile = {
 
   // Calls shotgun-sh to generate the spec files.
   run({ cwd, featName, saifDir, model, prompt }: DesignerRunOpts): void {
-    const specDir = getFeatureDirRelative({ cwd, saifDir, featureName: featName });
+    const featureDir = getFeatureDirRelative({ cwd, saifDir, featureName: featName });
     const proposalPath = join(
       getFeatureDirAbsolute({ cwd, saifDir, featureName: featName }),
       'proposal.md',
@@ -48,8 +48,8 @@ export const shotgunDesignerProfile: DesignerProfile = {
     const runArgs = ['-n', proposalPrompt];
     if (model?.trim()) runArgs.splice(0, 0, '--model', model.trim());
 
-    // Run `shotgun-sh --spec-dir <specDir> run -n <proposalPrompt>`
-    runShotgunCli(['--spec-dir', specDir, 'run', ...runArgs], {
+    // Run `shotgun-sh --spec-dir <featureDir> run -n <proposalPrompt>`
+    runShotgunCli(['--spec-dir', featureDir, 'run', ...runArgs], {
       projectDir: cwd,
       // Shotgun needs these environment variables to stream the output to the console.
       env: { PYTHONUNBUFFERED: '1', SHOTGUN_LOGGING_TO_CONSOLE: '1' },

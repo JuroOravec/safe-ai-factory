@@ -1,4 +1,4 @@
-# Sandbox Profiles
+# Sandbox profiles: Configure coding containers
 
 By default the factory uses a Node.js + pnpm + Python sandbox.
 

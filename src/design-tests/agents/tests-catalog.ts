@@ -57,8 +57,8 @@ export function createTestsCatalogAgent(indexerTool?: Tool, overrides: ModelOver
 /** Options for running the catalog agent. */
 export interface RunCatalogAgentOpts {
   featureName: string;
-  specDir: string;
-  specFiles: Record<string, string>;
+  featureDir: string;
+  featureFiles: Record<string, string>;
   testPlan: string;
   extraPrompt?: string;
   /** Test profile determines file extensions and naming rules. Defaults to vitest. */
@@ -78,8 +78,8 @@ export interface RunCatalogAgentOpts {
 export async function runCatalogAgent(opts: RunCatalogAgentOpts) {
   const {
     featureName,
-    specDir,
-    specFiles,
+    featureDir,
+    featureFiles,
     testPlan,
     extraPrompt,
     testProfile,
@@ -90,7 +90,7 @@ export async function runCatalogAgent(opts: RunCatalogAgentOpts) {
     abortSignal,
   } = opts;
 
-  const fileSection = Object.entries(specFiles)
+  const fileSection = Object.entries(featureFiles)
     .map(([name, content]) => `=== ${name} ===\n${content}`)
     .join('\n\n');
 
@@ -112,7 +112,7 @@ Output a single JSON object (no markdown fences). Shape:
 {
   "version": "1.0",
   "featureName": "<feature>",
-  "specDir": "<path>",
+  "featureDir": "<path>",
   "containers": { "staging": { "sidecarPort": 8080, "sidecarPath": "/exec" }, "additional": [] },
   "testCases": [
     {
@@ -130,7 +130,7 @@ Output a single JSON object (no markdown fences). Shape:
 IMPORTANT: Every test case MUST have an "entrypoint" field following the naming rule above. Group logically related tests into the same file.`;
 
   const prompt = `Feature: ${featureName}
-Spec directory: ${specDir}
+Spec directory: ${featureDir}
 ${testProfileSection}
 
 === SPECIFICATION FILES ===

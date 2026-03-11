@@ -74,9 +74,20 @@ saif feat design --indexer none
 
 ## The `--project` flag
 
-The project name ties the index built during `saif init` to the index queried during `saif feat design`. It defaults to the `name` field in your `package.json`.
+Indexers use the project name the database ID!
 
-Override it with `-p / --project` when you have multiple indexed codebases or no `package.json`:
+The ID ties the index built during `saif init` to the index queried during `saif feat design`. 
+
+Make sure to use the same project name when building and querying the index:
+
+```bash
+saif init
+saif feat design
+```
+
+Project name defaults to the `name` field in your `package.json`.
+
+Override project name with `-p / --project` when you have multiple indexed codebases or no `package.json`:
 
 ```bash
 saif init --project my-app

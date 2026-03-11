@@ -1,7 +1,7 @@
 {
   "name": "safe-ai-factory",
   "version": "0.0.0",
-  "description": "Spec-driven AI factory. Use with any agentic CLI. Language-agnostic. Safe by design.",
+  "description": "Agentic Swarms for Engineering Teams: Spec-driven AI factory. Use with any agentic CLI. Language-agnostic. Safe by design.",
   "private": false,
   "type": "module",
   "license": "MIT",

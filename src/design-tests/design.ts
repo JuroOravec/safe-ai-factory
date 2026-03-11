@@ -62,7 +62,7 @@ export interface RunTestsDesignResult {
  * Reads all spec files from the feature directory (recursively, text files only).
  * Returns a map of relative path → file content.
  */
-function readSpecFiles(specDir: string): Record<string, string> {
+function readFeatureFiles(featureDir: string): Record<string, string> {
   const files: Record<string, string> = {};
 
   function walk(dir: string, prefix: string): void {
@@ -82,7 +82,7 @@ function readSpecFiles(specDir: string): Record<string, string> {
     }
   }
 
-  walk(specDir, '');
+  walk(featureDir, '');
   return files;
 }
 
@@ -151,23 +151,23 @@ export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTests
 
   const featureDir = getFeatureDirAbsolute({ cwd: projectDir, saifDir, featureName });
   const testsDir = join(featureDir, 'tests');
-  const specDirRelative = getFeatureDirRelative({
+  const featureDirRelative = getFeatureDirRelative({
     cwd: projectDir,
     saifDir,
     featureName,
   });
 
   console.log(`[design-tests:plan] Reading spec files from ${featureDir}`);
-  const specFiles = readSpecFiles(featureDir);
+  const featureFiles = readFeatureFiles(featureDir);
 
-  if (Object.keys(specFiles).length === 0) {
+  if (Object.keys(featureFiles).length === 0) {
     throw new Error(
       `No spec files found in ${featureDir}. ` +
         `Run 'pnpm shotgun' first or ensure the feature directory exists.`,
     );
   }
 
-  console.log(`[design-tests:plan] Found ${Object.keys(specFiles).length} spec files`);
+  console.log(`[design-tests:plan] Found ${Object.keys(featureFiles).length} spec files`);
   if (indexerTool) {
     console.log(
       `[design-tests:plan] Codebase index: ${indexerProfile!.displayName} (project: ${projectName})`,
@@ -176,7 +176,7 @@ export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTests
   console.log(`[design-tests:plan] Step 1a: Generating test plan...`);
 
   // Step 1a: Planner agent → Markdown test plan
-  const plannerPrompt = buildPlannerPrompt(specFiles, extraPrompt);
+  const plannerPrompt = buildPlannerPrompt(featureFiles, extraPrompt);
   const plannerAgent = createTestsPlannerAgent(indexerTool, overrides);
 
   // Run the planner agent
@@ -218,8 +218,8 @@ export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTests
     // Step 1b: Catalog agent → structured JSON catalog
     catalog = await runCatalogAgent({
       featureName,
-      specDir: specDirRelative,
-      specFiles,
+      featureDir: featureDirRelative,
+      featureFiles,
       testPlan,
       extraPrompt,
       indexerTool,

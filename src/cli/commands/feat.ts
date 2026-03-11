@@ -234,7 +234,7 @@ async function _runDesignSpecs(args: {
   const saifDir = parseSaifDir(args);
   const designerProfile = parseDesignerProfile(args);
 
-  const specDir = getFeatureDirRelative({ cwd: projectDir, saifDir, featureName: featName });
+  const featureDir = getFeatureDirRelative({ cwd: projectDir, saifDir, featureName: featName });
   const designerBaseOpts = { cwd: projectDir, featName, saifDir };
 
   // 1. Generate full specs and plan from user's proposal.
@@ -247,7 +247,7 @@ async function _runDesignSpecs(args: {
     } else {
       intro(`${designerProfile.displayName} output present`);
       const redo = await confirm({
-        message: `${specDir} already has designer output. Redo ${designerProfile.displayName} spec generation?`,
+        message: `${featureDir} already has designer output. Redo ${designerProfile.displayName} spec generation?`,
       });
       outro('');
       if (isCancel(redo)) {
@@ -266,7 +266,7 @@ async function _runDesignSpecs(args: {
       model: typeof args.model === 'string' ? args.model.trim() : undefined,
     });
   } else {
-    console.log(`\nSkipping designer (${specDir} already has required spec files).`);
+    console.log(`\nSkipping designer (${featureDir} already has required spec files).`);
   }
 
   const overrides = parseModelOverrides(args);
