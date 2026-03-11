@@ -37,8 +37,8 @@ import { minimatch } from 'minimatch';
 import type { TestCatalog } from '../design-tests/schema.js';
 import { getFeatureDirAbsolute } from '../specs/discover.js';
 
-/** Recursively removes all directories named "hidden" under baseDir. */
-function removeAllHiddenDirs(baseDir: string): number {
+/** Recursively removes all directories named "hidden" under baseDir. Exported for testing. */
+export function removeAllHiddenDirs(baseDir: string): number {
   let removed = 0;
   if (!existsSync(baseDir)) return removed;
 

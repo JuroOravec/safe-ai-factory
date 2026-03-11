@@ -2,12 +2,24 @@
  * Unit tests for sandbox utilities.
  *
  * Focuses on the pure, side-effect-free helpers that can run without Docker
- * or the filesystem.
+ * or the filesystem. Also includes filesystem-based tests for removeAllHiddenDirs.
  */
+
+import { execSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { filterPatchHunks } from './sandbox.js';
+import { createSandbox, destroySandbox, filterPatchHunks, removeAllHiddenDirs } from './sandbox.js';
 
 const PATCH_TWO_FILES = `\
 diff --git a/src/index.ts b/src/index.ts
@@ -50,6 +62,213 @@ describe('filterPatchHunks', () => {
 
   it('returns an empty string unchanged', () => {
     expect(filterPatchHunks('', [{ type: 'glob', pattern: '**' }])).toBe('');
+  });
+});
+
+describe('removeAllHiddenDirs', () => {
+  it('removes all hidden/ dirs recursively under baseDir', () => {
+    const tmp = mkdtempSync(join(process.cwd(), 'sandbox-test-'));
+    try {
+      // feat-a/tests/public, feat-a/tests/hidden
+      mkdirSync(join(tmp, 'feat-a', 'tests', 'public'), { recursive: true });
+      mkdirSync(join(tmp, 'feat-a', 'tests', 'hidden'), { recursive: true });
+      writeFileSync(join(tmp, 'feat-a', 'tests', 'hidden', 'bar.spec.ts'), '');
+      // feat-b/tests/hidden
+      mkdirSync(join(tmp, 'feat-b', 'tests', 'hidden'), { recursive: true });
+      writeFileSync(join(tmp, 'feat-b', 'tests', 'hidden', 'edge.spec.ts'), '');
+      // feat-c/nested/hidden (deep nesting)
+      mkdirSync(join(tmp, 'feat-c', 'nested', 'hidden'), { recursive: true });
+      writeFileSync(join(tmp, 'feat-c', 'nested', 'hidden', 'deep.ts'), '');
+
+      const removed = removeAllHiddenDirs(tmp);
+
+      expect(removed).toBe(3);
+      expect(existsSync(join(tmp, 'feat-a', 'tests', 'hidden'))).toBe(false);
+      expect(existsSync(join(tmp, 'feat-b', 'tests', 'hidden'))).toBe(false);
+      expect(existsSync(join(tmp, 'feat-c', 'nested', 'hidden'))).toBe(false);
+      expect(existsSync(join(tmp, 'feat-a', 'tests', 'public'))).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true });
+    }
+  });
+
+  it('returns 0 when baseDir does not exist', () => {
+    const removed = removeAllHiddenDirs('/nonexistent/path/xyz');
+    expect(removed).toBe(0);
+  });
+
+  it('returns 0 when no hidden dirs are present', () => {
+    const tmp = mkdtempSync(join(process.cwd(), 'sandbox-test-'));
+    try {
+      mkdirSync(join(tmp, 'feat', 'tests', 'public'), { recursive: true });
+      writeFileSync(join(tmp, 'feat', 'tests', 'public', 'foo.spec.ts'), '');
+
+      const removed = removeAllHiddenDirs(tmp);
+
+      expect(removed).toBe(0);
+    } finally {
+      rmSync(tmp, { recursive: true });
+    }
+  });
+});
+
+describe('createSandbox + destroySandbox (integration)', () => {
+  const TEST_CATALOG = {
+    version: '1.0',
+    featureName: 'my-feature',
+    featureDir: 'saif/features/my-feature',
+    containers: {
+      staging: { sidecarPort: 8080, sidecarPath: '/exec' },
+      additional: [],
+    },
+    testCases: [
+      {
+        id: 'tc-public-001',
+        title: 'Public test',
+        description: 'Happy path',
+        tracesTo: [],
+        category: 'happy_path',
+        visibility: 'public',
+        entrypoint: 'public/foo.spec.ts',
+      },
+      {
+        id: 'tc-hidden-001',
+        title: 'Hidden test',
+        description: 'Holdout',
+        tracesTo: [],
+        category: 'boundary',
+        visibility: 'hidden',
+        entrypoint: 'hidden/bar.spec.ts',
+      },
+    ],
+  };
+
+  const GATE_SCRIPT = '#!/bin/sh\necho "gate"';
+  const STARTUP_SCRIPT = '#!/bin/sh\necho "startup"';
+  const AGENT_START_SCRIPT = '#!/bin/sh\necho "agent-start"';
+  const AGENT_SCRIPT = '#!/bin/sh\necho "agent"';
+  const STAGE_SCRIPT = '#!/bin/sh\necho "stage"';
+
+  it('creates sandbox with hidden dirs removed, clean git, and mounted scripts; destroySandbox cleans up', () => {
+    const projectDir = mkdtempSync(join(process.cwd(), 'createSandbox-project-'));
+    const sandboxBaseDir = mkdtempSync(join(process.cwd(), 'createSandbox-sandbox-'));
+    try {
+      // 1. Build dummy codebase: .git, .gitignore, saif/features with public + hidden tests
+      writeFileSync(join(projectDir, '.gitignore'), 'node_modules\n');
+      execSync('git init', { cwd: projectDir });
+      writeFileSync(join(projectDir, 'README.md'), 'dummy');
+      execSync('git add README.md', { cwd: projectDir });
+      execSync('git commit -m "Initial"', {
+        cwd: projectDir,
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'test',
+          GIT_AUTHOR_EMAIL: 'test@test',
+          GIT_COMMITTER_NAME: 'test',
+          GIT_COMMITTER_EMAIL: 'test@test',
+        },
+      });
+
+      const saifDir = 'saif';
+      const featureTests = join(projectDir, saifDir, 'features', 'my-feature', 'tests');
+      mkdirSync(join(featureTests, 'public'), { recursive: true });
+      mkdirSync(join(featureTests, 'hidden'), { recursive: true });
+      writeFileSync(join(featureTests, 'tests.json'), JSON.stringify(TEST_CATALOG, null, 2));
+      writeFileSync(
+        join(featureTests, 'public', 'foo.spec.ts'),
+        "import { expect } from 'vitest';\n",
+      );
+      writeFileSync(
+        join(featureTests, 'hidden', 'bar.spec.ts'),
+        "import { expect } from 'vitest';\n",
+      );
+
+      const otherFeatureHidden = join(
+        projectDir,
+        saifDir,
+        'features',
+        'other-feature',
+        'tests',
+        'hidden',
+      );
+      mkdirSync(otherFeatureHidden, { recursive: true });
+      writeFileSync(join(otherFeatureHidden, 'edge.spec.ts'), "import { expect } from 'vitest';\n");
+
+      // 2. Run createSandbox
+      const paths = createSandbox({
+        featureName: 'my-feature',
+        projectDir,
+        saifDir,
+        projectName: 'test-proj',
+        sandboxBaseDir,
+        runId: 'abc123',
+        gateScript: GATE_SCRIPT,
+        startupScript: STARTUP_SCRIPT,
+        agentStartScript: AGENT_START_SCRIPT,
+        agentScript: AGENT_SCRIPT,
+        stageScript: STAGE_SCRIPT,
+      });
+
+      const codePath = paths.codePath;
+      const sandboxBasePath = paths.sandboxBasePath;
+
+      // 3. Assert hidden dirs are removed
+      expect(existsSync(join(codePath, saifDir, 'features', 'my-feature', 'tests', 'hidden'))).toBe(
+        false,
+      );
+      expect(
+        existsSync(join(codePath, saifDir, 'features', 'other-feature', 'tests', 'hidden')),
+      ).toBe(false);
+      expect(existsSync(join(codePath, saifDir, 'features', 'my-feature', 'tests', 'public'))).toBe(
+        true,
+      );
+
+      // 4. Assert tests.json contains only public test cases
+      const copiedCatalog = JSON.parse(
+        readFileSync(
+          join(codePath, saifDir, 'features', 'my-feature', 'tests', 'tests.json'),
+          'utf8',
+        ),
+      );
+      expect(copiedCatalog.testCases).toHaveLength(1);
+      expect(copiedCatalog.testCases[0].visibility).toBe('public');
+      expect(copiedCatalog.testCases[0].id).toBe('tc-public-001');
+
+      // 5. Assert clean git (one commit "Base state")
+      const commitCount = execSync('git rev-list --count HEAD', { cwd: codePath })
+        .toString()
+        .trim();
+      expect(commitCount).toBe('1');
+      const lastMsg = execSync('git log -1 --format=%s', { cwd: codePath }).toString().trim();
+      expect(lastMsg).toBe('Base state');
+
+      // 6. Assert .git from source was NOT copied (fresh init), and code has .git
+      expect(existsSync(join(codePath, '.git'))).toBe(true);
+
+      // 7. Assert mounted scripts exist with correct content and are executable
+      const scripts: [string, string][] = [
+        [paths.gatePath, GATE_SCRIPT],
+        [paths.startupPath, STARTUP_SCRIPT],
+        [paths.agentStartPath, AGENT_START_SCRIPT],
+        [paths.agentPath, AGENT_SCRIPT],
+        [paths.stagePath, STAGE_SCRIPT],
+      ];
+      for (const [p, content] of scripts) {
+        expect(readFileSync(p, 'utf8')).toBe(content);
+        expect((statSync(p).mode & 0o111) !== 0).toBe(true);
+      }
+
+      // 8. Destroy sandbox
+      destroySandbox(sandboxBasePath);
+
+      // 9. Assert sandbox dir is gone
+      expect(existsSync(sandboxBasePath)).toBe(false);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+      if (existsSync(sandboxBaseDir)) {
+        rmSync(sandboxBaseDir, { recursive: true, force: true });
+      }
+    }
   });
 });
 
