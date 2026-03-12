@@ -134,6 +134,7 @@ Dive into the details of what you can customize in the [Features guide](./docs/f
 ## Reference
 
 - [Usage](./docs/usage.md)
+- [Configuration](./docs/config.md)
 - [Agents](docs/agents/README.md)
 - [Security & Isolation](./docs/security.md)
 - [Access control with Cedar](./docs/cedar-access-control.md)

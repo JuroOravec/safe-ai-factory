@@ -81,13 +81,13 @@ export interface LlmConfig {
  * from command entry points down to any function that resolves an agent model.
  */
 export interface ModelOverrides {
-  /** Value of `--model` (global part) — applies to all agents. */
-  model?: string;
-  /** Value of `--base-url` — applies to all agents. */
-  baseUrl?: string;
-  /** Per-agent model overrides from `--model` agent=model parts. */
+  /** Global model; value of `--model` — applies to all agents. */
+  globalModel?: string;
+  /** Global base URL; value of `--base-url` — applies to all agents. */
+  globalBaseUrl?: string;
+  /** Per-agent model overrides from `--model`; agent=model parts. */
   agentModels?: Record<string, string>;
-  /** Per-agent base URL overrides from `--base-url` agent=url parts. */
+  /** Per-agent base URL overrides from `--base-url`; agent=url parts. */
   agentBaseUrls?: Record<string, string>;
 }
 
@@ -331,7 +331,7 @@ export function resolveAgentLlmConfig(agentName: string, overrides: ModelOverrid
   // 1. Per-agent CLI flag
   const agentModelRaw = overrides.agentModels?.[agentName];
   // 2. Global CLI flag
-  const globalModelRaw = overrides.model;
+  const globalModelRaw = overrides.globalModel;
 
   const modelRaw = agentModelRaw ?? globalModelRaw;
 
@@ -363,7 +363,7 @@ export function resolveAgentLlmConfig(agentName: string, overrides: ModelOverrid
   // Base URL: per-agent override → global override → provider default
   const baseURL =
     overrides.agentBaseUrls?.[agentName] ??
-    overrides.baseUrl ??
+    overrides.globalBaseUrl ??
     PROVIDER_LOOKUP[provider.toLowerCase()]?.baseURL;
 
   return { modelId, provider, fullModelString, apiKey, baseURL };

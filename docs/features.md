@@ -85,6 +85,31 @@ saif feat run --model anthropic/claude-sonnet-4-6,pr-summarizer=openai/gpt-4o-mi
 
 See [Models](./models.md) for the full reference and available agents.
 
+## Configuration files
+
+You can store default options in `saif/config.*` so you don't have to pass them via CLI every time.
+
+`safe-ai-factory` uses [Cosmiconfig](https://github.com/cosmiconfig/cosmiconfig), so you can write your config in JSON, YAML, JS, or TS:
+
+- `saif/config.json`
+- `saif/config.yaml` / `config.yml`
+- `saif/config.js` / `config.cjs`
+- `saif/config.ts`
+
+Any CLI flag you pass overrides the corresponding config default.
+
+```json
+{
+  "defaults": {
+    "maxRuns": 5,
+    "globalModel": "anthropic/claude-sonnet-4",
+    "globalStorage": "s3://my-bucket/saif-runs"
+  }
+}
+```
+
+See the [Configuration guide](./config.md) for the full schema and details.
+
 ## Sandbox profiles: Configure coding containers
 
 The AI agent is placed inside a container with Node.js + pnpm + Python (default profile).

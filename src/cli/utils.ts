@@ -14,6 +14,7 @@ import {
   resolveAgentScriptPath,
   resolveAgentStartScriptPath,
 } from '../agent-profiles/index.js';
+import { type SaifConfig } from '../config/schema.js';
 import { getSaifRoot } from '../constants.js';
 import {
   DEFAULT_DESIGNER_PROFILE,

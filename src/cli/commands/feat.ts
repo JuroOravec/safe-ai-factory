@@ -24,6 +24,8 @@ import {
   resolveAgentScriptPath,
   resolveAgentStartScriptPath,
 } from '../../agent-profiles/index.js';
+import { loadSaifConfig } from '../../config/load.js';
+import { type SaifConfig } from '../../config/schema.js';
 import { runDesignTests } from '../../design-tests/design.js';
 import { generateTests } from '../../design-tests/write.js';
 import { DEFAULT_DESIGNER_PROFILE } from '../../designer-profiles/index.js';
@@ -133,11 +135,14 @@ const newCommand = defineCommand({
     const nonInteractive = args.yes === true;
     const namePreFill = getFeatNameFromArgs(args);
 
+    const saifDir = parseSaifDir(args);
+
     if (nonInteractive && !namePreFill) {
       console.error('Error: --name/-n is required when using --yes/-y');
       process.exit(1);
     }
 
+    // Prompt for feature name if not provided
     let featName: string;
     if (nonInteractive) {
       featName = namePreFill!;
@@ -160,6 +165,7 @@ const newCommand = defineCommand({
       featName = nameResult.trim();
     }
 
+    // Prompt for feature description if not provided
     let description: string | undefined;
     if (typeof args.desc === 'string') {
       description = args.desc.trim() || undefined;
@@ -177,11 +183,13 @@ const newCommand = defineCommand({
       description = typeof descResult === 'string' ? descResult.trim() : undefined;
     }
 
+    // Create feature directory
     if (!nonInteractive) outro('Creating feature…');
 
-    const saifDir = parseSaifDir(args);
     const featureDir = join(projectDir, saifDir, 'features', featName);
     mkdirSync(featureDir, { recursive: true });
+
+    // Write proposal.md if description is provided
     if (description) {
       const proposalPath = resolve(featureDir, 'proposal.md');
       writeFileSync(proposalPath, `## What Changes\n\n${description}\n`, 'utf8');
@@ -216,14 +224,14 @@ async function _runDesignSpecs(args: {
   force?: boolean;
   model?: string;
   'base-url'?: string;
-  'agent-model'?: string | string[];
-  'agent-base-url'?: string | string[];
   designer?: string;
   'saif-dir'?: string;
   'project-dir'?: string;
   [key: string]: unknown;
 }) {
   const projectDir = parseProjectDir(args);
+  const saifDir = parseSaifDir(args);
+  const config = loadSaifConfig(saifDir, projectDir);
   const nonInteractive = args.yes === true;
   const force = args.force === true;
   if (nonInteractive && !getFeatNameFromArgs(args)) {
@@ -231,8 +239,7 @@ async function _runDesignSpecs(args: {
     process.exit(1);
   }
   const feature = await getFeatOrPrompt(args, projectDir);
-  const saifDir = parseSaifDir(args);
-  const designerProfile = parseDesignerProfile(args);
+  const designerProfile = parseDesignerProfile(args, config);
 
   const designerBaseOpts = { cwd: projectDir, feature, saifDir };
 
@@ -268,8 +275,14 @@ async function _runDesignSpecs(args: {
     console.log(`\nSkipping designer (${feature.relativePath} already has required spec files).`);
   }
 
-  const overrides = parseModelOverrides(args);
-  return { feature, projectDir, saifDir, overrides };
+  const overrides = parseModelOverrides(args, config);
+  return {
+    feature,
+    projectDir,
+    saifDir,
+    overrides,
+    config,
+  };
 }
 
 const designSpecsCommand = defineCommand({
@@ -309,6 +322,7 @@ interface DesignTestsOptions {
   skipCatalog: boolean;
   force: boolean;
   overrides: ModelOverrides;
+  config?: SaifConfig;
   args: {
     'test-profile'?: string;
     indexer?: string;
@@ -323,11 +337,12 @@ async function _runDesignTests({
   skipCatalog,
   force,
   overrides,
+  config,
   args,
 }: DesignTestsOptions) {
-  const projectName = resolveProjectName(args, projectDir);
-  const testProfile = parseTestProfile(args);
-  const indexerProfile = parseIndexerProfile(args);
+  const projectName = resolveProjectName(args, projectDir, config);
+  const testProfile = parseTestProfile(args, config);
+  const indexerProfile = parseIndexerProfile(args, config);
 
   if (!skipCatalog) {
     // 2a. Read specs and generate a plan of what to test as markdown and JSON.
@@ -386,8 +401,10 @@ const designTestsCommand = defineCommand({
   args: designTestsArgs,
   async run({ args }) {
     const projectDir = parseProjectDir(args);
+    const saifDir = parseSaifDir(args);
+    const config = loadSaifConfig(saifDir, projectDir);
     const feature = await getFeatOrPrompt(args, projectDir);
-    const overrides = parseModelOverrides(args);
+    const overrides = parseModelOverrides(args, config);
 
     const skipCatalog = args['skip-catalog'] === true;
     const force = args.force === true;
@@ -397,6 +414,7 @@ const designTestsCommand = defineCommand({
       skipCatalog,
       force,
       overrides,
+      config,
       args,
     });
 
@@ -427,23 +445,24 @@ async function _runDesignFail2pass(opts: {
   feature: Feature;
   projectDir: string;
   saifDir: string;
+  config?: SaifConfig;
   args: DesignFail2passArgs;
 }): Promise<void> {
-  const { feature, projectDir, saifDir, args } = opts;
-  const sandboxBaseDir = parseSandboxBaseDir(args);
+  const { feature, projectDir, saifDir, config, args } = opts;
+  const sandboxBaseDir = parseSandboxBaseDir(args, config);
 
-  const projectName = resolveProjectName(args, projectDir);
-  const sandboxProfile = parseSandboxProfile(args);
-  const testProfile = parseTestProfile(args);
-  const testImage = parseTestImage(args, testProfile.id);
+  const projectName = resolveProjectName(args, projectDir, config);
+  const sandboxProfile = parseSandboxProfile(args, config);
+  const testProfile = parseTestProfile(args, config);
+  const testImage = parseTestImage(args, testProfile.id, config);
 
   const [gateScript, startupScript, stageScript, { agentStartScript, agentScript }, testScript] =
     await Promise.all([
-      parseGateScript({ args, projectDir }),
-      parseStartupScript({ args, projectDir }),
-      parseStageScript({ args, projectDir }),
-      parseAgentScripts({ args, projectDir }),
-      parseTestScript({ args, projectDir, profileId: testProfile.id }),
+      parseGateScript({ args, projectDir, config }),
+      parseStartupScript({ args, projectDir, config }),
+      parseStageScript({ args, projectDir, config }),
+      parseAgentScripts({ args, projectDir, config }),
+      parseTestScript({ args, projectDir, profileId: testProfile.id, config }),
     ]);
 
   console.log(`\nFail2Pass verification: ${feature.name}`);
@@ -476,12 +495,14 @@ const designFail2passCommand = defineCommand({
   args: designFail2passArgs,
   async run({ args }) {
     const projectDir = parseProjectDir(args);
-    const feature = await getFeatOrPrompt(args, projectDir);
     const saifDir = parseSaifDir(args);
+    const config = loadSaifConfig(saifDir, projectDir);
+    const feature = await getFeatOrPrompt(args, projectDir);
     await _runDesignFail2pass({
       feature,
       projectDir,
       saifDir,
+      config,
       args: args as DesignFail2passArgs,
     });
     console.log('\nDone.');
@@ -503,7 +524,7 @@ const designCommand = defineCommand({
   },
   async run({ args }) {
     // 1. Generate specs
-    const { feature, projectDir, saifDir, overrides } = await _runDesignSpecs(args);
+    const { feature, projectDir, saifDir, overrides, config } = await _runDesignSpecs(args);
     // 2. Generate tests
     await _runDesignTests({
       feature,
@@ -511,6 +532,7 @@ const designCommand = defineCommand({
       skipCatalog: false,
       force: !!args.force,
       overrides,
+      config,
       args,
     });
     // 3. Verify tests (expect them to fail)
@@ -518,6 +540,7 @@ const designCommand = defineCommand({
       feature,
       projectDir,
       saifDir,
+      config,
       args: args as DesignFail2passArgs,
     });
     console.log('\nDone.');
@@ -567,40 +590,47 @@ const runCommand = defineCommand({
 
 export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand>) => {
   const projectDir = parseProjectDir(args);
+  const saifDir = parseSaifDir(args);
+  const config = loadSaifConfig(saifDir, projectDir);
+
   const feature = await getFeatOrPrompt(args, projectDir);
   const runArgs = args as FeatRunArgs;
 
-  const maxRuns = parseMaxRuns(runArgs);
-  const overrides = parseModelOverrides(args);
-  const saifDir = parseSaifDir(args);
-  const sandboxBaseDir = parseSandboxBaseDir(args);
-  const projectName = resolveProjectName(args, projectDir);
-  const testProfile = parseTestProfile(args);
-  const testImage = parseTestImage(runArgs, testProfile.id);
-  const resolveAmbiguity = parseResolveAmbiguity(runArgs);
-  const testRetries = parseTestRetries(runArgs);
-  const dangerousDebug = parseDangerousDebug(runArgs);
-  const cedarPolicyPath = parseCedarPolicyPath(runArgs);
-  const coderImage = parseCoderImage(runArgs);
-  const sandboxProfile = parseSandboxProfile(runArgs);
-  const agentProfile = parseAgentProfile(runArgs);
+  const maxRuns = parseMaxRuns(runArgs, config);
+  const overrides = parseModelOverrides(args, config);
+  const sandboxBaseDir = parseSandboxBaseDir(args, config);
+  const projectName = resolveProjectName(args, projectDir, config);
+  const testProfile = parseTestProfile(args, config);
+  const testImage = parseTestImage(runArgs, testProfile.id, config);
+  const resolveAmbiguity = parseResolveAmbiguity(runArgs, config);
+  const testRetries = parseTestRetries(runArgs, config);
+  const dangerousDebug = parseDangerousDebug(runArgs, config);
+  const cedarPolicyPath = parseCedarPolicyPath(runArgs, config);
+  const coderImage = parseCoderImage(runArgs, config);
+  const sandboxProfile = parseSandboxProfile(runArgs, config);
+  const agentProfile = parseAgentProfile(runArgs, config);
 
   const [startupScript, gateScript, { agentStartScript, agentScript }, stageScript, testScript] =
     await Promise.all([
-      parseStartupScript({ args: runArgs, projectDir }),
-      parseGateScript({ args: runArgs, projectDir }),
-      parseAgentScripts({ args: runArgs, projectDir }),
-      parseStageScript({ args: runArgs, projectDir }),
-      parseTestScript({ args: runArgs, projectDir, profileId: testProfile.id }),
+      parseStartupScript({ args: runArgs, projectDir, config }),
+      parseGateScript({ args: runArgs, projectDir, config }),
+      parseAgentScripts({ args: runArgs, projectDir, config }),
+      parseStageScript({ args: runArgs, projectDir, config }),
+      parseTestScript({
+        args: runArgs,
+        projectDir,
+        profileId: testProfile.id,
+        config,
+      }),
     ]);
 
-  const gateRetries = parseGateRetries(runArgs);
-  const agentEnv = parseAgentEnv({ args: runArgs, projectDir });
-  const agentLogFormat = parseAgentLogFormat(runArgs, agentProfile);
-  const push = parsePush(runArgs);
-  const pr = parsePr(runArgs);
-  const gitProvider = parseGitProvider(runArgs);
-  const runStorage = parseRunStorage(runArgs, projectDir);
+  const gateRetries = parseGateRetries(runArgs, config);
+  const agentEnv = parseAgentEnv({ args: runArgs, projectDir, config });
+  const agentLogFormat = parseAgentLogFormat(runArgs, agentProfile, config);
+  const push = parsePush(runArgs, config);
+  const pr = parsePr(runArgs, config);
+  const gitProvider = parseGitProvider(runArgs, config);
+  const runStorage = parseRunStorage(runArgs, projectDir, config);
 
   console.log(`\nStarting iterative loop: ${feature.name}`);
   console.log(`  Max runs: ${maxRuns}`);
@@ -669,15 +699,16 @@ const debugCommand = defineCommand({
   args: featDebugArgs,
   async run({ args }) {
     const projectDir = parseProjectDir(args);
-    const feature = await getFeatOrPrompt(args, projectDir);
     const saifDir = parseSaifDir(args);
-    const sandboxBaseDir = parseSandboxBaseDir(args);
-    const projectName = resolveProjectName(args, projectDir);
-    const sandboxProfile = parseSandboxProfile(args);
+    const config = loadSaifConfig(saifDir, projectDir);
+    const feature = await getFeatOrPrompt(args, projectDir);
+    const sandboxBaseDir = parseSandboxBaseDir(args, config);
+    const projectName = resolveProjectName(args, projectDir, config);
+    const sandboxProfile = parseSandboxProfile(args, config);
 
     const [startupScript, stageScript] = await Promise.all([
-      parseStartupScript({ args, projectDir }),
-      parseStageScript({ args, projectDir }),
+      parseStartupScript({ args, projectDir, config }),
+      parseStageScript({ args, projectDir, config }),
     ]);
 
     const gateScript = readSandboxGateScript(sandboxProfile.id);

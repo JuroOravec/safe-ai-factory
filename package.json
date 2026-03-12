@@ -80,6 +80,7 @@
     "@clack/prompts": "^1.0.1",
     "@mastra/core": "^1.7.0",
     "citty": "^0.2.1",
+    "cosmiconfig": "^9.0.1",
     "dockerode": "^4.0.9",
     "fast-xml-parser": "^5.4.2",
     "minimatch": "^10.2.4",
