@@ -171,7 +171,7 @@ saif feat run \
   --agent-env-file ./agent.env
 ```
 
-**Reserved variables**: The factory filters out `FACTORY_*`, `WORKSPACE_BASE`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_PROVIDER`, and `LLM_BASE_URL`. If you pass them via `--agent-env`, they are ignored with a warning.
+**Reserved variables**: The factory filters out `FACTORY_*`, `LLM_*`, `REVIEWER_LLM_*`. If you pass them via `--agent-env`, they are ignored with a warning.
 
 ---
 
@@ -262,7 +262,7 @@ saif feat run \
 
 In this mode:
 
-- The workspace is the sandbox `code/` directory (path passed as `WORKSPACE_BASE`)
+- The workspace is the sandbox `code/` directory (path passed as `FACTORY_WORKSPACE_BASE`)
 - `$FACTORY_TASK_PATH` points to `{sandbox}/code/.factory_task.md`
 - Your agent must be installed on the host
 
@@ -270,13 +270,13 @@ In this mode:
 
 ## Troubleshooting
 
-| Issue                        | Cause                                                            | Fix                                                                                                                       |
-| ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `agent script not found`     | The path to `--agent-script` is wrong or the file isn't readable | Use an absolute path or a path relative to the repo root; ensure the file exists                                          |
-| Agent receives empty task    | `$FACTORY_TASK_PATH` is unset or wrong                           | Don't override `FACTORY_TASK_PATH` via `--agent-env`; the factory sets it automatically                                   |
-| `--agent-env` var is ignored | Variable is reserved                                             | Don't pass `FACTORY_*`, `WORKSPACE_BASE`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_PROVIDER`, or `LLM_BASE_URL` via `--agent-env` |
-| Agent not found in container | Agent isn't installed in the coder image or startup script       | Install in `--startup-script` or build a custom `--coder-image`                                                           |
-| Garbled or missing output    | Using default `openhands` log format with a non-OpenHands agent  | Add `--agent-log-format raw`                                                                                              |
+| Issue                        | Cause                                                            | Fix                                                                                     |
+| ---------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `agent script not found`     | The path to `--agent-script` is wrong or the file isn't readable | Use an absolute path or a path relative to the repo root; ensure the file exists        |
+| Agent receives empty task    | `$FACTORY_TASK_PATH` is unset or wrong                           | Don't override `FACTORY_TASK_PATH` via `--agent-env`; the factory sets it automatically |
+| `--agent-env` var is ignored | Variable is reserved                                             | Don't pass `FACTORY_*`, `LLM_*`, `REVIEWER_LLM_*` via `--agent-env`                     |
+| Agent not found in container | Agent isn't installed in the coder image or startup script       | Install in `--startup-script` or build a custom `--coder-image`                         |
+| Garbled or missing output    | Using default `openhands` log format with a non-OpenHands agent  | Add `--agent-log-format raw`                                                            |
 
 ---
 

@@ -119,13 +119,12 @@ export interface RunAgentOpts {
    * or inject into the host process env (dangerous-debug mode).
    *
    * Useful for agent-specific configuration (e.g. AIDER_MODEL, CLAUDE_API_KEY).
-   * If a key conflicts with a reserved factory variable (FACTORY_*, WORKSPACE_BASE,
-   * LLM_API_KEY, LLM_MODEL, LLM_PROVIDER, LLM_BASE_URL), a warning is emitted and the
-   * user-supplied value is ignored to prevent breaking the factory loop.
+   * If a key conflicts with a reserved factory variable (FACTORY_*, LLM_*, REVIEWER_LLM_*),
+   * a warning is emitted and the user-supplied value is ignored to prevent breaking the factory loop.
    */
   agentEnv: Record<string, string>;
   /**
-   * Controls how agent stdout is parsed and printed.
+   * Controls how agent stdout is parsed and displayed.
    *
    * - `'openhands'` (default) — parse OpenHands --json event stream; pretty-print
    *   action events, thought blocks, and errors.
@@ -133,6 +132,17 @@ export interface RunAgentOpts {
    *   agent CLI that does not emit OpenHands-style JSON events.
    */
   agentLogFormat: 'openhands' | 'raw';
+  /**
+   * Settings for the semantic reviewer (argus-ai).
+   *
+   * When non-null, mounts argus-ai binary and reviewer.sh, sets FACTORY_REVIEWER_SCRIPT and REVIEWER_LLM_* env vars.
+   * null = reviewer not enabled.
+   */
+  reviewer: {
+    llmConfig: LlmConfig;
+    scriptPath: string;
+    argusBinaryPath: string;
+  } | null;
 }
 
 export interface RunAgentResult {
@@ -150,19 +160,25 @@ const RESERVED_ENV_KEYS = new Set([
   'FACTORY_INITIAL_TASK',
   'FACTORY_GATE_RETRIES',
   'FACTORY_GATE_SCRIPT',
+  'FACTORY_REVIEWER_SCRIPT',
   'FACTORY_STARTUP_SCRIPT',
   'FACTORY_AGENT_START_SCRIPT',
   'FACTORY_AGENT_SCRIPT',
   'FACTORY_TASK_PATH',
-  'WORKSPACE_BASE',
+  'FACTORY_WORKSPACE_BASE',
   'LLM_API_KEY',
   'LLM_MODEL',
   'LLM_PROVIDER',
   'LLM_BASE_URL',
+  'REVIEWER_LLM_PROVIDER',
+  'REVIEWER_LLM_MODEL',
+  'REVIEWER_LLM_API_KEY',
+  'REVIEWER_LLM_BASE_URL',
 ]);
 
 const SENSITIVE_ENV_KEYS = new Set([
   'LLM_API_KEY',
+  'REVIEWER_LLM_API_KEY',
   'ANTHROPIC_API_KEY',
   'OPENAI_API_KEY',
   'OPENROUTER_API_KEY',
@@ -178,7 +194,7 @@ const SENSITIVE_ENV_KEYS = new Set([
  *   1. Any key with a `FACTORY_` prefix — covers all current and future
  *      internal factory loop variables.
  *   2. Exact-match keys in RESERVED_ENV_KEYS — covers non-prefixed vars like
- *      WORKSPACE_BASE, LLM_API_KEY, LLM_MODEL, LLM_PROVIDER, and LLM_BASE_URL.
+ *      FACTORY_WORKSPACE_BASE, LLM_API_KEY, LLM_MODEL, LLM_PROVIDER, and LLM_BASE_URL.
  */
 export function filterAgentEnv(agentEnv: Record<string, string>): Record<string, string> {
   const result: Record<string, string> = {};
@@ -211,7 +227,7 @@ export function filterAgentEnv(agentEnv: Record<string, string>): Record<string,
  *
  * In --dangerous-debug mode the command is:
  *   bash src/orchestrator/scripts/coder-start.sh
- *   (with WORKSPACE_BASE=codePath in env, cwd=codePath)
+ *   (with FACTORY_WORKSPACE_BASE=codePath in env, cwd=codePath)
  *
  * The caller extracts the patch afterwards via sandbox.extractPatch().
  */
@@ -233,6 +249,7 @@ export async function runAgent(opts: RunAgentOpts): Promise<RunAgentResult> {
     agentPath,
     agentEnv,
     agentLogFormat,
+    reviewer,
   } = opts;
 
   const safeAgentEnv = filterAgentEnv(agentEnv);
@@ -268,7 +285,7 @@ export async function runAgent(opts: RunAgentOpts): Promise<RunAgentResult> {
       LLM_API_KEY: llmApiKey,
       ...(llmProvider ? { LLM_PROVIDER: llmProvider } : {}),
       ...(llmBaseUrl ? { LLM_BASE_URL: llmBaseUrl } : {}),
-      WORKSPACE_BASE: codePath,
+      FACTORY_WORKSPACE_BASE: codePath,
       FACTORY_INITIAL_TASK: taskPrompt,
       FACTORY_GATE_RETRIES: String(gateRetries),
       FACTORY_STARTUP_SCRIPT: startupPath,
@@ -332,6 +349,23 @@ export async function runAgent(opts: RunAgentOpts): Promise<RunAgentResult> {
       `${agentPath}:/factory/agent.sh:ro`,
     ];
 
+    // Add a semantic reviewer (uses LLMs). argus-ai is a Rust-based binary.
+    if (reviewer) {
+      leashArgs.push(
+        '--volume',
+        `${reviewer.scriptPath}:/factory/reviewer.sh:ro`,
+        '--volume',
+        `${reviewer.argusBinaryPath}:/usr/local/bin/argus:ro`,
+      );
+      envForward.FACTORY_REVIEWER_SCRIPT = '/factory/reviewer.sh';
+      envForward.REVIEWER_LLM_PROVIDER = reviewer.llmConfig.provider;
+      envForward.REVIEWER_LLM_MODEL = reviewer.llmConfig.fullModelString;
+      envForward.REVIEWER_LLM_API_KEY = reviewer.llmConfig.apiKey;
+      if (reviewer.llmConfig.baseURL) {
+        envForward.REVIEWER_LLM_BASE_URL = reviewer.llmConfig.baseURL;
+      }
+    }
+
     if (existsSync(cedarPolicyPath)) {
       leashArgs.push('--policy', cedarPolicyPath);
       console.log(`[agent-runner] Cedar policy: ${cedarPolicyPath}`);
@@ -345,7 +379,7 @@ export async function runAgent(opts: RunAgentOpts): Promise<RunAgentResult> {
 
     leashArgs.push(
       '--env',
-      `WORKSPACE_BASE=${CONTAINER_WORKSPACE}`,
+      `FACTORY_WORKSPACE_BASE=${CONTAINER_WORKSPACE}`,
       '--env',
       `FACTORY_INITIAL_TASK=${taskPrompt}`,
       '--env',
@@ -386,6 +420,10 @@ export async function runAgent(opts: RunAgentOpts): Promise<RunAgentResult> {
     console.log(`[agent-runner] Startup script: ${startupPath} → /factory/startup.sh (ro)`);
     console.log(`[agent-runner] Gate script: ${sandboxBasePath}/gate.sh → /factory/gate.sh (ro)`);
     console.log(`[agent-runner] Gate retries: ${gateRetries}`);
+    if (reviewer) {
+      console.log(`[agent-runner] Reviewer: ${reviewer.scriptPath} → /factory/reviewer.sh (ro)`);
+      console.log(`[agent-runner] Argus: ${reviewer.argusBinaryPath} → /usr/local/bin/argus (ro)`);
+    }
   }
 
   console.log(`[agent-runner] Starting agent (model: ${llmModel})`);

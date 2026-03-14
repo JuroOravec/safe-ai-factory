@@ -53,14 +53,14 @@ Your script must read from `$FACTORY_TASK_PATH` and invoke the agent.
 
 The factory forwards these into the agent container:
 
-| Variable            | Purpose                                                                                            |
-| ------------------- | -------------------------------------------------------------------------------------------------- |
-| `LLM_MODEL`         | Model string (e.g. `anthropic/claude-sonnet-4-5`, `gpt-4o`). <br/>Overridable via `--model`.       |
-| `LLM_API_KEY`       | API key.<br/>Agents may map this to provider-specific vars (e.g. `OPENAI_API_KEY`).                |
-| `LLM_PROVIDER`      | Provider ID (e.g. `anthropic`, `openrouter`).<br/>Some agents that need it for base URL / routing. |
-| `LLM_BASE_URL`      | Base URL (e.g. `https://openrouter.ai/api/v1`).<br/>Overridable via `--base-url`.                  |
-| `FACTORY_TASK_PATH` | Path to the task markdown file. Agent script must read from here.                                  |
-| `WORKSPACE_BASE`    | Path to the workspace (`/workspace` or host path).                                                 |
+| Variable                 | Purpose                                                                                            |
+| ------------------------ | -------------------------------------------------------------------------------------------------- |
+| `LLM_MODEL`              | Model string (e.g. `anthropic/claude-sonnet-4-5`, `gpt-4o`). <br/>Overridable via `--model`.       |
+| `LLM_API_KEY`            | API key.<br/>Agents may map this to provider-specific vars (e.g. `OPENAI_API_KEY`).                |
+| `LLM_PROVIDER`           | Provider ID (e.g. `anthropic`, `openrouter`).<br/>Some agents that need it for base URL / routing. |
+| `LLM_BASE_URL`           | Base URL (e.g. `https://openrouter.ai/api/v1`).<br/>Overridable via `--base-url`.                  |
+| `FACTORY_TASK_PATH`      | Path to the task markdown file. Agent script must read from here.                                  |
+| `FACTORY_WORKSPACE_BASE` | Path to the workspace (`/workspace` or host path).                                                 |
 
 Additional vars from `--agent-env` and `--agent-env-file` are forwarded to the container.
 

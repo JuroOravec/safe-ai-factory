@@ -112,8 +112,8 @@ There are two architectures that matter in practice:
 A binary compiled for `amd64` will not run on `arm64`, and vice versa. So two binaries are required. They live at:
 
 ```
-src/orchestrator/sidecar/out/sidecar-linux-amd64
-src/orchestrator/sidecar/out/sidecar-linux-arm64
+src/orchestrator/sidecars/cli-over-http/out/sidecar-linux-amd64
+src/orchestrator/sidecars/cli-over-http/out/sidecar-linux-arm64
 ```
 
 Both are committed to the repository. Users do not need Go installed to run the factory.

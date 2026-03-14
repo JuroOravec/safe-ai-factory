@@ -309,6 +309,8 @@ After the tests successfully failed, you can start your coding agent.
 
 - Running tests requires Docker deamon.
 
+- A **semantic AI reviewer** runs after the gate by default. Disable with `--no-reviewer`. See [reviewer](reviewer.md).
+
 - On test failures, an AI **Judge** decides whether the errors are:
   1. Genuine - coding agent made an error
   2. Due to ambiguity in the specs

@@ -99,6 +99,7 @@ You can store default options in `saif/config.*` so you don't have to pass them 
 Any CLI flag you pass overrides the corresponding config default.
 
 ```json
+// saif/config.json
 {
   "defaults": {
     "maxRuns": 5,

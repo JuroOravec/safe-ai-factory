@@ -354,12 +354,16 @@ export async function startAdditionalContainers(
 function loadSidecarBinary(): Buffer {
   const hostArch = arch(); // 'arm64' on Apple Silicon, 'x64' on Intel/AMD
   const binaryName = hostArch === 'arm64' ? 'sidecar-linux-arm64' : 'sidecar-linux-amd64';
-  const binaryPath = resolve(dirname(fileURLToPath(import.meta.url)), '../sidecar/out', binaryName);
+  const binaryPath = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    '../sidecars/cli-over-http/out',
+    binaryName,
+  );
 
   if (!existsSync(binaryPath)) {
     throw new Error(
       `[sidecar] Pre-compiled sidecar binary not found at ${binaryPath}. ` +
-        `Run: cd src/orchestrator/sidecar && ` +
+        `Run: cd src/orchestrator/sidecars/cli-over-http && ` +
         `GOOS=linux GOARCH=${hostArch === 'arm64' ? 'arm64' : 'amd64'} CGO_ENABLED=0 go build -o out/${binaryName} .`,
     );
   }

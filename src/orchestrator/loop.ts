@@ -9,6 +9,7 @@ import { join } from 'node:path';
 
 import { isCancel, text } from '@clack/prompts';
 
+import { getSaifRoot } from '../constants.js';
 import { runDesignTests } from '../design-tests/design.js';
 import { TestCatalogSchema } from '../design-tests/schema.js';
 import { generateTests } from '../design-tests/write.js';
@@ -32,6 +33,7 @@ import {
   type PatchExcludeRule,
   type SandboxPaths,
 } from './sandbox.js';
+import { getArgusBinaryPath } from './sidecars/reviewer/argus.js';
 
 // ---------------------------------------------------------------------------
 // Shared: Iterative Loop (used by 'start' and 'continue')
@@ -132,9 +134,8 @@ export interface IterativeLoopOpts {
    * or inject into the host process env (--dangerous-debug mode).
    *
    * Parsed from --agent-env KEY=VALUE flags and --agent-env-file <path> by the CLI.
-   * Reserved factory variables (FACTORY_*, WORKSPACE_BASE, LLM_API_KEY, LLM_MODEL,
-   * LLM_PROVIDER, LLM_BASE_URL) are silently filtered out by the runner to prevent
-   * accidental override.
+   * Reserved factory variables (FACTORY_*, LLM_*, REVIEWER_LLM_*) are silently filtered out
+   * by the runner to prevent accidental override.
    */
   agentEnv: Record<string, string>;
   /**
@@ -172,6 +173,12 @@ export interface IterativeLoopOpts {
    * automatically — passing rules here adds to that, not replaces it.
    */
   patchExclude?: PatchExcludeRule[];
+  /**
+   * When true, run the semantic AI reviewer (Argus) after static checks pass.
+   * Requires the Argus binary. Disable with --no-reviewer.
+   * Default: true.
+   */
+  reviewerEnabled: boolean;
 }
 
 export interface OrchestratorResult {
@@ -220,11 +227,20 @@ export async function runIterativeLoop(
     testScript,
     testProfile,
     testRetries,
+    reviewerEnabled,
   } = opts;
 
   // Resolve the coder agent's LLM config once per loop.
   // The resolved config is injected into the Leash container as LLM_* env vars.
   const coderLlmConfig = resolveAgentLlmConfig('coder', overrides);
+  const reviewer =
+    reviewerEnabled && !dangerousDebug
+      ? {
+          llmConfig: resolveAgentLlmConfig('reviewer', overrides),
+          scriptPath: join(getSaifRoot(), 'src', 'orchestrator', 'scripts', 'reviewer.sh'),
+          argusBinaryPath: getArgusBinaryPath(),
+        }
+      : null;
   // Always exclude saif/ and .git/hooks/ regardless of any additional caller-supplied rules.
   // saif/: reward-hacking prevention (agent must not modify its own test specs).
   // .git/hooks/: prevents a malicious patch from installing hooks that execute on the host
@@ -274,6 +290,7 @@ export async function runIterativeLoop(
         agentPath: sandbox.agentPath,
         agentEnv,
         agentLogFormat,
+        reviewer,
       });
 
       // 2. Extract the patch, stripping any excluded paths (reward-hacking prevention)

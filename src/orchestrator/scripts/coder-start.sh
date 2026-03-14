@@ -24,6 +24,9 @@
 #                                 agent invocation (default: /workspace/.factory_task.md).
 #                                 Agent scripts should read from this file rather than from
 #                                 command-line arguments to avoid escaping and length issues.
+#   FACTORY_REVIEWER_SCRIPT     — (optional) path to semantic reviewer script. When set and
+#                                 present, runs after the gate passes. If it fails, the round
+#                                 is treated as a gate failure and the agent retries.
 
 set -euo pipefail
 
@@ -87,23 +90,40 @@ while [ "$round" -lt "$GATE_RETRIES" ]; do
   bash "$AGENT_SCRIPT"
   echo "[coder-start] Agent completed."
 
-  if [ ! -f "$GATE_SCRIPT" ]; then
-    echo "[coder-start] No gate script found at $GATE_SCRIPT — exiting with success."
-    exit 0
+  if [ -f "$GATE_SCRIPT" ]; then
+    echo "[coder-start] Running gate: $GATE_SCRIPT"
+    # Capture stdout+stderr; preserve exit code without triggering set -e.
+    gate_output=$("$GATE_SCRIPT" 2>&1) && gate_exit=0 || gate_exit=$?
+  else
+    echo "[coder-start] No gate script at $GATE_SCRIPT — skipping static checks."
+    gate_output=""
+    gate_exit=0
   fi
 
-  echo "[coder-start] Running gate: $GATE_SCRIPT"
-  # Capture stdout+stderr; preserve exit code without triggering set -e.
-  gate_output=$("$GATE_SCRIPT" 2>&1) && gate_exit=0 || gate_exit=$?
-
+  # User-supplied gate script succeeded, now let's run the semantic reviewer (argus-ai) if enabled.
   if [ "$gate_exit" -eq 0 ]; then
-    echo "[coder-start] Gate PASSED."
-    exit 0
+    # No reviewer configured — gate passed, we're done.
+    if [ -z "${FACTORY_REVIEWER_SCRIPT:-}" ] || [ ! -f "${FACTORY_REVIEWER_SCRIPT}" ]; then
+      echo "[coder-start] Gate PASSED."
+      exit 0
+    fi
+    # Reviewer enabled — run it.
+    echo "[coder-start] Running semantic reviewer: $FACTORY_REVIEWER_SCRIPT"
+    gate_output=$("$FACTORY_REVIEWER_SCRIPT" 2>&1) && gate_exit=0 || gate_exit=$?
+    if [ "$gate_exit" -eq 0 ]; then
+      # Both gate and reviewer passed, we're done.
+      echo "[coder-start] Gate PASSED (static checks + reviewer)."
+      exit 0
+    fi
+    echo "[coder-start] Reviewer FAILED (round $round/$GATE_RETRIES):"
+  else
+    echo "[coder-start] Gate FAILED (round $round/$GATE_RETRIES):"
   fi
 
-  echo "[coder-start] Gate FAILED (round $round/$GATE_RETRIES):"
+  # Failure branch: append the output to the task prompt and retry.
   echo "$gate_output"
 
+  # If we've reached the max number of retries, exit with failure.
   if [ "$round" -ge "$GATE_RETRIES" ]; then
     break
   fi

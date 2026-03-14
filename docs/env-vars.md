@@ -53,14 +53,20 @@ The following variables are **generated at runtime by the orchestrator** and
 injected into the Leash coder container. Do not set them in your `.env` — they
 will be overwritten.
 
-| Variable       | Set from                                                               |
-| -------------- | ---------------------------------------------------------------------- |
-| `LLM_MODEL`    | Resolved from `--model` (global or agent=model parts) / auto-discovery |
-| `LLM_PROVIDER` | Derived from the `provider/model` prefix                               |
-| `LLM_API_KEY`  | Resolved from the provider's standard key env var                      |
-| `LLM_BASE_URL` | Resolved from `--base-url` (global or agent=url parts)                 |
+| Variable                | Set from                                                               |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `LLM_MODEL`             | Resolved from `--model` (global or agent=model parts) / auto-discovery |
+| `LLM_PROVIDER`          | Derived from the `provider/model` prefix                               |
+| `LLM_API_KEY`           | Resolved from the provider's standard key env var                      |
+| `LLM_BASE_URL`          | Resolved from `--base-url` (global or agent=url parts)                 |
+| `REVIEWER_LLM_PROVIDER` | Reviewer model provider                                                |
+| `REVIEWER_LLM_MODEL`    | Reviewer model string                                                  |
+| `REVIEWER_LLM_API_KEY`  | API key for the reviewer provider                                      |
+| `REVIEWER_LLM_BASE_URL` | Optional custom base URL for reviewer                                  |
 
-Agent shell scripts (`agent.sh`, `agent-start.sh`) read these variables to
+The `REVIEWER_LLM_*` vars are injected when the semantic AI reviewer (argus-ai) is enabled. See [Semantic reviewer](./reviewer.md).
+
+Agent shell scripts (`agent.sh`, `agent-start.sh`) read the `LLM_*` variables to
 configure the coding agent (e.g. `OPENAI_API_KEY` for Codex, `ANTHROPIC_API_KEY`
 for Claude Code).
 

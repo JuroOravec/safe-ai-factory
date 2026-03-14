@@ -44,9 +44,9 @@ describe('filterAgentEnv', () => {
     expect(result).toHaveProperty('SAFE', 'z');
   });
 
-  it('strips WORKSPACE_BASE', () => {
-    const result = filterAgentEnv({ WORKSPACE_BASE: '/workspace', KEEP: 'yes' });
-    expect(result).not.toHaveProperty('WORKSPACE_BASE');
+  it('strips FACTORY_WORKSPACE_BASE', () => {
+    const result = filterAgentEnv({ FACTORY_WORKSPACE_BASE: '/workspace', KEEP: 'yes' });
+    expect(result).not.toHaveProperty('FACTORY_WORKSPACE_BASE');
     expect(result).toHaveProperty('KEEP', 'yes');
   });
 
@@ -65,6 +65,21 @@ describe('filterAgentEnv', () => {
     expect(result).toHaveProperty('AGENT_SETTING', 'fine');
   });
 
+  it('strips REVIEWER_LLM_API_KEY, REVIEWER_LLM_MODEL, REVIEWER_LLM_PROVIDER, and REVIEWER_LLM_BASE_URL', () => {
+    const result = filterAgentEnv({
+      REVIEWER_LLM_API_KEY: 'secret',
+      REVIEWER_LLM_MODEL: 'gpt-4o',
+      REVIEWER_LLM_PROVIDER: 'anthropic',
+      REVIEWER_LLM_BASE_URL: 'https://openrouter.ai/api/v1',
+      AGENT_SETTING: 'fine',
+    });
+    expect(result).not.toHaveProperty('REVIEWER_LLM_API_KEY');
+    expect(result).not.toHaveProperty('REVIEWER_LLM_MODEL');
+    expect(result).not.toHaveProperty('REVIEWER_LLM_PROVIDER');
+    expect(result).not.toHaveProperty('REVIEWER_LLM_BASE_URL');
+    expect(result).toHaveProperty('AGENT_SETTING', 'fine');
+  });
+
   it('emits a console.warn for each stripped key', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     filterAgentEnv({ FACTORY_INITIAL_TASK: 'x', LLM_API_KEY: 'y', SAFE: 'z' });
@@ -75,7 +90,7 @@ describe('filterAgentEnv', () => {
   });
 
   it('returns an empty object when all keys are reserved', () => {
-    const result = filterAgentEnv({ FACTORY_INITIAL_TASK: 'x', WORKSPACE_BASE: 'y' });
+    const result = filterAgentEnv({ FACTORY_INITIAL_TASK: 'x', FACTORY_WORKSPACE_BASE: 'y' });
     expect(result).toEqual({});
   });
 

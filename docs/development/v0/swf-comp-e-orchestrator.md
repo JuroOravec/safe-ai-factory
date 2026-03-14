@@ -83,7 +83,7 @@ This is where we enforce the "Perfect Black Box" to prevent reward hacking. We m
 
 - The Orchestrator waits for the Test Runner to finish and checks its **Exit Code**.
 - **If Exit Code 1:** The Orchestrator captures the `stderr` logs, destroys both containers, goes back to Step 7, and passes the error log to the Coder Agent: _"The holdout test failed with this error. Try again."_
-- **If Exit Code 0:** The code is mathematically proven to work. The Orchestrator proceeds to Phase 4.
+- **If Exit Code 0:** The code is proven to work. The Orchestrator proceeds to Phase 4.
 
 ### Phase 4: Teardown
 

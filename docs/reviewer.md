@@ -1,0 +1,90 @@
+# Semantic Code Reviewer
+
+After your agent finishes coding and passes standard static checks (`gate` script), an AI reviewer checks the diff to ensure the original goal was actually met.
+
+If the agent missed logic, hallucinated APIs, or failed to complete the task, the reviewer catches it, fails the gate, and sends feedback back to the agent for another try.
+
+---
+
+## When it runs
+
+The reviewer runs inside the container loop right before finishing an attempt.
+
+```
+Agent writes code
+       ↓
+Gate script — static checks (e.g. lint, format)
+       ↓ pass
+AI reviewer — semantic review
+       ↓ pass
+Round complete → exit container
+```
+
+The reviewer runs only for:
+
+- `saif feat run`
+- `saif run resume`
+
+To disable the reviewer, you can, pass `--no-reviewer`.
+
+---
+
+## Configure the reviewer
+
+The reviewer is **enabled by default**.
+
+You can configure the reviewer to use a different model than the main coding agent. A common pattern is using a fast/cheap model for coding, but a powerful reasoning model for review.
+
+### Using CLI flags
+
+```bash
+# Use Sonnet for the coder, and Opus for the reviewer
+saif feat run --model coder=anthropic/claude-sonnet-4-6,reviewer=anthropic/claude-opus-4-6
+
+# Disable the reviewer for this run
+saif feat run --no-reviewer
+```
+
+### Using config file
+
+To configure this permanently, update `saif/config.json`:
+
+```json
+{
+  "defaults": {
+    "agentModels": {
+      "coder": "anthropic/claude-sonnet-4-6",
+      "reviewer": "openai/gpt-4o"
+    }
+  }
+}
+```
+
+---
+
+## How it works
+
+The reviewer workflow is implemented by the [`argus-ai`](https://github.com/Meru143/argus) project.
+
+Argus provides best practices for semantic code review:
+
+- Reviews are checked for false positives.
+- Reviewer can search the codebase to understand call stacks across files.
+- Reviewer compares the diff against the original task.
+
+The factory downloads Argus binary for your architecture on first run and mounts it into the container alongside a script (`reviewer.sh`).
+
+If Argus spots an issue, it prints findings like `- file.ts:42: Missing error handling` which the factory feeds back into the prompt for the next agent iteration.
+
+## Troubleshooting
+
+- **"Failed to download binary from..."**  
+  The factory fetches Argus from GitHub releases. If GitHub is unreachable or the specific architecture release is missing, the run will fail. Use `--no-reviewer` to bypass it.
+- **Reviewer passes but tests fail**  
+  The reviewer verifies _intent and logic_ from the git diff. It does not actually execute your code or tests. Tests verification runs in the next stage after the reviewer passes.
+
+## See Also
+
+- [Environment variables](env-vars.md) — `REVIEWER_LLM_*` and container vars
+- [Models](models.md) — Agent reference and `--model` usage
+- [Meru143/argus](https://github.com/Meru143/argus) — Argus semantic review tool

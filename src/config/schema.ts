@@ -9,7 +9,7 @@
 import { z } from 'zod';
 
 import { isSupportedAgentName, SUPPORTED_AGENT_NAMES } from '../llm-config.js';
-import { isSupportedStorageKey, SUPPORTED_STORAGE_KEYS } from '../run-storage/types.js';
+import { isSupportedStorageKey, SUPPORTED_STORAGE_KEYS } from '../storage/types.js';
 
 export const saifConfigDefaultsSchema = z.object({
   // Run params
@@ -20,6 +20,7 @@ export const saifConfigDefaultsSchema = z.object({
   cedarPolicyPath: z.string().optional(),
   coderImage: z.string().optional(),
   gateRetries: z.number().int().positive().optional(),
+  reviewerEnabled: z.boolean().optional(),
   agentLogFormat: z.enum(['openhands', 'raw']).optional(),
   push: z.string().optional(),
   pr: z.boolean().optional(),

@@ -21,11 +21,13 @@ flowchart TD
     end
 
     subgraph inner [Inner Loop - inside container or host]
-        H[coder-start.sh] --> I[openhands]
+        H[coder-start.sh] --> I[coding agent makes changes]
         I --> J{gate.sh}
-        J -->|exit 0| K[exit successfully]
-        J -->|exit 1| L["append feedback to task → retry"]
+        J -->|fail| L["append feedback to task → retry"]
+        J -->|pass| N{reviewer}
         L --> I
+        N -->|pass / skip| K[exit successfully]
+        N -->|fail| L
     end
 
     C -->|spawns| H
@@ -49,11 +51,11 @@ A shell script that wraps each agent invocation with a post-run validation step.
 3. Loop up to `FACTORY_GATE_RETRIES` times (default: 5):
    - Write `$current_task` to `$FACTORY_TASK_PATH` (default: `/workspace/.factory_task.md`)
    - Invoke the agent script: `bash "$FACTORY_AGENT_SCRIPT"` — the script must read the task from `$FACTORY_TASK_PATH`
-   - If `FACTORY_GATE_SCRIPT` (or `/factory/gate.sh`) does not exist → exit 0 (no gate)
-   - Run the gate script, capture stdout+stderr and exit code
-   - If gate exits 0 → exit 0 (success)
+   - If `FACTORY_GATE_SCRIPT` (or `/factory/gate.sh`) does not exist → treat as gate pass (gate_exit=0)
+   - Else run the gate script, capture stdout+stderr and exit code
+   - If gate exits 0: run the semantic reviewer (if `FACTORY_REVIEWER_SCRIPT` is set and exists). If reviewer passes → exit 0 (success). If reviewer fails → append output and loop again
    - If gate exits non-zero → append the output to `current_task` as "## Validation Failed — Fix Before Finishing" and loop again
-4. If max rounds exhausted without gate passing → exit 1
+4. If max rounds exhausted without gate/reviewer passing → exit 1
 
 **Environment variables:**
 
@@ -62,6 +64,7 @@ A shell script that wraps each agent invocation with a post-run validation step.
 | `FACTORY_INITIAL_TASK`   | yes      | —                             | Full task prompt; written to `FACTORY_TASK_PATH` each round   |
 | `FACTORY_GATE_RETRIES`   | no       | 5                             | Max inner loop rounds before giving up                        |
 | `FACTORY_GATE_SCRIPT`    | no       | `/factory/gate.sh`            | Path to the gate script                                       |
+| `FACTORY_REVIEWER_SCRIPT`| no       | —                             | Path to the semantic reviewer script; when set, runs after gate passes |
 | `FACTORY_AGENT_SCRIPT`   | no       | `/factory/agent.sh`           | Path to the agent runner script                               |
 | `FACTORY_TASK_PATH`      | no       | `/workspace/.factory_task.md` | Path where the current task is written before each invocation |
 | `FACTORY_STARTUP_SCRIPT` | yes      | —                             | Path to a script run once before the agent loop               |
@@ -86,7 +89,7 @@ The default gate script used when no custom `--gate-script` is provided. Each sa
 - **Loaded at runtime:** The CLI's `parseGateScript(ctx, profile)` calls `readSandboxGateScript(profile.id)` when `--gate-script` is not set.
 - **Profiles:** Every profile must have a `gate.sh`. Node has a no-op placeholder (warns to use `--gate-script`); Go and Rust have language-specific defaults (e.g. `go vet`+`go test`, `cargo check`+`clippy`+`test`).
 
-**Note:** In Leash (container) mode, `/workspace` is the mounted sandbox. In `--dangerous-debug` mode, `/workspace` does not exist on the host; users running without Leash should provide a custom gate that uses the current directory or `$WORKSPACE_BASE`.
+**Note:** In Leash (container) mode, `/workspace` is the mounted sandbox. In `--dangerous-debug` mode, `/workspace` does not exist on the host; users running without Leash should provide a custom gate that uses the current directory or `$FACTORY_WORKSPACE_BASE`.
 
 ### 4. Sandbox (`sandbox.ts`)
 
@@ -108,7 +111,7 @@ The default gate script used when no custom `--gate-script` is provided. Each sa
 
 - Mount `sandboxBasePath/gate.sh` at `/factory/gate.sh` with `:ro` (read-only)
 - Mount `sandboxBasePath/agent.sh` at `/factory/agent.sh` with `:ro` (read-only)
-- Pass `FACTORY_INITIAL_TASK`, `FACTORY_GATE_RETRIES`, `FACTORY_AGENT_SCRIPT`, `WORKSPACE_BASE` as environment variables
+- Pass `FACTORY_INITIAL_TASK`, `FACTORY_GATE_RETRIES`, `FACTORY_AGENT_SCRIPT`, `FACTORY_WORKSPACE_BASE` as environment variables
 - Invoke `/factory/coder-start.sh` as the container command (not the agent directly)
 
 **Dangerous-debug mode:**
@@ -181,7 +184,7 @@ After sandbox creation:
 - The gate runs inside the container with access to `/workspace` only — no host-side trust surface, no HTTP, no bind-mount race conditions.
 - The **Test Runner** (hidden tests) remains the authoritative enforcement layer. The gate is purely a cheap early-exit that catches deterministic failures before the expensive Docker build and test runner run.
 - The agent **can observe** gate output — it is fed back as task feedback. This is intentional: the feedback comes from the user's own public check, not from hidden tests.
-- **`agentEnv`** reserved-key filtering: factory internal variables (`FACTORY_*`, `WORKSPACE_BASE`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_PROVIDER`, `LLM_BASE_URL`) cannot be overridden by user-supplied `--agent-env` flags. The runner emits a warning and ignores them.
+- **`agentEnv`** reserved-key filtering: factory internal variables (`FACTORY_*`, `LLM_*`, `REVIEWER_LLM_*`) cannot be overridden by user-supplied `--agent-env` flags. The runner emits a warning and ignores them.
 
 ---
 
@@ -280,10 +283,10 @@ Commit the gate script to your repo and reference it via `--gate-script ./script
 
 ## Feedback Flow
 
-When the gate fails:
+When the gate or semantic reviewer fails:
 
-1. `coder-start.sh` captures stdout+stderr from the gate
-2. It rebuilds the task prompt: original task + `## Validation Failed — Fix Before Finishing` + a code block containing the gate output
+1. `coder-start.sh` captures stdout+stderr from the gate or reviewer
+2. It rebuilds the task prompt: original task + `## Validation Failed — Fix Before Finishing` + a code block containing the output
 3. OpenHands is invoked again with this augmented prompt
 4. The agent sees the failure and can fix the code
 5. The loop repeats until the gate passes or max rounds are reached

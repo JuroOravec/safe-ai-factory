@@ -4,7 +4,7 @@
 
 import { DEFAULT_INDEXER_PROFILE } from '../indexer-profiles/index.js';
 import { DEFAULT_SANDBOX_BASE_DIR } from '../orchestrator/sandbox.js';
-import { SUPPORTED_STORAGE_KEYS } from '../run-storage/types.js';
+import { SUPPORTED_STORAGE_KEYS } from '../storage/types.js';
 
 /** Project directory (default: process.cwd() / current working directory) */
 export const projectDirArg = {
@@ -162,6 +162,11 @@ export const featRunArgs = {
   'gate-retries': {
     type: 'string' as const,
     description: 'Max gate retries per run (default: 10).',
+  },
+  'no-reviewer': {
+    type: 'boolean' as const,
+    description:
+      'Skip the semantic AI reviewer (Argus) after static checks. Use when Argus is unavailable.',
   },
   'agent-env': {
     type: 'string' as const,

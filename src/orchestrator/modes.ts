@@ -104,6 +104,11 @@ export interface OrchestratorOpts extends IterativeLoopOpts {
     runContext: RunStorageContext;
     initialErrorFeedback?: string;
   } | null;
+  /**
+   * When true, append the semantic reviewer step to the gate script.
+   * Disabled via --no-reviewer.
+   */
+  reviewerEnabled: boolean;
 }
 
 // ---------------------------------------------------------------------------

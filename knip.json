@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "ignoreFiles": [
     "src/test-profiles/templates/**",
-    "src/orchestrator/sidecar/**",
+    "src/orchestrator/sidecars/cli-over-http/**",
     "saif/**"
   ]
 }

@@ -174,14 +174,15 @@ Keys are checked in the order listed above; the first match wins.
 
 ## Agent reference
 
-| Agent                             | ID              | Commands                                       |
-| --------------------------------- | --------------- | ---------------------------------------------- |
-| Coding agent<br/>(e.g. OpenHands) | `coder`         | `feat run`<br/>`feat continue`                 |
-| Tests planner                     | `tests-planner` | `feat design-tests`<br/>`feat design`          |
-| Tests cataloger                   | `tests-catalog` | `feat design-tests`<br/>`feat design`          |
-| Tests writer                      | `tests-writer`  | `feat design-tests`<br/>`feat design`          |
-| Results judge                     | `results-judge` | `feat run`<br/>`feat continue`<br/>`feat test` |
-| PR summarizer                     | `pr-summarizer` | `feat run`<br/>`feat continue`<br/>`feat test` |
+| Agent                             | ID              | Commands                                         |
+| --------------------------------- | --------------- | ------------------------------------------------ |
+| Coding agent<br/>(e.g. OpenHands) | `coder`         | `feat run`<br/>`feat run resume`                 |
+| Tests planner                     | `tests-planner` | `feat design-tests`<br/>`feat design`            |
+| Tests cataloger                   | `tests-catalog` | `feat design-tests`<br/>`feat design`            |
+| Tests writer                      | `tests-writer`  | `feat design-tests`<br/>`feat design`            |
+| Results judge                     | `results-judge` | `feat run`<br/>`feat run resume`<br/>`feat test` |
+| PR summarizer                     | `pr-summarizer` | `feat run`<br/>`feat run resume`<br/>`feat test` |
+| Semantic reviewer                 | `reviewer`      | `feat run`<br/>`feat run resume`                 |
 
 **Example — override agents individually:**
 
@@ -204,4 +205,5 @@ saif feat run --model anthropic/claude-sonnet-4-6,pr-summarizer=openai/gpt-4o-mi
 - [Environment variables](env-vars.md) — API keys and container-injected vars
 - [feat design-specs](commands/feat-design-specs.md) — Spec generation command
 - [feat design-tests](commands/feat-design-tests.md) — Test generation command
-- [feat run / feat continue](commands/README.md) — Coding agent loop commands
+- [feat run / feat run resume](commands/README.md) — Coding agent loop commands
+- [Semantic reviewer](reviewer.md) — Uses `reviewer` agent.

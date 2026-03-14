@@ -9,9 +9,12 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { buildRunArtifact } from '../run-storage/build-artifact.js';
-import { deserializeOpts } from '../run-storage/serialize.js';
-import type { RunArtifact, RunStorage } from '../run-storage/types.js';
+import {
+  buildRunArtifact,
+  deserializeArtifactConfig,
+  type RunArtifact,
+  type RunStorage,
+} from '../runs/index.js';
 import { resolveFeature } from '../specs/discover.js';
 import { type IterativeLoopOpts, type RunStorageContext } from './loop.js';
 import type { OrchestratorOpts } from './modes.js';
@@ -235,7 +238,7 @@ export interface MergeResumeOptsParams {
 export function mergeResumeOpts(params: MergeResumeOptsParams): OrchestratorOpts {
   const { artifact, opts, overrides, worktreePath } = params;
   const { baseCommitSha, basePatchDiff } = artifact;
-  const deserialized = deserializeOpts(artifact.config);
+  const deserialized = deserializeArtifactConfig(artifact.config);
   const feature = resolveFeature({
     input: deserialized.featureName,
     projectDir: opts.projectDir,

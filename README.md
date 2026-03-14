@@ -140,6 +140,7 @@ Dive into the details of what you can customize in the [Features guide](./docs/f
 - [Access control with Cedar](./docs/cedar-access-control.md)
 - [Sandbox profiles](./docs/sandbox-profiles.md)
 - [Test profiles](./docs/test-profiles.md)
+- [Semantic reviewer](./docs/reviewer.md)
 - [Spec designers](./docs/designers/README.md)
 - [Codebase indexers](./docs/indexer/README.md)
 - [Source control integrations](docs/source-control.md)

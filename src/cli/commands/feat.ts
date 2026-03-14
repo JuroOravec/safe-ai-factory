@@ -72,6 +72,7 @@ import {
   parseProjectDir,
   parsePush,
   parseResolveAmbiguity,
+  parseReviewerEnabled,
   parseRunStorage,
   parseSaifDir,
   parseSandboxBaseDir,
@@ -480,6 +481,7 @@ async function _runDesignFail2pass(opts: {
     stageScript,
     testScript,
     startupScript,
+    reviewerEnabled: false, // fail2pass does not run the agent; gate is never executed
   });
 
   console.log(`\n${result.message}`);
@@ -625,6 +627,7 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
     ]);
 
   const gateRetries = parseGateRetries(runArgs, config);
+  const reviewerEnabled = parseReviewerEnabled(runArgs, config);
   const agentEnv = parseAgentEnv({ args: runArgs, projectDir, config });
   const agentLogFormat = parseAgentLogFormat(runArgs, agentProfile, config);
   const push = parsePush(runArgs, config);
@@ -678,6 +681,7 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
     agentEnv,
     agentLogFormat,
     gateRetries,
+    reviewerEnabled,
     push,
     pr,
     gitProvider,
@@ -733,6 +737,7 @@ const debugCommand = defineCommand({
       agentStartScript,
       agentScript,
       stageScript,
+      reviewerEnabled: false,
     });
   },
 });
