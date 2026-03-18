@@ -10,7 +10,9 @@
 
 _Like [GasTown](https://github.com/steveyegge/gastown), but agents can't cheat, leak, wreak havoc._
 
-Full feature preview at [safeaifactory.com](https://safeaifactory.com).
+Full feature preview at:
+
+[![Visit safeaifactory.com](https://img.shields.io/badge/Visit_Website-safeaifactory.com-00CC66?style=for-the-badge)](https://safeaifactory.com)
 
 > ⚠️ **Status: Alpha.** SAIFAC is under active development. See the [Roadmap](https://github.com/users/JuroOravec/projects/3) for what's coming next.
 >
