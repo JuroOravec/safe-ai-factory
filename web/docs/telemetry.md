@@ -149,7 +149,9 @@ TypeScript will then require the correct props wherever `track('my_new_event', .
 | ------------------------------ | ------------- | -------------------------------------------------------------------------------------------- |
 | `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Yes (in prod) | Your site's domain, e.g. `safeaifactory.com`. Leave empty to disable analytics in local dev. |
 
-Set in `.env.local` (copy from `.env.local.example`).
+**Local:** Set in `.env.local` (copy from `.env.local.example`).
+
+**Production (GitHub Pages):** The deploy workflow needs `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` at build time. Add it as a GitHub Actions secret (Settings → Secrets and variables → Actions) with value `safeaifactory.com` (or your domain). Without it, Plausible does not load in production.
 
 ### Plausible dashboard setup (Cloud)
 

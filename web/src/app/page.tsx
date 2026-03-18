@@ -141,9 +141,7 @@ export default function Home() {
             }}
             className="flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer"
           >
-            <div className="w-6 h-6 bg-[#00FF66] rounded-sm flex items-center justify-center text-black font-bold font-mono text-xs">
-              S
-            </div>
+            <img src="/saifac-icon-green.svg" alt="SAIFAC" className="w-6 h-6 shrink-0" />
             <span className="font-mono font-bold tracking-tight text-white">SAIFAC</span>
           </a>
           <div className="hidden md:flex items-center gap-6 text-sm">
@@ -894,9 +892,7 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 bg-[#00FF66] rounded-sm flex items-center justify-center text-black font-bold font-mono text-xs">
-                  S
-                </div>
+                <img src="/saifac-icon-green.svg" alt="SAIFAC" className="w-6 h-6 shrink-0" />
                 <span className="font-mono font-bold text-white">SAIFAC</span>
               </div>
               <p className="text-gray-500 text-sm leading-relaxed mb-4">
