@@ -284,7 +284,10 @@ export default function Home() {
                           setSelectedPipelineNode(i);
                           track('pipeline_step_click', { step: node.title });
                         }}
-                        onMouseEnter={() => setSelectedPipelineNode(i)}
+                        onMouseEnter={() => {
+                          setSelectedPipelineNode(i);
+                          track('pipeline_step_click', { step: node.title });
+                        }}
                         className={`flex flex-col items-center gap-2 w-full sm:w-28 sm:h-full py-2 rounded-xl transition-all cursor-pointer text-left border-2 border-transparent hover:border-[#00FF66]/50 ${
                           isSelected
                             ? 'border-[#00FF66]/70 bg-[#00FF66]/5'
