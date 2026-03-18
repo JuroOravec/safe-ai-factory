@@ -49,6 +49,15 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_PLAUSIBLE_DOMAIN: ${{ secrets.NEXT_PUBLIC_PLAUSIBLE_DOMAIN }}
 
+      - name: Verify Plausible in build
+        run: |
+          if grep -rq "plausible" out/ 2>/dev/null; then
+            echo "✓ Plausible script found in build output"
+          else
+            echo "::error::Plausible not found in build. Ensure NEXT_PUBLIC_PLAUSIBLE_DOMAIN secret is set (e.g. safeaifactory.com)."
+            exit 1
+          fi
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
