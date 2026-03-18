@@ -46,7 +46,7 @@ The deploy workflow injects these variables from **GitHub repository secrets** a
 2. Add repository secrets:
    - `NEXT_PUBLIC_SUPABASE_URL` — your Supabase project URL
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — your anon public key
-   - `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` — your site domain (e.g. `safeaifactory.com`) for analytics
+   - `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` — your site domain (e.g. `safeaifactory.com`) for analytics (use a **variable**; domain is not sensitive)
 
 The workflow passes these to the build step so they are inlined into the static export. Without them, the deployed site will throw when a user submits the waitlist form.
 

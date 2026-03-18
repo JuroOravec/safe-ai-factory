@@ -151,9 +151,9 @@ TypeScript will then require the correct props wherever `track('my_new_event', .
 
 **Local:** Set in `.env.local` (copy from `.env.local.example`).
 
-**Production (GitHub Pages):** The deploy workflow needs `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` at build time. Add it as a GitHub Actions secret (Settings → Secrets and variables → Actions) with value `safeaifactory.com` (or your domain). Without it, Plausible does not load in production.
+**Production (GitHub Pages):** The deploy workflow needs `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` at build time. Add it as a GitHub Actions **variable** or secret (Settings → Secrets and variables → Actions) with value `safeaifactory.com` (or your domain). Variables are fine since the domain is not sensitive. Without it, Plausible does not load in production.
 
-**Verifying the domain was published:** After deploying, view the production site's HTML source (Ctrl+U) and search for `plausible` or `data-domain`. You should see a script tag with `data-domain="safeaifactory.com"`. If the script is missing or `data-domain=""`, the secret was not set or the build used a cached artifact from before the secret existed — re-run the workflow. The workflow also has a "Verify Plausible in build" step; if it fails, the secret is missing.
+**Verifying the domain was published:** After deploying, view the production site's HTML source (Ctrl+U) and search for `plausible` or `data-domain`. You should see a script tag with `data-domain="safeaifactory.com"`. If the script is missing or `data-domain=""`, the secret was not set or the build used a cached artifact from before the secret existed — re-run the workflow. The workflow also has a "Verify Plausible in build" step; if it fails, the variable/secret is missing.
 
 ### Plausible dashboard setup (Cloud)
 
