@@ -16,7 +16,7 @@
 #                         Always defined — even for web projects — because the sidecar runs
 #                         in every staging container.
 #
-#   FACTORY_FEATURE_NAME  Name of the Saif feature being tested (e.g. "greet-cmd").
+#   FACTORY_FEATURE_NAME  Name of the Saifac feature being tested (e.g. "greet-cmd").
 #
 #   FACTORY_TESTS_DIR     Absolute path inside the container where test files are mounted.
 #                         Default: /tests

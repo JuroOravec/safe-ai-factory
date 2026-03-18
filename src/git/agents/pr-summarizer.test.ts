@@ -35,8 +35,8 @@ function makeSummary(title: string, body: string): PRSummary {
 
 const baseFeature = {
   name: 'greet-cmd',
-  absolutePath: '/repo/saif/features/greet-cmd',
-  relativePath: 'saif/features/greet-cmd',
+  absolutePath: '/repo/saifac/features/greet-cmd',
+  relativePath: 'saifac/features/greet-cmd',
 } as const;
 
 describe('generatePRSummary', () => {

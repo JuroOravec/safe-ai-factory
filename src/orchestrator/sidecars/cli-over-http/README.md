@@ -216,7 +216,7 @@ The sidecar is configured entirely through environment variables, set by `stagin
 | `SIDECAR_PATH` | `/exec`      | HTTP path for the exec endpoint            |
 | `WORKSPACE`    | `/workspace` | Working directory for all spawned commands |
 
-These values come from the test catalog (`tests.json`) and are injected by the orchestrator as container environment variables (`FACTORY_SIDECAR_PORT`, `FACTORY_SIDECAR_PATH`).
+These values come from `saifac/config.ts` (`environments.staging.app`) and are injected by the orchestrator as container environment variables (`FACTORY_SIDECAR_PORT`, `FACTORY_SIDECAR_PATH`).
 
 ---
 

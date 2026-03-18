@@ -22,8 +22,8 @@ Round complete → exit container
 
 The reviewer runs only for:
 
-- `saif feat run`
-- `saif run resume`
+- `saifac feat run`
+- `saifac run resume`
 
 To disable the reviewer, you can, pass `--no-reviewer`.
 
@@ -39,15 +39,15 @@ You can configure the reviewer to use a different model than the main coding age
 
 ```bash
 # Use Sonnet for the coder, and Opus for the reviewer
-saif feat run --model coder=anthropic/claude-sonnet-4-6,reviewer=anthropic/claude-opus-4-6
+saifac feat run --model coder=anthropic/claude-sonnet-4-6,reviewer=anthropic/claude-opus-4-6
 
 # Disable the reviewer for this run
-saif feat run --no-reviewer
+saifac feat run --no-reviewer
 ```
 
 ### Using config file
 
-To configure this permanently, update `saif/config.json`:
+To configure this permanently, update `saifac/config.json`:
 
 ```json
 {

@@ -53,6 +53,17 @@ You are a strict QA gate. The user originally requested: '$USER_PROMPT_ESCAPED'
 Look at the git diff. Did the coding agent completely fulfill this request?
 If it missed logic, hallucinated APIs, or failed the request, flag it as 'bug' or 'warning'.
 """
+
+[[rules]]
+name = "Idiomatic Code & Maintainability"
+prompt = """
+You are an adversarial Senior Engineer reviewing a Junior Developer's PR.
+Analyze the git diff for "AI-isms" or the "Uncanny Valley of Code":
+1. Are there overly complex, bizarre architectural choices where a simple pattern would do?
+2. Does the code violate idiomatic patterns of the language/framework being used?
+3. Is there unmaintainable "write-only" code (e.g. massive regexes instead of simple parsing, convoluted state management)?
+If the code is alien, unnecessarily complex, or unmaintainable, flag it as 'warning' to force a rewrite.
+"""
 EOF
 
 echo "[reviewer] Generating AST repo map..."

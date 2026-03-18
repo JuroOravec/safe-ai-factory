@@ -87,7 +87,7 @@ export class FeaturesTreeProvider implements vscode.TreeDataProvider<SaifTreeIte
       '.venv',
       'venv',
       '__pycache__',
-      '.saif',
+      '.saifac',
     ]);
 
     const search = async (currentDir: string) => {
@@ -103,7 +103,7 @@ export class FeaturesTreeProvider implements vscode.TreeDataProvider<SaifTreeIte
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
 
-        if (entry.name === 'saif') {
+        if (entry.name === 'saifac') {
           if (!isProjectRoot) {
             const projectName =
               currentDir === this.workspaceRoot
@@ -128,9 +128,9 @@ export class FeaturesTreeProvider implements vscode.TreeDataProvider<SaifTreeIte
   }
 
   private async getFeatures(projectPath: string): Promise<FeatureItem[]> {
-    let saifBase = path.join(projectPath, 'saif');
+    let saifBase = path.join(projectPath, 'saifac');
     if (!fs.existsSync(saifBase)) {
-      saifBase = path.join(projectPath, 'saif');
+      saifBase = path.join(projectPath, 'saifac');
     }
 
     const featuresDirPath = path.join(saifBase, 'features');

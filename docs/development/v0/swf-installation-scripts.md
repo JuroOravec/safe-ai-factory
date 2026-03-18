@@ -120,7 +120,7 @@ The workspace is rsync’d into `code/` and bind-mounted at `/workspace` for eac
 **The default profile (node-pnpm-python) supplies an installation script that runs `pnpm install`.** For most Node.js/pnpm projects, no configuration is needed:
 
 ```bash
-saif feat run
+saifac feat run
 ```
 
 You should see in the logs:
@@ -155,13 +155,13 @@ chmod +x scripts/factory-startup.sh
 ### Step 2: Run with `--startup-script`
 
 ```bash
-saif feat run --startup-script ./scripts/factory-startup.sh
+saifac feat run --startup-script ./scripts/factory-startup.sh
 ```
 
 For a resume (continue):
 
 ```bash
-pnpm agents saif run resume --sandbox-path /tmp/factory-sandbox/... --startup-script ./scripts/factory-startup.sh
+pnpm agents saifac run resume --sandbox-path /tmp/factory-sandbox/... --startup-script ./scripts/factory-startup.sh
 ```
 
 ---
@@ -198,7 +198,7 @@ pytest tests/
 ### Step 3: Run with both scripts
 
 ```bash
-saif feat run \
+saifac feat run \
   --startup-script ./scripts/factory-startup.sh \
   --gate-script ./scripts/factory-gate.sh
 ```
@@ -235,7 +235,7 @@ RUN npm install -g @anthropic-ai/claude-code
 
 ```bash
 docker build -f Dockerfile.my-coder -t my-factory-coder:latest .
-saif feat run --coder-image my-factory-coder:latest
+saifac feat run --coder-image my-factory-coder:latest
 ```
 
 **Note:** `coder-start.sh` invokes `openhands` by name. If your coder has a different CLI, you would need to either fork `coder-start.sh` or add a configurable agent command (future enhancement).
@@ -269,7 +269,7 @@ uv run ruff check .
 ### 3. Run
 
 ```bash
-saif feat run \
+saifac feat run \
   --startup-script ./scripts/factory-startup.sh \
   --gate-script ./scripts/factory-gate.sh
 ```
@@ -278,16 +278,16 @@ saif feat run \
 
 ## CLI Reference
 
-| Flag               | Subcommands                  | Description                                                                                                                                                                              |
-| ------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--model`          | saif feat run, saif run resume | LLM model override (e.g. anthropic/claude-sonnet-4-5). Falls back to `LLM_MODEL` env.                                                                                                    |
-| `--provider`       | saif feat run, saif run resume | LLM provider ID (e.g. anthropic, openai, openrouter). Forwarded as `LLM_PROVIDER`. Used by agents like opencode for base URL / routing when `LLM_MODEL` is not in provider/model format. |
-| `--base-url`       | saif feat run, saif run resume | LLM base URL override (e.g. https://openrouter.ai/api/v1). Falls back to `LLM_BASE_URL` env.                                                                                             |
-| `--profile`        | saif feat run, saif run resume | Sandbox profile; sets the installation script (and other defaults).                                                                                                                      |
-| `--startup-script` | saif feat run, saif run resume | Path to script run once before the agent loop (overrides profile).                                                                                                                       |
-| `--gate-script`    | saif feat run, saif run resume | Path to script run after each agent round. Default: built-in pnpm check.                                                                                                                 |
-| `--gate-retries`   | saif feat run, saif run resume | Max gate retries per run (default: 5).                                                                                                                                                   |
-| `--coder-image`    | saif feat run, saif run resume | Docker image for the coder container (default: from profile, e.g. factory-coder-node-pnpm-python:latest).                                                                                |
+| Flag               | Subcommands                        | Description                                                                                                                                                                              |
+| ------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--model`          | saifac feat run, saifac run resume | LLM model override (e.g. anthropic/claude-sonnet-4-5). Falls back to `LLM_MODEL` env.                                                                                                    |
+| `--provider`       | saifac feat run, saifac run resume | LLM provider ID (e.g. anthropic, openai, openrouter). Forwarded as `LLM_PROVIDER`. Used by agents like opencode for base URL / routing when `LLM_MODEL` is not in provider/model format. |
+| `--base-url`       | saifac feat run, saifac run resume | LLM base URL override (e.g. https://openrouter.ai/api/v1). Falls back to `LLM_BASE_URL` env.                                                                                             |
+| `--profile`        | saifac feat run, saifac run resume | Sandbox profile; sets the installation script (and other defaults).                                                                                                                      |
+| `--startup-script` | saifac feat run, saifac run resume | Path to script run once before the agent loop (overrides profile).                                                                                                                       |
+| `--gate-script`    | saifac feat run, saifac run resume | Path to script run after each agent round. Default: built-in pnpm check.                                                                                                                 |
+| `--gate-retries`   | saifac feat run, saifac run resume | Max gate retries per run (default: 5).                                                                                                                                                   |
+| `--coder-image`    | saifac feat run, saifac run resume | Docker image for the coder container (default: from profile, e.g. factory-coder-node-pnpm-python:latest).                                                                                |
 
 ---
 

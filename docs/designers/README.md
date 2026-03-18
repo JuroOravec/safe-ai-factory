@@ -27,10 +27,10 @@ The coding agent sees a grounded spec, not a one-liner. It ships better code on 
 
 ## Choosing a designer
 
-Use `--designer <id>` with `saif feat design`:
+Use `--designer <id>` with `saifac feat design`:
 
 ```bash
-saif feat design --designer shotgun
+saifac feat design --designer shotgun
 ```
 
 | ID                        | Name                | Project URL                                   |
@@ -41,25 +41,25 @@ saif feat design --designer shotgun
 
 ## How to use it
 
-The designer runs as part of `saif feat design`.
+The designer runs as part of `saifac feat design`.
 
 ### 1. Create a proposal
 
 ```bash
-saif feat new
+saifac feat new
 ```
 
-Edit `saif/features/add-login/proposal.md` with what you want to build. One paragraph is enough — the designer figures out the rest.
+Edit `saifac/features/add-login/proposal.md` with what you want to build. One paragraph is enough — the designer figures out the rest.
 
-### 2. Run spec generation — `saif feat design`
+### 2. Run spec generation — `saifac feat design`
 
 ```bash
-saif feat design
+saifac feat design
 # or explicitly:
-saif feat design --designer shotgun
+saifac feat design --designer shotgun
 ```
 
-The designer reads your `proposal.md`, researches the codebase (via the active indexer), and writes the 4 spec files into `saif/features/add-login/`.
+The designer reads your `proposal.md`, researches the codebase (via the active indexer), and writes the 4 spec files into `saifac/features/add-login/`.
 
 If the spec files already exist, the CLI asks whether to redo them — so re-running is always safe. Use `-y`/`--yes` with `--name` to skip the prompt and assume redo (non-interactive mode).
 
@@ -68,7 +68,7 @@ If the spec files already exist, the CLI asks whether to redo them — so re-run
 Pass `--model` to override the LLM the designer uses:
 
 ```bash
-saif feat design --model claude-opus-4-5
+saifac feat design --model claude-opus-4-5
 ```
 
 ### 4. Disable the designer
@@ -76,23 +76,23 @@ saif feat design --model claude-opus-4-5
 Pass `--designer none` to skip spec generation entirely and jump straight to tests generation — useful when you've already written your spec files manually:
 
 ```bash
-saif feat design --designer none
+saifac feat design --designer none
 ```
 
 ---
 
 ## Designer and indexer: how they work together
 
-The designer and indexer are complementary — they both run during `saif feat design`, but they do different things.
+The designer and indexer are complementary — they both run during `saifac feat design`, but they do different things.
 
 The designer uses the indexer to ground its spec in real code.
 
-|      Who      | Indexer                                                    | Designer                                                 |
-| ---------- | ---------------------------------------------------------- | -------------------------------------------------------- |
-| **What**   | Parses your repo into a semantic graph                     | Researches your codebase and writes the spec             |
-| **When**   | Runs at `saif init` (build index)<br/>and `saif feat design` (query index) | Runs at `saif feat design`                               |
-| **Output** | A queryable codebase index                                 | `plan.md`, `specification.md`, `research.md`, `tasks.md` |
-| **Flag**   | `--indexer`                                                | `--designer`                                             |
+| Who        | Indexer                                                                        | Designer                                                 |
+| ---------- | ------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| **What**   | Parses your repo into a semantic graph                                         | Researches your codebase and writes the spec             |
+| **When**   | Runs at `saifac init` (build index)<br/>and `saifac feat design` (query index) | Runs at `saifac feat design`                             |
+| **Output** | A queryable codebase index                                                     | `plan.md`, `specification.md`, `research.md`, `tasks.md` |
+| **Flag**   | `--indexer`                                                                    | `--designer`                                             |
 
 ---
 

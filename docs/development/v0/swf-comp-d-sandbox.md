@@ -86,7 +86,7 @@ The agent must **never** have write access to the test files.
 Borrowing from machine learning training principles, we use "Mutual Verification" (as seen in frameworks like SWE-Playground).
 
 - **Public Tests:** The agent is given a subset of tests it can read to understand the goal and debug its code.
-- **Hidden Tests:** The Orchestrator keeps a "Holdout Set" of tests completely hidden from the agent. Before the agent runs, _all_ `hidden/` directories under `saif/features/` (for every feature, not just the current one) are removed from the code copy. The agent therefore never sees holdout tests from any feature.
+- **Hidden Tests:** The Orchestrator keeps a "Holdout Set" of tests completely hidden from the agent. Before the agent runs, _all_ `hidden/` directories under `saifac/features/` (for every feature, not just the current one) are removed from the code copy. The agent therefore never sees holdout tests from any feature.
 - **Final Verification:** When the agent claims the public tests are passing, the Orchestrator steps in. It takes _only_ the agent's source code patch, applies it to a clean checkout of the `main` branch, and runs the hidden tests outside of the agent's container. If the agent hardcoded a fake response to pass the public test, it will instantly fail the hidden test.
 
 ---
@@ -126,7 +126,7 @@ Leash manages its own containers; we never pull StrongDM images. Use `--dangerou
 
 ### Host-to-Docker Code Flow (Local vs Remote)
 
-**Our Factory:** We use a **pure file copy** approach. The Orchestrator uses `rsync` (honoring `.gitignore`) to copy the repo to a disposable `/tmp/factory-sandbox/{feature}-{runId}/code` directory. After rsync, _all_ `hidden/` directories under `saif/features/` are recursively removed from the code copy so the agent cannot see holdout tests from any feature. This guarantees the agent cannot corrupt the host's `.git` or files, and cannot read hidden tests. OpenHands uses this directory as its workspace. By default (Leash enabled), OpenHands runs inside the Leash coder container; with `--dangerous-debug` it runs on the host.
+**Our Factory:** We use a **pure file copy** approach. The Orchestrator uses `rsync` (honoring `.gitignore`) to copy the repo to a disposable `/tmp/factory-sandbox/{feature}-{runId}/code` directory. After rsync, _all_ `hidden/` directories under `saifac/features/` are recursively removed from the code copy so the agent cannot see holdout tests from any feature. This guarantees the agent cannot corrupt the host's `.git` or files, and cannot read hidden tests. OpenHands uses this directory as its workspace. By default (Leash enabled), OpenHands runs inside the Leash coder container; with `--dangerous-debug` it runs on the host.
 
 **OpenHands' traditional flow (for reference):**
 
@@ -171,7 +171,7 @@ To realize the workflow we designed, we do not merely install SWE-Bench and clic
 
 1. Use **OpenHands** in headless mode as the Execution Sandbox and Coder Agent.
 2. Write a **custom orchestrator script** that:
-   - Copies the repo to a disposable sandbox via `rsync`; removes _all_ `hidden/` dirs under `saif/features/` from the code copy before the agent runs, so holdout tests from every feature are physically absent from the agent's workspace.
+   - Copies the repo to a disposable sandbox via `rsync`; removes _all_ `hidden/` dirs under `saifac/features/` from the code copy before the agent runs, so holdout tests from every feature are physically absent from the agent's workspace.
    - Triggers OpenHands with the task (`plan.md` contents).
    - Extracts the `patch.diff` when OpenHands finishes.
    - Runs the hidden tests via the three-container Black-Box flow (Test Runner over HTTP to Staging container) against a clean checkout with the patch applied (Mutual Verification).

@@ -5,7 +5,7 @@
   "version": "0.0.1",
   "publisher": "JuroOravec",
   "license": "MIT",
-  "icon": "resources/saif-icon-green.png",
+  "icon": "resources/saifac-icon-green.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/JuroOravec/safe-ai-factory.git",
@@ -80,206 +80,206 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "saif-explorer",
+          "id": "saifac-explorer",
           "title": "Safe AI Factory",
-          "icon": "resources/saif-icon-mono.svg"
+          "icon": "resources/saifac-icon-mono.svg"
         }
       ]
     },
     "views": {
-      "saif-explorer": [
+      "saifac-explorer": [
         {
-          "id": "saif-features",
+          "id": "saifac-features",
           "name": "Features"
         },
         {
-          "id": "saif-runs",
+          "id": "saifac-runs",
           "name": "Runs"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "saif-features",
-        "contents": "The SAIF CLI is not installed or not in your PATH. You need it to run containerized swarms.\n\n[Install SAIF](https://github.com/JuroOravec/safe-ai-factory)\n[Refresh Status](command:saif.recheckInstall)",
-        "when": "!saif.isCliInstalled"
+        "view": "saifac-features",
+        "contents": "The SAIFAC CLI is not installed or not in your PATH. You need it to run containerized swarms.\n\n[Install SAIFAC](https://github.com/JuroOravec/safe-ai-factory)\n[Refresh Status](command:saifac.recheckInstall)",
+        "when": "!saifac.isCliInstalled"
       },
       {
-        "view": "saif-runs",
-        "contents": "No CLI detected. Install SAIF to view and manage your agent runs.\n\n[Install SAIF](https://github.com/JuroOravec/safe-ai-factory)\n[Refresh Status](command:saif.recheckInstall)",
-        "when": "!saif.isCliInstalled"
+        "view": "saifac-runs",
+        "contents": "No CLI detected. Install SAIFAC to view and manage your agent runs.\n\n[Install SAIFAC](https://github.com/JuroOravec/safe-ai-factory)\n[Refresh Status](command:saifac.recheckInstall)",
+        "when": "!saifac.isCliInstalled"
       },
       {
-        "view": "saif-runs",
+        "view": "saifac-runs",
         "contents": "No runs found.\n\nRight-click a feature in **Features** and select **Run** to start your swarm.",
-        "when": "saif.isCliInstalled"
+        "when": "saifac.isCliInstalled"
       }
     ],
     "commands": [
       {
-        "command": "saif.recheckInstall",
-        "title": "Recheck SAIF Installation"
+        "command": "saifac.recheckInstall",
+        "title": "Recheck SAIFAC Installation"
       },
       {
-        "command": "saif.createFeature",
+        "command": "saifac.createFeature",
         "title": "Create Feature",
         "icon": "$(plus)"
       },
       {
-        "command": "saif.createDir",
+        "command": "saifac.createDir",
         "title": "Create Folder",
         "icon": "$(new-folder)"
       },
       {
-        "command": "saif.createFile",
+        "command": "saifac.createFile",
         "title": "Create File",
         "icon": "$(new-file)"
       },
       {
-        "command": "saif.refreshFeatures",
+        "command": "saifac.refreshFeatures",
         "title": "Refresh",
         "icon": "$(refresh)"
       },
       {
-        "command": "saif.runFeature",
+        "command": "saifac.runFeature",
         "title": "Run",
         "icon": "$(play)"
       },
       {
-        "command": "saif.debugFeature",
+        "command": "saifac.debugFeature",
         "title": "Debug",
         "icon": "$(debug)"
       },
       {
-        "command": "saif.designFeature",
+        "command": "saifac.designFeature",
         "title": "Design",
         "icon": "$(edit)"
       },
       {
-        "command": "saif.refreshRuns",
+        "command": "saifac.refreshRuns",
         "title": "Refresh",
         "icon": "$(refresh)"
       },
       {
-        "command": "saif.resumeRun",
+        "command": "saifac.resumeRun",
         "title": "Resume",
         "icon": "$(play)"
       },
       {
-        "command": "saif.removeRun",
+        "command": "saifac.removeRun",
         "title": "Remove",
         "icon": "$(trash)"
       },
       {
-        "command": "saif.clearAllRuns",
+        "command": "saifac.clearAllRuns",
         "title": "Clear All",
         "icon": "$(clear-all)"
       },
       {
-        "command": "saif.revealRunInFinder",
+        "command": "saifac.revealRunInFinder",
         "title": "Reveal in Explorer"
       },
       {
-        "command": "saif.copyRunId",
+        "command": "saifac.copyRunId",
         "title": "Copy Run ID"
       },
       {
-        "command": "saif.copyRunName",
+        "command": "saifac.copyRunName",
         "title": "Copy Name"
       },
       {
-        "command": "saif.showLogs",
-        "title": "Show SAIF Logs",
+        "command": "saifac.showLogs",
+        "title": "Show SAIFAC Logs",
         "icon": "$(output)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "saif.createFeature",
-          "when": "view == saif-features",
+          "command": "saifac.createFeature",
+          "when": "view == saifac-features",
           "group": "navigation@1"
         },
         {
-          "command": "saif.createDir",
-          "when": "view == saif-features",
+          "command": "saifac.createDir",
+          "when": "view == saifac-features",
           "group": "navigation@2"
         },
         {
-          "command": "saif.createFile",
-          "when": "view == saif-features",
+          "command": "saifac.createFile",
+          "when": "view == saifac-features",
           "group": "navigation@3"
         },
         {
-          "command": "saif.refreshFeatures",
-          "when": "view == saif-features",
+          "command": "saifac.refreshFeatures",
+          "when": "view == saifac-features",
           "group": "navigation@4"
         },
         {
-          "command": "saif.showLogs",
-          "when": "view == saif-features",
+          "command": "saifac.showLogs",
+          "when": "view == saifac-features",
           "group": "navigation@5"
         },
         {
-          "command": "saif.refreshRuns",
-          "when": "view == saif-runs",
+          "command": "saifac.refreshRuns",
+          "when": "view == saifac-runs",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "saif.runFeature",
+          "command": "saifac.runFeature",
           "when": "viewItem == feature",
           "group": "inline@1"
         },
         {
-          "command": "saif.debugFeature",
+          "command": "saifac.debugFeature",
           "when": "viewItem == feature",
           "group": "inline@2"
         },
         {
-          "command": "saif.designFeature",
+          "command": "saifac.designFeature",
           "when": "viewItem == feature",
           "group": "inline@3"
         },
         {
-          "command": "saif.resumeRun",
+          "command": "saifac.resumeRun",
           "when": "viewItem == run_failed",
           "group": "inline@1"
         },
         {
-          "command": "saif.removeRun",
+          "command": "saifac.removeRun",
           "when": "viewItem =~ /^run_/",
           "group": "inline@2"
         },
         {
-          "command": "saif.clearAllRuns",
+          "command": "saifac.clearAllRuns",
           "when": "viewItem == runProject",
           "group": "inline"
         },
         {
-          "command": "saif.revealRunInFinder",
+          "command": "saifac.revealRunInFinder",
           "when": "viewItem =~ /^run_/",
           "group": "1_modification@1"
         },
         {
-          "command": "saif.copyRunId",
+          "command": "saifac.copyRunId",
           "when": "viewItem =~ /^run_/",
           "group": "1_modification@2"
         },
         {
-          "command": "saif.copyRunName",
+          "command": "saifac.copyRunName",
           "when": "viewItem =~ /^run_/",
           "group": "1_modification@3"
         },
         {
-          "command": "saif.createFile",
-          "when": "view == saif-features && (viewItem == feature || viewItem == dir)",
+          "command": "saifac.createFile",
+          "when": "view == saifac-features && (viewItem == feature || viewItem == dir)",
           "group": "2_workspace@1"
         },
         {
-          "command": "saif.createDir",
-          "when": "view == saif-features && (viewItem == feature || viewItem == dir)",
+          "command": "saifac.createDir",
+          "when": "view == saifac-features && (viewItem == feature || viewItem == dir)",
           "group": "2_workspace@2"
         }
       ]

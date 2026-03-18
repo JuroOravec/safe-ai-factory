@@ -4,7 +4,7 @@
  * Supported profiles: shotgun (default)
  *
  * Each profile is responsible for:
- *   1. `init`         — indexing the codebase (called by `saif init`)
+ *   1. `init`         — indexing the codebase (called by `saifac init`)
  *   2. `getMastraTool` — producing a Mastra tool that agents can call
  *                        to query the index by natural language question.
  *
@@ -41,7 +41,7 @@ export interface IndexerProfile {
 
   /**
    * Initializes (or re-indexes) the codebase.
-   * Called once during `saif init`.
+   * Called once during `saifac init`.
    */
   init(opts: IndexerInitOpts): void | Promise<void>;
 

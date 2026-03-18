@@ -87,7 +87,7 @@ npm install -g aider
 Then run:
 
 ```bash
-saif feat run \
+saifac feat run \
   --agent-script ./aider-runner.sh \
   --startup-script ./startup-with-aider.sh
 ```
@@ -116,7 +116,7 @@ docker build -f Dockerfile.my-coder -t my-coder:latest .
 Then run with `--coder-image my-coder:latest`:
 
 ```bash
-saif feat run \
+saifac feat run \
   --agent-script ./aider-runner.sh \
   --coder-image my-coder:latest
 ```
@@ -145,7 +145,7 @@ In **dangerous-debug mode**, the agent inherits the full host environment (inclu
 ### Single variables (custom)
 
 ```bash
-saif feat run \
+saifac feat run \
   --agent-script ./aider-runner.sh \
   --agent-env AIDER_MODEL=gpt-4o \
   --agent-env AIDER_YES=1
@@ -166,7 +166,7 @@ AIDER_YES=1
 Run:
 
 ```bash
-saif feat run \
+saifac feat run \
   --agent-script ./aider-runner.sh \
   --agent-env-file ./agent.env
 ```
@@ -180,7 +180,7 @@ saif feat run \
 Non-OpenHands agents usually don't emit the `--json` event stream. Use `--agent-log-format raw` so stdout is streamed line-by-line instead of parsed as JSON:
 
 ```bash
-saif feat run \
+saifac feat run \
   --agent-script ./aider-runner.sh \
   --agent-log-format raw
 ```
@@ -194,17 +194,17 @@ saif feat run \
 
 ## Step 6: Run the Factory Loop
 
-Invoke `saif feat run` (or `saif run resume <runId>` for resume) with all flags combined:
+Invoke `saifac feat run` (or `saifac run resume <runId>` for resume) with all flags combined:
 
 ```bash
-saif feat run \
+saifac feat run \
   --agent-script ./aider-runner.sh \
   --agent-log-format raw \
   --agent-env-file ./agent.env \
   --startup-script ./startup-with-aider.sh
 ```
 
-For `saif run resume`, the same flags apply — you can change the agent script between runs.
+For `saifac run resume`, the same flags apply — you can change the agent script between runs.
 
 ---
 
@@ -241,7 +241,7 @@ For `saif run resume`, the same flags apply — you can change the agent script 
    ```bash
    chmod +x ./aider-runner.sh ./startup-with-aider.sh
 
-   saif feat run \
+   saifac feat run \
      --agent-script ./aider-runner.sh \
      --startup-script ./startup-with-aider.sh \
      --agent-log-format raw
@@ -254,7 +254,7 @@ For `saif run resume`, the same flags apply — you can change the agent script 
 If you use `--dangerous-debug`, the agent runs directly on the host (no Docker/Leash). Useful for debugging:
 
 ```bash
-saif feat run \
+saifac feat run \
   --agent-script ./aider-runner.sh \
   --agent-log-format raw \
   --dangerous-debug

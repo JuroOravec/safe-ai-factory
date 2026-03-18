@@ -16,7 +16,7 @@
     }
   },
   "bin": {
-    "saif": "dist/cli.js"
+    "saifac": "dist/cli.js"
   },
   "files": [
     "dist"
@@ -35,16 +35,16 @@
     "check": "tsx src/commands/cli.ts check",
     "check:agent": "tsx src/commands/cli.ts check --reporter=agent",
     "agents": "tsx src/commands/cli.ts agents",
-    "saif:init": "tsx src/cli/commands/init.ts",
-    "saif:feat:new": "tsx src/cli/commands/feat.ts new",
-    "saif:feat:design": "tsx src/cli/commands/feat.ts design",
-    "saif:feat:design-discovery": "tsx src/cli/commands/feat.ts design-discovery",
-    "saif:feat:design-specs": "tsx src/cli/commands/feat.ts design-specs",
-    "saif:feat:design-tests": "tsx src/cli/commands/feat.ts design-tests",
-    "saif:feat:design-fail2pass": "tsx src/cli/commands/feat.ts design-fail2pass",
-    "saif:feat:run": "tsx src/cli/commands/feat.ts run",
+    "saifac:init": "tsx src/cli/commands/init.ts",
+    "saifac:feat:new": "tsx src/cli/commands/feat.ts new",
+    "saifac:feat:design": "tsx src/cli/commands/feat.ts design",
+    "saifac:feat:design-discovery": "tsx src/cli/commands/feat.ts design-discovery",
+    "saifac:feat:design-specs": "tsx src/cli/commands/feat.ts design-specs",
+    "saifac:feat:design-tests": "tsx src/cli/commands/feat.ts design-tests",
+    "saifac:feat:design-fail2pass": "tsx src/cli/commands/feat.ts design-fail2pass",
+    "saifac:feat:run": "tsx src/cli/commands/feat.ts run",
     "agents:feat:test": "pnpm agents feat:test",
-    "saif:feat:debug": "tsx src/cli/commands/feat.ts debug",
+    "saifac:feat:debug": "tsx src/cli/commands/feat.ts debug",
     "docker": "tsx scripts/docker.ts",
     "docker:build:test": "pnpm docker build test",
     "docker:build:coder": "pnpm docker build coder",

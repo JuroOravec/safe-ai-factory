@@ -75,14 +75,14 @@ Opens a Pull Request (GitHub/Bitbucket) or Merge Request (GitLab) via the provid
 
 Use the `--git-provider` flag on subcommands that support push and PR creation:
 
-- `saif feat run`
-- `saif run resume`
+- `saifac feat run`
+- `saifac run resume`
 - `feat:test`
 
 **Syntax:**
 
 ```bash
-saif feat run --push owner/repo --pr --git-provider github
+saifac feat run --push owner/repo --pr --git-provider github
 ```
 
 | Flag             | Values                                            | Default  | Description                                           |
@@ -99,27 +99,27 @@ saif feat run --push owner/repo --pr --git-provider github
 ```bash
 # Push to GitHub and create a PR (uses GITHUB_TOKEN)
 export GITHUB_TOKEN=ghp_...
-saif feat run --push origin --pr
+saifac feat run --push origin --pr
 
 # Push to GitLab and open a Merge Request (uses GITLAB_TOKEN)
 export GITLAB_TOKEN=glpat-...
 export GITLAB_URL=https://gitlab.mycompany.com  # omit to use gitlab.com
-saif feat run --push group/repo --pr --git-provider gitlab
+saifac feat run --push group/repo --pr --git-provider gitlab
 
 # Push to Bitbucket and open a Pull Request (uses BITBUCKET_TOKEN + BITBUCKET_USERNAME)
 export BITBUCKET_TOKEN=...
 export BITBUCKET_USERNAME=myuser
-saif feat run --push workspace/repo --pr --git-provider bitbucket
+saifac feat run --push workspace/repo --pr --git-provider bitbucket
 
 # Push to Azure Repos and open a Pull Request (uses AZURE_DEVOPS_TOKEN)
 export AZURE_DEVOPS_TOKEN=...
-saif feat run --push myorg/myproject/myrepo --pr --git-provider azure
+saifac feat run --push myorg/myproject/myrepo --pr --git-provider azure
 
 # Push to Gitea and open a Pull Request (uses GITEA_TOKEN + GITEA_USERNAME)
 export GITEA_TOKEN=...
 export GITEA_USERNAME=myuser
 export GITEA_URL=https://gitea.mycompany.com  # omit to use gitea.com
-saif feat run --push owner/repo --pr --git-provider gitea
+saifac feat run --push owner/repo --pr --git-provider gitea
 ```
 
 ---
@@ -317,7 +317,7 @@ Once registered, users can run:
 
 ```bash
 export GITEA_TOKEN=...
-saif feat run --push origin --pr --git-provider gitea
+saifac feat run --push origin --pr --git-provider gitea
 ```
 
 ---
@@ -327,7 +327,7 @@ saif feat run --push origin --pr --git-provider gitea
 The current design requires modifying the codebase to add a provider. A future enhancement could support loading providers from a path, e.g.:
 
 ```bash
-saif feat run --push origin --pr --git-provider ./my-gitea-provider.js
+saifac feat run --push origin --pr --git-provider ./my-gitea-provider.js
 ```
 
 That would require dynamic `import()` of a module that exports a `GitProvider` implementation. Not implemented at this time.

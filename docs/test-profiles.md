@@ -10,26 +10,26 @@ You don't need to build anything. The factory ships pre-built test runner images
 
 A **test profile** is a language and framework combination (e.g. TypeScript + Vitest, Python + pytest) that the factory uses in two places:
 
-1. **Test generation** — When the factory generates tests for your feature (`saif feat design`), the profile determines in what language the code gets generated.
+1. **Test generation** — When the factory generates tests for your feature (`saifac feat design`), the profile determines in what language the code gets generated.
 
    For example, `node-vitest` produces `*.spec.ts` files with Vitest; `python-pytest` produces `test_*.py` files with pytest.
 
-2. **Test execution** — When you run the coding agent (`saif feat run`), the profile selects the Docker image that runs your tests.
+2. **Test execution** — When you run the coding agent (`saifac feat run`), the profile selects the Docker image that runs your tests.
 
    Each profile has its own pre-built image with the right runtime and tooling.
 
 Use `--test-profile` to pick a profile. The default is `node-vitest`.
 
-The profile must match on both generation and execution. If you ran `saif feat design` with `python-pytest`, use the same profile for `saif feat run` too.
+The profile must match on both generation and execution. If you ran `saifac feat design` with `python-pytest`, use the same profile for `saifac feat run` too.
 
 ---
 
 ## Generating tests
 
-Run `saif feat design` to let AI agent write tests for your feature:
+Run `saifac feat design` to let AI agent write tests for your feature:
 
 ```bash
-saif feat design --test-profile python-pytest
+saifac feat design --test-profile python-pytest
 ```
 
 Docker pulls the test runner image from GHCR. Nothing to configure. No `docker build` needed for default images.
@@ -39,7 +39,7 @@ Docker pulls the test runner image from GHCR. Nothing to configure. No `docker b
 With `--test-profile python-pytest`, you get the following layout:
 
 ```
-saif/features/my-feature/
+saifac/features/my-feature/
 └── tests/
     ├── tests.json
     ├── tests.md
@@ -78,7 +78,7 @@ class TestDummyMdContentStructure:
 For comparison, this is the project layout for a TypeScript project:
 
 ```
-saif/features/my-feature/
+saifac/features/my-feature/
 └── tests/
     ├── tests.json
     ├── tests.md
@@ -125,16 +125,16 @@ To make it easier, each language language (Node, Python, Go, Rust) offers both P
 
 ```bash
 # TypeScript + Vitest
-saif feat run --test-profile node-vitest
+saifac feat run --test-profile node-vitest
 
 # TypeScript + Playwright
-saif feat run --test-profile node-playwright
+saifac feat run --test-profile node-playwright
 
 # Python + Pytest
-saif feat run --test-profile python-pytest
+saifac feat run --test-profile python-pytest
 
 # Python + Playwright
-saif feat run --test-profile python-playwright
+saifac feat run --test-profile python-playwright
 
 ...
 ```
@@ -159,7 +159,7 @@ Use `--test-profile python-pytest` or `--test-image <url>` to switch.
 To lock to a specific version instead of `latest`:
 
 ```bash
-saif feat run --test-image ghcr.io/JuroOravec/safe-ai-factory/factory-test-node-vitest:v1.0.0
+saifac feat run --test-image ghcr.io/JuroOravec/safe-ai-factory/factory-test-node-vitest:v1.0.0
 ```
 
 Images are tagged with each release (e.g. `v1.0.0`). Use `:latest` for the bleeding edge.
@@ -168,10 +168,10 @@ Images are tagged with each release (e.g. `v1.0.0`). Use `:latest` for the bleed
 
 ## Changing profiles
 
-If you already ran `saif feat design` with one profile (e.g. `node-vitest`) and then switch to another (e.g. `python-pytest`), you must re-run `saif feat design` with `--force` flag to regenerate the test scaffold.
+If you already ran `saifac feat design` with one profile (e.g. `node-vitest`) and then switch to another (e.g. `python-pytest`), you must re-run `saifac feat design` with `--force` flag to regenerate the test scaffold.
 
 That will overwrite existing test files, so back up any custom edits first.
 
 ```sh
-saif feat design --test-profile python-pytest --force
+saifac feat design --test-profile python-pytest --force
 ```

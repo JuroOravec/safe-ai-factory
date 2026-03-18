@@ -7,25 +7,31 @@ The agent writes code and tests its code against your tests.
 ## The pipeline
 
 ```mermaid
-flowchart LR
-    subgraph Prepare
-        direction TB
+flowchart TD
+    subgraph G1[1. Prepare]
+        direction LR
         A[1. Write proposal]
-        B[2. Research]
-        C[3. Write black box tests]
-        D[4. Confirm tests fail]
-        A --> B --> C --> D
+        B[2. Discovery]
+        C[3. Research + gen specs]
+        D[4. Gen tests]
+        E[5. Confirm tests fail]
+        A --> B --> C --> D --> E
     end
-    A ~~~ E
-    subgraph Exec
-        direction TB
-        E[5. Coder agent iterates until tests pass]
-        F[6. Black box testing]
-        G[7. PR]
-        E --> F --> G
+    subgraph G2[2. Execute]
+        direction LR
+        F[6. Code]
+        Fg[Gate: static checks]
+        Fr[AI Reviewer]
+        G[7. Black box testing]
+        H[8. PR]
+        F --> Fg --> Fr --> G --> H
+        Fg -->|Fail| F
+        Fr -->|Fail| F
+        G -->|Fail| F
     end
-    style Prepare fill:none,stroke:none
-    style Exec fill:none,stroke:none
+    G1 ~~~ G2
+    style G1 fill:none,stroke:none
+    style G2 fill:none,stroke:none
 ```
 
 Full design: [docs/development/v0/](./development/v0/).
@@ -43,7 +49,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 saif init
 ```
 
-This creates configures Shotgun, and indexes your codebase.
+This scaffolds `saif/config.ts` (if missing), creates and configures Shotgun, and indexes your codebase.
 
 See [LLM configuration](models.md) for all supported providers and model override options.
 
@@ -197,7 +203,7 @@ The `tests/` directory contains:
 - `tests.md` - Human-readable summary of generated tests.
 - `tests.json` - Test catalog - metadata of all tests.
 - `helpers.ts` - Helpers to send requests to the test runner container.
-- `infra.spec.ts` - Tests to ensure containers work correctly.
+- `infra.spec.ts` - Tests to ensure staging container/sidecar work correctly.
 
 Fix test errors, add extra tests if needed.
 
@@ -311,7 +317,7 @@ After the tests successfully failed, you can start your coding agent.
 
 - A **semantic AI reviewer** runs after the gate by default. Disable with `--no-reviewer`. See [reviewer](reviewer.md).
 
-- On test failures, an AI **Judge** decides whether the errors are:
+- On test failures, an AI **Va gue Specs Checker** decides whether the errors are:
   1. Genuine - coding agent made an error
   2. Due to ambiguity in the specs
 

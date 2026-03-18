@@ -85,7 +85,7 @@ The reviewer is **enabled by default**. No setup is needed if you have a compati
 To disable it:
 
 ```sh
-saif feat run --no-reviewer
+saifac feat run --no-reviewer
 ```
 
 ### First Run
@@ -108,17 +108,17 @@ Configure the reviewer model independently from the coder:
 
 ```sh
 # Use GPT-4o for the reviewer, Claude for the coder
-saif feat run --model coder=anthropic/claude-sonnet-4-6,reviewer=openai/gpt-4o
+saifac feat run --model coder=anthropic/claude-sonnet-4-6,reviewer=openai/gpt-4o
 
 # Single global — both use the same model
-saif feat run --model anthropic/claude-sonnet-4-6
+saifac feat run --model anthropic/claude-sonnet-4-6
 ```
 
 The reviewer uses the same resolution order as other agents: per-agent override → global override → auto-discovery from API keys.
 
 ### Config File
 
-In `saif/config.json` (or equivalent):
+In `saifac/config.json` (or equivalent):
 
 ```json
 {
@@ -156,15 +156,15 @@ These are **reserved** — do not override them with `--agent-env`. See [env-var
 
 The reviewer is **skipped** in these cases:
 
-| Scenario                          | Reviewer runs?                         |
-| --------------------------------- | -------------------------------------- |
-| `saif feat run` (default)         | Yes                                    |
-| `saif feat run --no-reviewer`     | No                                     |
-| `saif feat run --dangerous-debug` | No                                     |
-| `saif feat run resume`            | Same as initial run (from stored opts) |
-| `saif feat test`                  | No (no coder agent)                    |
-| `saif feat design-fail2pass`      | No (no coder agent)                    |
-| `saif feat assess`                | No (patch test only)                   |
+| Scenario                            | Reviewer runs?                         |
+| ----------------------------------- | -------------------------------------- |
+| `saifac feat run` (default)         | Yes                                    |
+| `saifac feat run --no-reviewer`     | No                                     |
+| `saifac feat run --dangerous-debug` | No                                     |
+| `saifac feat run resume`            | Same as initial run (from stored opts) |
+| `saifac feat test`                  | No (no coder agent)                    |
+| `saifac feat design-fail2pass`      | No (no coder agent)                    |
+| `saifac feat assess`                | No (patch test only)                   |
 
 ---
 
@@ -206,7 +206,7 @@ The reviewer only checks semantic correctness against the task. It does not run 
 Override with `--model reviewer=provider/model`:
 
 ```sh
-saif feat run --model reviewer=anthropic/claude-opus-4-5
+saifac feat run --model reviewer=anthropic/claude-opus-4-5
 ```
 
 ---

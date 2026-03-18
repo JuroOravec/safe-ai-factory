@@ -62,7 +62,7 @@ export const SUPPORTED_AGENT_NAMES = [
   'coder',
   'discovery',
   'reviewer',
-  'results-judge',
+  'vague-specs-check',
   'pr-summarizer',
   'tests-catalog',
   'tests-writer',
@@ -353,7 +353,7 @@ function parseModelString(raw: string): { provider: string; modelId: string } {
  *   2. Global from `--model` CLI flag
  *   3. Auto-discovery from standard API keys (ANTHROPIC_API_KEY, etc.)
  *
- * @param agentName - Canonical agent name (e.g. "coder", "results-judge") used in `--model` agent=model parts.
+ * @param agentName - Canonical agent name (e.g. "coder", "vague-specs-check") used in `--model` agent=model parts.
  * @param overrides - Parsed CLI flags (from `parseModelOverrides()`).
  */
 export function resolveAgentLlmConfig(agentName: string, overrides: ModelOverrides): LlmConfig {

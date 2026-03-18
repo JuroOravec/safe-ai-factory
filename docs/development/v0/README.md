@@ -35,10 +35,10 @@ flowchart TD
     subgraph Convergence_Loop[The Convergence Loop/ Factory Floor]
         direction TB
         Coder[Coder Agent] -->|Proposes Patch| TestRunner{Test Runner<br/>in Secure Sandbox}
-        TestRunner -->|Fails / exit code 1| Judge[Results Judge<br/>ambiguity check]
-        Judge -->|Ambiguous| UpdateSpec[Update spec + regenerate tests]
+        TestRunner -->|Fails / exit code 1| VagueSpecsChecker[Vague Specs Checker<br/>ambiguity check]
+        VagueSpecsChecker -->|Ambiguous| UpdateSpec[Update spec + regenerate tests]
         UpdateSpec --> Coder
-        Judge -->|Genuine failure| Feedback[Sanitized hint]
+        VagueSpecsChecker -->|Genuine failure| Feedback[Sanitized hint]
         Feedback --> Coder
     end
 
@@ -65,7 +65,7 @@ The pipeline bridges human intent (Markdown PRDs) with deterministic software ge
 5. **The Factory Floor (The Convergence Loop)**
    - The **Coder Agent** is handed the specs and the failing tests.
    - It runs inside an execution loop. It proposes a patch, the test runner (in a separate Test Runner container) evaluates it over HTTP.
-   - **On failure:** The **Results Judge** (default: ai) runs to distinguish spec ambiguity from genuine implementation errors. If the spec was ambiguous, it appends clarifications, regenerates tests, and resets the loop; otherwise it feeds back a sanitized behavioral hint. See [swf-spec-ambiguity.md](swf-spec-ambiguity.md).
+   - **On failure:** The **Vague Specs Checker** (default: ai) runs to distinguish spec ambiguity from genuine implementation errors. If the spec was ambiguous, it appends clarifications, regenerates tests, and resets the loop; otherwise it feeds back a sanitized behavioral hint. See [swf-spec-ambiguity.md](swf-spec-ambiguity.md).
    - This loop repeats autonomously (5, 10, or 50 times) until the test suite returns `exit code 0`.
 6. **Continuous Integration & Merge**
    - Once the local loop turns green, the orchestrator opens a Pull Request.
@@ -79,7 +79,7 @@ The pipeline bridges human intent (Markdown PRDs) with deterministic software ge
 2. **Orchestrator** calls **Shotgun**
    - `shotgun specify --input proposal.md`
    - Outputs codebase-aware `spec.md` and `plan.md`
-3. **Orchestrator** invokes the **Black Box Testing Agent** (`saif feat design`)
+3. **Orchestrator** invokes the **Black Box Testing Agent** (`saifac feat design`)
    - Reads `plan.md`
    - Generates Black-Box tests (Playwright, HTTP Sidecar) in `openspec/features/<feature-name>/tests/`
    - Entire design workflow: ~$1, 1–2 min on Sonnet 4.6
@@ -96,7 +96,7 @@ The pipeline bridges human intent (Markdown PRDs) with deterministic software ge
    - Extracts `patch.diff` from OpenHands sandbox (strips any changes to `openspec/` before applying — reward-hacking prevention)
    - Runs Mutual Verification against hidden holdout tests in Test Runner container
 9. **Orchestrator** routes by outcome
-   - If tests fail: run **Results Judge** (when `--resolve-ambiguity` is prompt or ai) to check for spec ambiguity. If ambiguous, update spec, regenerate tests, reset attempt counter; otherwise restart **OpenHands** with sanitized error hint.
+   - If tests fail: run **Vague Specs Checker** (when `--resolve-ambiguity` is prompt or ai) to check for spec ambiguity. If ambiguous, update spec, regenerate tests, reset attempt counter; otherwise restart **OpenHands** with sanitized error hint.
    - If tests pass: commit patch to host repo, run OpenSpec archive, open PR
 
 ---

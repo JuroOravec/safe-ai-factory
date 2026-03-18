@@ -9,7 +9,7 @@
 #
 #   FACTORY_TARGET_URL    URL of the application under test.
 #   FACTORY_SIDECAR_URL   URL of the HTTP sidecar.
-#   FACTORY_FEATURE_NAME  Name of the Saif feature being tested.
+#   FACTORY_FEATURE_NAME  Name of the Saifac feature being tested.
 #   FACTORY_TESTS_DIR     Absolute path inside the container where test files are mounted.
 #   FACTORY_OUTPUT_FILE   Absolute path where this script must write the JUnit XML report.
 

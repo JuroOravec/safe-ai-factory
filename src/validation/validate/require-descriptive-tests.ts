@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 export default async function validateDescriptiveTests() {
-  const output = execSync('git ls-files "src/**/*.test.ts" "saif/**/*.test.ts"', {
+  const output = execSync('git ls-files "src/**/*.test.ts" "saifac/**/*.test.ts"', {
     encoding: 'utf-8',
   });
   const files = output.split('\n').filter((f) => f.trim() !== '');

@@ -9,6 +9,10 @@ import { join } from 'node:path';
 
 import { isCancel, text } from '@clack/prompts';
 
+import type {
+  NormalizedCodingEnvironment,
+  NormalizedStagingEnvironment,
+} from '../config/schema.js';
 import { getSaifRoot } from '../constants.js';
 import { runDesignTests } from '../design-tests/design.js';
 import { TestCatalogSchema } from '../design-tests/schema.js';
@@ -16,17 +20,18 @@ import { generateTests } from '../design-tests/write.js';
 import { generatePRSummary } from '../git/agents/pr-summarizer.js';
 import type { GitProvider } from '../git/types.js';
 import { type ModelOverrides, resolveAgentLlmConfig } from '../llm-config.js';
+import { createProvisioner } from '../provisioners/index.js';
+import {
+  type AssertionSuiteResult,
+  type RunTestsOpts,
+  type TestsResult,
+} from '../provisioners/types.js';
+import { buildRunArtifact, type RunStorage } from '../runs/index.js';
 import type { SupportedSandboxProfileId } from '../sandbox-profiles/types.js';
 import type { Feature } from '../specs/discover.js';
 import type { TestProfile } from '../test-profiles/types.js';
-import type { CleanupRegistry } from '../utils/docker.js';
-import { runAgent } from './agent-runner.js';
-import { runResultsJudge } from './agents/results-judge.js';
-import {
-  type AssertionSuiteResult,
-  runTeststWithContainers,
-  type StartTestRunnerContainerOpts,
-} from './docker/test-runner.js';
+import type { CleanupRegistry } from '../utils/cleanup.js';
+import { runVagueSpecsChecker } from './agents/vague-specs-check.js';
 import {
   destroySandbox,
   extractPatch,
@@ -56,13 +61,13 @@ export interface IterativeLoopOpts {
    *
    * The orchestrator uses this to resolve the coder agent's model config via
    * `resolveAgentLlmConfig('coder', 'coder', overrides)` and to pass overrides
-   * through to Mastra agents (results-judge, pr-summarizer, tests pipeline).
+   * through to Mastra agents (vague-specs-check, pr-summarizer, tests pipeline).
    *
    * When omitted, all agents fall back to env-var tier overrides then auto-discovery.
    */
   overrides: ModelOverrides;
   /**
-   * Saif directory name relative to repo root (e.g. 'saif').
+   * Saifac directory name relative to repo root (e.g. 'saifac').
    * Resolved by caller (e.g. agents CLI parseSaifDir).
    */
   saifDir: string;
@@ -179,12 +184,29 @@ export interface IterativeLoopOpts {
    * Default: true.
    */
   reviewerEnabled: boolean;
+  /**
+   * Normalized staging environment — always present (defaults to `{ provisioner: 'docker' }` when
+   * `environments.staging` is absent in config). Contains `app` (with DEFAULT_STAGING_APP
+   * defaults) and `appEnvironment` (defaults to `{}`). Used to configure the staging container
+   * and to instantiate the provisioner.
+   */
+  stagingEnvironment: NormalizedStagingEnvironment;
+  /**
+   * Normalized coding environment — always present (defaults to `{ provisioner: 'docker' }` when
+   * `environments.coding` is absent in config).
+   *
+   * When a docker-compose `file` is provided, the orchestrator starts the declared Compose stack
+   * before each agent run and attaches the Leash container to the same Docker network so the agen
+   * can reach services (e.g. databases, mock APIs) by their service-name hostnames.
+   * The stack is torn down cleanly after each agent run regardless of outcome.
+   */
+  codingEnvironment: NormalizedCodingEnvironment;
 }
 
 export interface OrchestratorResult {
   success: boolean;
   attempts: number;
-  /** Run ID for resuming (run state saved to .saif/runs/) */
+  /** Run ID for resuming (run state saved to .saifac/runs/) */
   runId?: string;
   /** Path to the winning patch.diff if success=true */
   patchPath?: string;
@@ -228,6 +250,7 @@ export async function runIterativeLoop(
     testProfile,
     testRetries,
     reviewerEnabled,
+    codingEnvironment,
   } = opts;
 
   // Resolve the coder agent's LLM config once per loop.
@@ -241,8 +264,8 @@ export async function runIterativeLoop(
           argusBinaryPath: getArgusBinaryPath(),
         }
       : null;
-  // Always exclude saif/ and .git/hooks/ regardless of any additional caller-supplied rules.
-  // saif/: reward-hacking prevention (agent must not modify its own test specs).
+  // Always exclude saifac/ and .git/hooks/ regardless of any additional caller-supplied rules.
+  // saifac/: reward-hacking prevention (agent must not modify its own test specs).
   // .git/hooks/: prevents a malicious patch from installing hooks that execute on the host
   //   when the orchestrator runs `git commit` in applyPatchToHost.
   const saifExclude: PatchExcludeRule = { type: 'glob', pattern: `${saifDir}/**` };
@@ -253,45 +276,100 @@ export async function runIterativeLoop(
     ...(opts.patchExclude ?? []),
   ];
 
-  const catalog = loadCatalog({ feature });
   const testRunnerOpts = getTestRunnerOpts({
     feature,
     sandboxBasePath: sandbox.sandboxBasePath,
     testScript,
   });
 
-  // Read the task from plan.md if available
-  const task = buildInitialTask({ projectDir, changeName, openspecDir });
+  const task = buildInitialTask({ feature, saifDir });
 
-  let errorFeedback = '';
+  const cleanupAndSaveRun = async (input: { didSucceed: boolean }) => {
+    const { didSucceed } = input;
+
+    if (runStorage && !didSucceed && runContext && lastRunPatchDiff.trim()) {
+      try {
+        const { registry: _reg, runStorage: _rs, runContext: _rc, ...loopOpts } = opts;
+        const artifact = buildRunArtifact({
+          runId,
+          baseCommitSha: runContext.baseCommitSha,
+          basePatchDiff: runContext.basePatchDiff,
+          runPatchDiff: lastRunPatchDiff,
+          specRef: feature.relativePath,
+          lastFeedback: lastErrorFeedback || undefined,
+          status: didSucceed ? 'completed' : 'failed',
+          opts: loopOpts,
+        });
+        await runStorage.saveRun(runId, artifact);
+        console.log(`[orchestrator] Run state saved. Resume with: saifac run resume ${runId}`);
+      } catch (err) {
+        console.warn('[orchestrator] Failed to save run state:', err);
+      }
+    }
+    if (!sandboxDestroyed) {
+      destroySandbox(sandbox.sandboxBasePath);
+    }
+  };
+
+  // Wrapper for the main loop so we can derive didSucceed from returned value and cleanup on error.
+  const withCleanup = async (fn: () => Promise<OrchestratorResult>) => {
+    let didSucceed = false;
+    try {
+      const result = await fn();
+      didSucceed = result.success;
+      return result;
+    } finally {
+      await cleanupAndSaveRun({ didSucceed });
+    }
+  };
+
+  let errorFeedback = opts.initialErrorFeedback ?? '';
   let attempts = 0;
   let sandboxDestroyed = false;
 
-  try {
+  return await withCleanup(async () => {
     while (attempts < maxRuns) {
       attempts++;
       console.log(`\n[orchestrator] ===== ATTEMPT ${attempts}/${maxRuns} =====`);
 
       // 1. Run agent (fresh context every iteration — Ralph Wiggum)
-      await runAgent({
-        codePath: sandbox.codePath,
-        sandboxBasePath: sandbox.sandboxBasePath,
-        task,
-        errorFeedback,
-        llmConfig: coderLlmConfig,
-        saifDir,
-        feature,
-        dangerousDebug,
-        cedarPolicyPath,
-        coderImage,
-        gateRetries,
-        startupPath: sandbox.startupPath,
-        agentStartPath: sandbox.agentStartPath,
-        agentPath: sandbox.agentPath,
-        agentEnv,
-        agentLogFormat,
-        reviewer,
-      });
+      //    The coding provisioner sets up its network + compose services, runs the agent,
+      //    then tears itself down, regardless of outcome.
+      const codingRunId = `${sandbox.runId}-coding-${attempts}`;
+      const codingProvisioner = createProvisioner(codingEnvironment);
+      registry?.registerProvisioner(codingProvisioner, codingRunId);
+
+      try {
+        await codingProvisioner.setup({
+          runId: codingRunId,
+          projectName,
+          featureName: feature.name,
+          projectDir,
+        });
+
+        await codingProvisioner.runAgent({
+          codePath: sandbox.codePath,
+          sandboxBasePath: sandbox.sandboxBasePath,
+          task,
+          errorFeedback,
+          llmConfig: coderLlmConfig,
+          saifDir,
+          feature,
+          dangerousDebug,
+          cedarPolicyPath,
+          coderImage,
+          gateRetries,
+          startupPath: sandbox.startupPath,
+          agentStartPath: sandbox.agentStartPath,
+          agentPath: sandbox.agentPath,
+          agentEnv,
+          agentLogFormat,
+          reviewer,
+        });
+      } finally {
+        registry?.deregisterProvisioner(codingProvisioner);
+        await codingProvisioner.teardown({ runId: codingRunId });
+      }
 
       // 2. Extract the patch, stripping any excluded paths (reward-hacking prevention)
       const { patch: patchContent, patchPath }: { patch: string; patchPath: string } = extractPatch(
@@ -315,7 +393,9 @@ export async function runIterativeLoop(
       // 3. Mutual Verification (with test retries for flaky environments)
       let testAttempts = 0;
       let lastRunId = '';
-      let lastJudgeResult: Awaited<ReturnType<typeof runResultsJudgeForFailure>> | undefined;
+      let lastVagueSpecsCheckResult:
+        | Awaited<ReturnType<typeof runVagueSpecsCheckerForFailure>>
+        | undefined;
 
       while (testAttempts < testRetries) {
         testAttempts++;
@@ -324,21 +404,42 @@ export async function runIterativeLoop(
           `\n[orchestrator] Test attempt ${testAttempts}/${testRetries} (outer attempt ${attempts}/${maxRuns})`,
         );
 
-        const result = await runTeststWithContainers({
-          sandboxProfileId,
-          codePath: sandbox.codePath,
-          projectDir,
-          feature,
-          projectName,
-          catalog,
-          testRunnerOpts,
-          registry,
-          testImage,
+        const stagingProvisioner = createProvisioner(opts.stagingEnvironment);
+        registry?.registerProvisioner(stagingProvisioner, lastRunId);
+        await stagingProvisioner.setup({
           runId: lastRunId,
-          startupPath: sandbox.startupPath,
-          stagePath: sandbox.stagePath,
-          reportPath: join(sandbox.sandboxBasePath, 'results.xml'),
+          projectName,
+          featureName: feature.name,
+          projectDir,
         });
+
+        const result: TestsResult = await (async (): Promise<TestsResult> => {
+          try {
+            const stagingHandle = await stagingProvisioner.startStaging({
+              sandboxProfileId,
+              codePath: sandbox.codePath,
+              projectDir,
+              stagingEnvironment: opts.stagingEnvironment,
+              feature,
+              projectName,
+              startupPath: sandbox.startupPath,
+              stagePath: sandbox.stagePath,
+            });
+
+            return await stagingProvisioner.runTests({
+              ...testRunnerOpts,
+              stagingHandle,
+              testImage,
+              runId: lastRunId,
+              feature,
+              projectName,
+              reportPath: join(sandbox.sandboxBasePath, 'results.xml'),
+            });
+          } finally {
+            registry?.deregisterProvisioner(stagingProvisioner);
+            await stagingProvisioner.teardown({ runId: lastRunId });
+          }
+        })();
         if (result.runnerError) {
           throw new Error(
             `Test runner error on attempt ${attempts}: ${result.runnerError}\n` +
@@ -377,7 +478,7 @@ export async function runIterativeLoop(
         //    - yes, we ask the human (or AI) for clarification and update specs and tests.
         //    - no, we treat errors as genuine code errors and continue the loop.
         if (resolveAmbiguity !== 'off' && result.testSuites) {
-          const resultsJudgeResult = await runResultsJudgeForFailure({
+          const VagueSpecsCheckResult = await runVagueSpecsCheckerForFailure({
             projectName,
             projectDir,
             feature,
@@ -387,7 +488,7 @@ export async function runIterativeLoop(
             overrides,
           });
 
-          if (resultsJudgeResult.ambiguityResolved) {
+          if (VagueSpecsCheckResult.ambiguityResolved) {
             // Spec was updated and tests regenerated — retry tests with updated suite.
             // Don't count this attempt against testRetries since the spec was at fault.
             console.log(
@@ -395,7 +496,7 @@ export async function runIterativeLoop(
             );
             testAttempts--;
           } else {
-            lastJudgeResult = resultsJudgeResult;
+            lastVagueSpecsCheckResult = VagueSpecsCheckResult;
           }
         }
       }
@@ -409,7 +510,7 @@ export async function runIterativeLoop(
       //       so the agent doesn't think it can fix the failure by changing tests.
       const base = 'An external service attempted to use this project and failed. ';
       const hint =
-        lastJudgeResult?.sanitizedHint ??
+        lastVagueSpecsCheckResult?.sanitizedHint ??
         'Re-read the plan and specification, and fix the implementation.';
       errorFeedback = base + hint;
 
@@ -435,10 +536,10 @@ export async function runIterativeLoop(
 }
 
 // ---------------------------------------------------------------------------
-// Results Judge: judge ambiguity vs genuine failure on tests failures
+// Vague Specs Checker: check for ambiguity vs genuine failure on tests failures
 // ---------------------------------------------------------------------------
 
-interface RunResultsJudgeForFailureOpts {
+interface RunVagueSpecsCheckerForFailureOpts {
   projectName: string;
   /** Absolute path to the project directory */
   projectDir: string;
@@ -451,11 +552,11 @@ interface RunResultsJudgeForFailureOpts {
    * - `prompt`: pause and ask human to confirm/edit proposed clarification before updating.
    */
   resolveAmbiguity: 'prompt' | 'ai';
-  /** CLI-level model overrides — forwarded to results-judge and tests pipeline. */
+  /** CLI-level model overrides — forwarded to vague-specs-check and tests pipeline. */
   overrides: ModelOverrides;
 }
 
-interface ResultsJudgeForFailureResult {
+interface VagueSpecsCheckerForFailureResult {
   /** True when the spec was genuinely ambiguous AND the ambiguity was resolved */
   ambiguityResolved: boolean;
   /** Sanitized behavioral hint for the agent (empty if ambiguityResolved=true) */
@@ -476,9 +577,9 @@ interface ResultsJudgeForFailureResult {
  * Returns `ambiguityResolved: true` when the spec was updated so the caller can
  * reset the attempt counter.
  */
-export async function runResultsJudgeForFailure(
-  opts: RunResultsJudgeForFailureOpts,
-): Promise<ResultsJudgeForFailureResult> {
+export async function runVagueSpecsCheckerForFailure(
+  opts: RunVagueSpecsCheckerForFailureOpts,
+): Promise<VagueSpecsCheckerForFailureResult> {
   const { projectDir, feature, testSuites, resolveAmbiguity, testProfile, projectName, overrides } =
     opts;
 
@@ -487,40 +588,40 @@ export async function runResultsJudgeForFailure(
     ? readFileSync(specPath, 'utf8')
     : '(specification.md not found)';
 
-  console.log('[results-judge] Running ambiguity check...');
+  console.log('[vague-specs-check] Running ambiguity check...');
 
-  // Stream judge thinking in real-time (similar to [think]/[agent] style from OpenHands)
+  // Stream vague-specs-check thinking in real-time (similar to [think]/[agent] style from OpenHands)
   let thinkBuf = '';
-  const onJudgeThought = (delta: string) => {
+  const onVagueSpecsCheckThought = (delta: string) => {
     thinkBuf += delta;
     const lines = thinkBuf.split('\n');
     thinkBuf = lines.pop() ?? '';
     for (const line of lines) {
       const trimmed = line.trim();
-      if (trimmed) process.stdout.write(`[results-judge:think] ${trimmed.slice(0, 200)}\n`);
+      if (trimmed) process.stdout.write(`[vague-specs-check:think] ${trimmed.slice(0, 200)}\n`);
     }
   };
-  const onJudgeEvent = (chunk: { type: string; payload: unknown }) => {
+  const onVagueSpecsCheckEvent = (chunk: { type: string; payload: unknown }) => {
     if (chunk.type === 'tool-call') {
       const p = chunk.payload as { toolName?: string };
-      process.stdout.write(`[results-judge] tool: ${p.toolName ?? '?'}\n`);
+      process.stdout.write(`[vague-specs-check] tool: ${p.toolName ?? '?'}\n`);
     }
   };
 
-  const verdict = await runResultsJudge({
+  const verdict = await runVagueSpecsChecker({
     specContent,
     failingSuites: testSuites,
     overrides,
-    onThought: onJudgeThought,
-    onEvent: onJudgeEvent,
+    onThought: onVagueSpecsCheckThought,
+    onEvent: onVagueSpecsCheckEvent,
   });
   // Flush any remaining partial thought line
   if (thinkBuf.trim()) {
-    process.stdout.write(`[results-judge:think] ${thinkBuf.trim().slice(0, 200)}\n`);
+    process.stdout.write(`[vague-specs-check:think] ${thinkBuf.trim().slice(0, 200)}\n`);
   }
 
-  console.log(`[results-judge] isAmbiguous=${verdict.isAmbiguous}`);
-  console.log(`[results-judge] Reason: ${verdict.reason}`);
+  console.log(`[vague-specs-check] isAmbiguous=${verdict.isAmbiguous}`);
+  console.log(`[vague-specs-check] Reason: ${verdict.reason}`);
 
   if (!verdict.isAmbiguous) {
     return {
@@ -530,11 +631,13 @@ export async function runResultsJudgeForFailure(
   }
 
   // --- Ambiguous spec detected ---
-  console.log(`[results-judge] Proposed spec addition:\n  "${verdict.proposedSpecAddition}"`);
+  console.log(`[vague-specs-check] Proposed spec addition:\n  "${verdict.proposedSpecAddition}"`);
 
   if (resolveAmbiguity === 'prompt') {
-    console.log(`\n[results-judge] Ambiguity detected. Reason: ${verdict.reason}`);
-    console.log(`[results-judge] Judge suggests: "${verdict.proposedSpecAddition}"`);
+    console.log(`\n[vague-specs-check] Ambiguity detected. Reason: ${verdict.reason}`);
+    console.log(
+      `[vague-specs-check] Vague Specs Checker suggests: "${verdict.proposedSpecAddition}"`,
+    );
 
     const answer = await text({
       message: 'What is the correct behavior? (describe it; we will add it to specification.md)',
@@ -542,7 +645,7 @@ export async function runResultsJudgeForFailure(
     });
 
     if (isCancel(answer) || !answer?.trim()) {
-      console.log('[results-judge] Human skipped — treating failure as genuine.');
+      console.log('[vague-specs-check] Human skipped — treating failure as genuine.');
       return {
         ambiguityResolved: false,
         sanitizedHint: verdict.sanitizedHintForAgent,
@@ -555,11 +658,11 @@ export async function runResultsJudgeForFailure(
 
   // Append clarification to specification.md
   if (existsSync(specPath)) {
-    const addition = `\n\n<!-- Results Judge clarification (auto-added) -->\n${verdict.proposedSpecAddition}\n`;
+    const addition = `\n\n<!-- Vague Specs Checker clarification (auto-added) -->\n${verdict.proposedSpecAddition}\n`;
     appendFileSync(specPath, addition, 'utf8');
-    console.log(`[results-judge] Appended clarification to ${specPath}`);
+    console.log(`[vague-specs-check] Appended clarification to ${specPath}`);
   } else {
-    console.warn('[results-judge] specification.md not found — cannot update spec.');
+    console.warn('[vague-specs-check] specification.md not found — cannot update spec.');
     return {
       ambiguityResolved: false,
       sanitizedHint: verdict.sanitizedHintForAgent,
@@ -568,7 +671,7 @@ export async function runResultsJudgeForFailure(
 
   // Regenerate tests from the updated spec (design pipeline writes tests.json,
   // then scaffold generates the spec files via the coder agent).
-  console.log('[results-judge] Regenerating tests with updated spec...');
+  console.log('[vague-specs-check] Regenerating tests with updated spec...');
   try {
     await runDesignTests({
       feature,
@@ -578,9 +681,9 @@ export async function runResultsJudgeForFailure(
       overrides,
     });
     await generateTests({ feature, testProfile, overrides });
-    console.log('[results-judge] Tests regenerated successfully.');
+    console.log('[vague-specs-check] Tests regenerated successfully.');
   } catch (err) {
-    console.warn(`[results-judge] Test regeneration failed (non-fatal): ${String(err)}`);
+    console.warn(`[vague-specs-check] Test regeneration failed (non-fatal): ${String(err)}`);
     return {
       ambiguityResolved: false,
       sanitizedHint: verdict.sanitizedHintForAgent,
@@ -701,7 +804,7 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
 
         // 5a. Generate AI title + body; fall back to generic strings on any error.
         let prTitle = `feat(${feature.name}): auto-generated implementation`;
-        let prBody = `Automated implementation produced by the [SAIF](https://github.com/JuroOravec/safe-ai-factory) for feature \`${feature.name}\`.\n\nRun ID: \`${runId}\``;
+        let prBody = `Automated implementation produced by the [SAIFAC](https://github.com/JuroOravec/safe-ai-factory) for feature \`${feature.name}\`.\n\nRun ID: \`${runId}\``;
         try {
           console.log(`[orchestrator] Generating AI PR summary for ${feature.name}...`);
           const summary = await generatePRSummary({
@@ -790,7 +893,7 @@ export function loadCatalog(opts: LoadCatalogOpts) {
   const testsJsonPath = join(feature.absolutePath, 'tests', 'tests.json');
   if (!existsSync(testsJsonPath)) {
     throw new Error(
-      `tests.json not found at ${testsJsonPath}. Run 'saif feat design -n ${feature.name}' first.`,
+      `tests.json not found at ${testsJsonPath}. Run 'saifac feat design -n ${feature.name}' first.`,
     );
   }
   const raw = JSON.parse(readFileSync(testsJsonPath, 'utf8')) as unknown;
@@ -816,22 +919,19 @@ interface GetTestRunnerOptsArgs {
 }
 
 /**
- * Returns test runner container opts for the feature.
+ * Prepares the test runner filesystem inputs for a feature run.
  *
  * Returns `testsDir` (the tests/ directory for the feature), `reportDir` (sandbox root,
  * so that `runTests` can find results.xml at `{sandboxRoot}/results.xml`), and
  * `testScriptPath` (always set — written from DEFAULT_TEST_SCRIPT or a custom override).
  *
- * Spec files are expected to already exist — generated by `saif feat design`.
+ * Spec files are expected to already exist — generated by `saifac feat design`.
  */
 export function getTestRunnerOpts({
   feature,
   sandboxBasePath,
   testScript,
-}: GetTestRunnerOptsArgs): Pick<
-  StartTestRunnerContainerOpts,
-  'testsDir' | 'reportDir' | 'testScriptPath'
-> {
+}: GetTestRunnerOptsArgs): Pick<RunTestsOpts, 'testsDir' | 'reportDir' | 'testScriptPath'> {
   const testsDir = join(feature.absolutePath, 'tests');
 
   const testScriptPath = join(sandboxBasePath, 'test.sh');

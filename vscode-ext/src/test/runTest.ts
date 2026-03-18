@@ -15,7 +15,7 @@ async function main(): Promise<void> {
     const extensionTestsPath = path.resolve(__dirname, './suite/index.js');
 
     // Open a specific workspace when the test window launches (for deterministic tests)
-    const launchArgs = [path.resolve(extensionDevelopmentPath, 'saif-test-workspace')];
+    const launchArgs = [path.resolve(extensionDevelopmentPath, 'saifac-test-workspace')];
 
     await runTests({
       extensionDevelopmentPath,

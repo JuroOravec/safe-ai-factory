@@ -7,7 +7,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { filterAgentEnv } from './agent-runner.js';
+import { filterAgentEnv } from '../provisioners/docker/agent-log.js';
 
 describe('filterAgentEnv', () => {
   it('passes through non-reserved keys unchanged', () => {

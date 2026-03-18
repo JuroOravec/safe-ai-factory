@@ -2,7 +2,7 @@
 
 [OpenCode](https://github.com/opencode-ai/opencode) is an open-source coding agent with a TUI. Pre-installed in the Leash coder image.
 
-**Usage:** `saif feat run --agent opencode`
+**Usage:** `saifac feat run --agent opencode`
 
 ## How we call it
 

@@ -11,12 +11,12 @@ describe('saifConfigSchema', () => {
     it('accepts valid agent keys', () => {
       const result = saifConfigSchema.parse({
         defaults: {
-          agentModels: { coder: 'openai/gpt-4o', 'results-judge': 'openai/gpt-4o-mini' },
+          agentModels: { coder: 'openai/gpt-4o', 'vague-specs-check': 'openai/gpt-4o-mini' },
         },
       });
       expect(result.defaults?.agentModels).toEqual({
         coder: 'openai/gpt-4o',
-        'results-judge': 'openai/gpt-4o-mini',
+        'vague-specs-check': 'openai/gpt-4o-mini',
       });
     });
 

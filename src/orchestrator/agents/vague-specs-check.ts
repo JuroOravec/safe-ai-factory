@@ -1,13 +1,13 @@
 /**
- * Results Judge — judges whether tests failures are caused by ambiguous specs
+ * Vague Specs Checker — analyses whether tests failures are caused by ambiguous specs
  * or genuine implementation errors.
  *
- * When the Test Runner container reports test failures, the Judge receives:
+ * When the Test Runner container reports test failures, the Vague Specs Checker receives:
  *   - The feature specification (specification.md)
  *   - The failing test details from results.xml (JUnit XML report)
  *
- * SECURITY: The Judge does NOT receive the implementation patch (git diff).
- * Agent-controlled content would allow prompt-injection attacks to bias the Judge
+ * SECURITY: The Vague Specs Checker does NOT receive the implementation patch (git diff).
+ * Agent-controlled content would allow prompt-injection attacks to bias the Vague Specs Checker
  * toward spec changes that no longer reflect user intent.
  *
  * It then decides:
@@ -22,14 +22,14 @@ import { Agent } from '@mastra/core/agent';
 import { z } from 'zod';
 
 import { type ModelOverrides, resolveAgentModel } from '../../llm-config.js';
+import type { AssertionResult, AssertionSuiteResult } from '../../provisioners/types.js';
 import { type DrainableChunk, drainFullStream } from '../../utils/drain-stream.js';
-import type { AssertionResult, AssertionSuiteResult } from '../docker/test-runner.js';
 
 // ---------------------------------------------------------------------------
-// Results Judge agent
+// Vague Specs Checker agent
 // ---------------------------------------------------------------------------
 
-const RESULTS_JUDGE_INSTRUCTIONS = `You are an impartial Results Judge for an AI Software Factory.
+const VAGUE_SPECS_CHECKER_INSTRUCTIONS = `You are an impartial Vague Specs Checker for an AI Software Factory.
 
 Your job is to determine whether a test failure is caused by:
   A) An ambiguous or incomplete feature specification (the test is unfair because the spec didn't define the behavior clearly enough), OR
@@ -54,12 +54,12 @@ Your output must be a JSON object with these fields:
 
 Output ONLY valid JSON, no other text.`;
 
-function createResultsJudgeAgent(overrides: ModelOverrides = {}) {
+function createVagueSpecsCheckerAgent(overrides: ModelOverrides = {}) {
   return new Agent({
-    id: 'results-judge',
-    name: 'ResultsJudge',
-    instructions: RESULTS_JUDGE_INSTRUCTIONS,
-    model: resolveAgentModel('results-judge', overrides),
+    id: 'vague-specs-check',
+    name: 'VagueSpecsChecker',
+    instructions: VAGUE_SPECS_CHECKER_INSTRUCTIONS,
+    model: resolveAgentModel('vague-specs-check', overrides),
   });
 }
 
@@ -67,20 +67,20 @@ function createResultsJudgeAgent(overrides: ModelOverrides = {}) {
 // Output schema
 // ---------------------------------------------------------------------------
 
-export const ResultsJudgeResultSchema = z.object({
+export const VagueSpecsCheckResultSchema = z.object({
   isAmbiguous: z.boolean(),
   reason: z.string(),
   proposedSpecAddition: z.string(),
   sanitizedHintForAgent: z.string(),
 });
 
-export type ResultsJudgeResult = z.infer<typeof ResultsJudgeResultSchema>;
+export type VagueSpecsCheckResult = z.infer<typeof VagueSpecsCheckResultSchema>;
 
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
-export interface RunResultsJudgeOpts {
+export interface RunVagueSpecsCheckerOpts {
   /** Full content of specification.md (or any spec files joined together) */
   specContent: string;
   /** Failing test cases from the vitest JSON report */
@@ -95,11 +95,11 @@ export interface RunResultsJudgeOpts {
 }
 
 /**
- * Formats the failing assertions into a human-readable block for the Results Judge prompt.
+ * Formats the failing assertions into a human-readable block for the Vague Specs Checker prompt.
  *
  * SECURITY: We pass ONLY test name and error type. We NEVER pass failureMessages, stack traces,
  * or assertion expected/actual values. Those contain agent-controlled output and can be used for
- * prompt injection attacks against the Judge. See docs/security.md.
+ * prompt injection attacks against the Vague Specs Checker. See docs/security.md.
  */
 function formatFailures(suites: AssertionSuiteResult[]): string {
   const lines: string[] = [];
@@ -120,14 +120,16 @@ function formatFailures(suites: AssertionSuiteResult[]): string {
 }
 
 /**
- * Runs the Results Judge and returns its verdict.
+ * Runs the Vague Specs Checker and returns its verdict.
  *
- * - If the Judge cannot be reached or its output fails schema validation,
+ * - If the Vague Specs Checker cannot be reached or its output fails schema validation,
  *   falls back to `{ isAmbiguous: false, ... }` so the loop continues normally.
  */
-export async function runResultsJudge(opts: RunResultsJudgeOpts): Promise<ResultsJudgeResult> {
+export async function runVagueSpecsChecker(
+  opts: RunVagueSpecsCheckerOpts,
+): Promise<VagueSpecsCheckResult> {
   const { specContent, failingSuites, overrides = {}, onThought, onEvent, abortSignal } = opts;
-  const resultsJudgeAgent = createResultsJudgeAgent(overrides);
+  const vagueSpecsCheckerAgent = createVagueSpecsCheckerAgent(overrides);
 
   const failureBlock = formatFailures(failingSuites);
 
@@ -145,7 +147,7 @@ Produce your JSON verdict now.`;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let text = '';
     try {
-      const output = await resultsJudgeAgent.stream([{ role: 'user', content: prompt }], {
+      const output = await vagueSpecsCheckerAgent.stream([{ role: 'user', content: prompt }], {
         ...(abortSignal ? { abortSignal } : {}),
       });
 
@@ -169,13 +171,13 @@ Produce your JSON verdict now.`;
       if (extracted) jsonStr = extracted.trim();
 
       const parsed = JSON.parse(jsonStr) as unknown;
-      const result = ResultsJudgeResultSchema.safeParse(parsed);
+      const result = VagueSpecsCheckResultSchema.safeParse(parsed);
       if (!result.success) {
         lastErr = new Error(
           `Schema validation failed: ${JSON.stringify(result.error.issues, null, 2)}`,
         );
         console.warn(
-          `[results-judge] Attempt ${attempt}/${MAX_ATTEMPTS}: invalid JSON schema, retrying...`,
+          `[vague-specs-check] Attempt ${attempt}/${MAX_ATTEMPTS}: invalid JSON schema, retrying...`,
         );
         continue;
       }
@@ -183,19 +185,19 @@ Produce your JSON verdict now.`;
       return result.data;
     } catch (err) {
       lastErr = err;
-      console.warn(`[results-judge] Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${String(err)}`);
+      console.warn(`[vague-specs-check] Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${String(err)}`);
     }
   }
 
-  console.warn(`[results-judge] All ${MAX_ATTEMPTS} attempts failed. Last: ${String(lastErr)}`);
+  console.warn(`[vague-specs-check] All ${MAX_ATTEMPTS} attempts failed. Last: ${String(lastErr)}`);
   return fallback();
 }
 
-function fallback(): ResultsJudgeResult {
+function fallback(): VagueSpecsCheckResult {
   return {
     isAmbiguous: false,
     reason:
-      'Results Judge could not produce a verdict; treating as genuine implementation failure.',
+      'Vague Specs Checker could not produce a verdict; treating as genuine implementation failure.',
     proposedSpecAddition: '',
     sanitizedHintForAgent: '',
   };

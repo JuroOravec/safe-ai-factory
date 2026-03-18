@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadSaifConfig } from './load.js';
 
 function makeTempDir(): string {
-  const dir = join(tmpdir(), `saif-config-test-${Math.random().toString(36).slice(2)}`);
+  const dir = join(tmpdir(), `saifac-config-test-${Math.random().toString(36).slice(2)}`);
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -23,20 +23,20 @@ describe('loadSaifConfig', () => {
     rmSync(projectDir, { recursive: true, force: true });
   });
 
-  it('returns empty config when saif dir does not exist', () => {
-    const config = loadSaifConfig('saif', projectDir);
+  it('returns empty config when saifac dir does not exist', () => {
+    const config = loadSaifConfig('saifac', projectDir);
     expect(config).toEqual({});
   });
 
-  it('returns empty config when saif dir exists but has no config file', () => {
-    const saifDir = join(projectDir, 'saif');
+  it('returns empty config when saifac dir exists but has no config file', () => {
+    const saifDir = join(projectDir, 'saifac');
     mkdirSync(saifDir, { recursive: true });
-    const config = loadSaifConfig('saif', projectDir);
+    const config = loadSaifConfig('saifac', projectDir);
     expect(config).toEqual({});
   });
 
   it('loads config.json and parses defaults', () => {
-    const saifDir = join(projectDir, 'saif');
+    const saifDir = join(projectDir, 'saifac');
     mkdirSync(saifDir, { recursive: true });
     writeFileSync(
       join(saifDir, 'config.json'),
@@ -50,7 +50,7 @@ describe('loadSaifConfig', () => {
       }),
     );
 
-    const config = loadSaifConfig('saif', projectDir);
+    const config = loadSaifConfig('saifac', projectDir);
     expect(config.defaults).toBeDefined();
     expect(config.defaults?.maxRuns).toBe(10);
     expect(config.defaults?.testRetries).toBe(2);
@@ -59,7 +59,7 @@ describe('loadSaifConfig', () => {
   });
 
   it('loads config.js (CommonJS-style export)', () => {
-    const saifDir = join(projectDir, 'saif');
+    const saifDir = join(projectDir, 'saifac');
     mkdirSync(saifDir, { recursive: true });
     // cosmiconfig loads .js; we use module.exports
     writeFileSync(
@@ -67,24 +67,24 @@ describe('loadSaifConfig', () => {
       "module.exports = { defaults: { maxRuns: 7, globalStorage: 'memory' } };",
     );
 
-    const config = loadSaifConfig('saif', projectDir);
+    const config = loadSaifConfig('saifac', projectDir);
     expect(config.defaults?.maxRuns).toBe(7);
     expect(config.defaults?.globalStorage).toBe('memory');
   });
 
   it('prefers config.json when both config.json and config.js exist', () => {
-    const saifDir = join(projectDir, 'saif');
+    const saifDir = join(projectDir, 'saifac');
     mkdirSync(saifDir, { recursive: true });
     writeFileSync(join(saifDir, 'config.json'), JSON.stringify({ defaults: { maxRuns: 3 } }));
     writeFileSync(join(saifDir, 'config.js'), 'module.exports = { defaults: { maxRuns: 99 } };');
 
-    const config = loadSaifConfig('saif', projectDir);
+    const config = loadSaifConfig('saifac', projectDir);
     // cosmiconfig search order: config.json is typically before config.js in searchPlaces
     expect([3, 99]).toContain(config.defaults?.maxRuns);
   });
 
   it('parses storage as globalStorage and storages', () => {
-    const saifDir = join(projectDir, 'saif');
+    const saifDir = join(projectDir, 'saifac');
     mkdirSync(saifDir, { recursive: true });
     writeFileSync(
       join(saifDir, 'config.json'),
@@ -96,13 +96,13 @@ describe('loadSaifConfig', () => {
       }),
     );
 
-    const config = loadSaifConfig('saif', projectDir);
+    const config = loadSaifConfig('saifac', projectDir);
     expect(config.defaults?.globalStorage).toBe('s3');
     expect(config.defaults?.storages).toEqual({ runs: 'local', tasks: 's3://bucket/tasks' });
   });
 
   it('parses agentEnv object', () => {
-    const saifDir = join(projectDir, 'saif');
+    const saifDir = join(projectDir, 'saifac');
     mkdirSync(saifDir, { recursive: true });
     writeFileSync(
       join(saifDir, 'config.json'),
@@ -113,7 +113,7 @@ describe('loadSaifConfig', () => {
       }),
     );
 
-    const config = loadSaifConfig('saif', projectDir);
+    const config = loadSaifConfig('saifac', projectDir);
     expect(config.defaults?.agentEnv).toEqual({
       OPENAI_API_KEY: 'sk-test',
       CUSTOM_VAR: 'value',
@@ -124,14 +124,14 @@ describe('loadSaifConfig', () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as never);
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const saifDir = join(projectDir, 'saif');
+    const saifDir = join(projectDir, 'saifac');
     mkdirSync(saifDir, { recursive: true });
     writeFileSync(
       join(saifDir, 'config.json'),
       JSON.stringify({ defaults: { maxRuns: 'not-a-number' } }),
     );
 
-    loadSaifConfig('saif', projectDir);
+    loadSaifConfig('saifac', projectDir);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(consoleSpy).toHaveBeenCalled();

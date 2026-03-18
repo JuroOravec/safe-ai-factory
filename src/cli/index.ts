@@ -10,7 +10,7 @@ import runCommand from './commands/run.js';
 
 const main = defineCommand({
   meta: {
-    name: 'saif',
+    name: 'saifac',
     description:
       'safe-ai-factory: Spec-driven AI factory. Use with any agentic CLI. Language-agnostic. Safe by design.',
   },

@@ -11,7 +11,7 @@ import * as vscode from 'vscode';
 
 import { type SaifCliService } from './cliService';
 
-/** Raw artifact shape from .saif/runs/*.json (subset of full RunArtifact) */
+/** Raw artifact shape from .saifac/runs/*.json (subset of full RunArtifact) */
 interface RunArtifactRaw {
   runId: string;
   status: 'failed' | 'completed' | 'running';
@@ -62,7 +62,7 @@ export class RunsTreeProvider implements vscode.TreeDataProvider<RunTreeElement>
         this.runsCache = raw.map((a) => toSaifRunData(a as RunArtifactRaw, this.workspaceRoot));
         return this.getProjectGroups();
       } catch {
-        vscode.window.showErrorMessage('Failed to fetch SAIF runs.');
+        vscode.window.showErrorMessage('Failed to fetch SAIFAC runs.');
         return [];
       }
     }

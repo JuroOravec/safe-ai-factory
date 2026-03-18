@@ -4,7 +4,7 @@
  * Step 1a: Planner agent reads spec files → produces tests.md (Markdown CoT)
  * Step 1b: Catalog agent reads tests.md + spec files → produces tests.json
  *
- * Outputs are written to saif/features/<featureName>/tests/
+ * Outputs are written to saifac/features/<featureName>/tests/
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -36,7 +36,7 @@ export interface RunTestsDesignOpts {
   indexerProfile?: IndexerProfile;
   /**
    * Project name — passed to indexerProfile.getMastraTool() so the tool can locate
-   * the correct index. Must match the name used during `saif init`.
+   * the correct index. Must match the name used during `saifac init`.
    */
   projectName: string;
   /** Test profile determines entrypoint naming rules for catalog generation. Defaults to vitest. */
@@ -119,8 +119,8 @@ function guardIndexerTool(raw: unknown, indexerProfile: IndexerProfile): asserts
  * Runs the full two-step tests design pipeline for a feature.
  *
  * Produces:
- *   saif/features/<featureName>/tests/tests.md
- *   saif/features/<featureName>/tests/tests.json
+ *   saifac/features/<featureName>/tests/tests.md
+ *   saifac/features/<featureName>/tests/tests.json
  */
 export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTestsDesignResult> {
   const {

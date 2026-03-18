@@ -26,7 +26,7 @@ It prepares an **exhaustive** list of test cases, then implements them as execut
 
 The black box testing agent uses a **two-phase** approach validated by recent research: design first, implement second. This enables easier human review and traceability.
 
-### Phase 1: Test Case Design (`saif feat design <feature>`)
+### Phase 1: Test Case Design (`saifac feat design <feature>`)
 
 **Cost & duration:** The full planning workflow (Shotgun spec gen + tests design + tests write) costs ~$1 and takes 1–2 min on Sonnet 4.6.
 
@@ -52,10 +52,10 @@ Each test case MUST **trace back** to a specific success criterion or acceptance
 
 A human reviews `tests.json` in their IDE before Phase 2 runs. If it's incomplete, the user can iterate:
 
-1. **Agentic Iteration:** Edit `tests.json` manually in your IDE, or add `--prompt` support to `saif feat design` to refine the catalog.
+1. **Agentic Iteration:** Edit `tests.json` manually in your IDE, or add `--prompt` support to `saifac feat design` to refine the catalog.
 2. **Manual/IDE Iteration:** The user can use standard IDE tools (like Cursor's inline chat) to modify the JSON directly.
 
-### Phase 2: Test Implementation (runs automatically after Phase 1 in `saif feat design`)
+### Phase 2: Test Implementation (runs automatically after Phase 1 in `saifac feat design`)
 
 **Input:** The Test Catalog (`tests.json`) from Phase 1.
 
@@ -202,42 +202,46 @@ The Phase 1 output is a JSON object compatible with `generateObject` and similar
 
 ### Test Catalog (Root)
 
+`tests.json` defines test cases only. Infrastructure (sidecarPort, sidecarPath, baseUrl, build, additional containers) comes from `saifac/config.ts` `environments.staging`. See [Environments and Infrastructure](../../services.md) for a user guide; [Software Factory Services](./swf-services.md) for the architecture.
+
+For a CLI application, `tests.json` looks like this:
+
 ```json
 {
   "version": "1.0",
   "featureName": "shotgun-test",
   "specDir": "openspec/features/shotgun-test",
-  "containers": {
-    "staging": {
-      "type": "cli",
-      "sidecarPort": 8080,
-      "sidecarPath": "/exec"
-    },
-    "additional": []
-  },
   "testCases": []
 }
 ```
 
-For a web API with a database:
+For a web API with a database, you would configure the infrastructure in `saifac/config.ts`:
+
+```typescript
+// saifac/config.ts
+export default {
+  environments: {
+    staging: {
+      provisioner: 'docker',
+      // This compose file would define your postgres container
+      file: './docker-compose.test.yml',
+      app: {
+        baseUrl: 'http://staging:3000',
+        sidecarPort: 8080,
+        sidecarPath: '/exec',
+      },
+    },
+  },
+};
+```
+
+And the `tests.json` remains strictly focused on the test cases:
 
 ```json
 {
   "version": "1.0",
   "featureName": "add-user-api",
   "specDir": "openspec/features/add-user-api",
-  "containers": {
-    "staging": {
-      "type": "web",
-      "baseUrl": "http://staging:3000"
-    },
-    "additional": [
-      {
-        "name": "postgres",
-        "image": "postgres:16-alpine"
-      }
-    ]
-  },
   "testCases": []
 }
 ```
@@ -362,14 +366,6 @@ For the greeting command (`openspec/features/shotgun-test/`):
   "version": "1.0",
   "featureName": "shotgun-test",
   "specDir": "openspec/features/shotgun-test",
-  "containers": {
-    "staging": {
-      "type": "cli",
-      "sidecarPort": 8080,
-      "sidecarPath": "/exec"
-    },
-    "additional": []
-  },
   "testCases": [
     {
       "id": "tc-greeting-001",
@@ -503,26 +499,25 @@ Before the Coder Agent starts, the black box testing agent runs the generated te
 5. **Black box testing Phase 2:** Implements test files from catalog (Vitest/Jest/Playwright).
 6. **Fail2Pass:** Run tests against `main`; at least one feature test must fail (partial overlap OK).
 7. **Handoff:** Failing tests + `plan.md` go to Coder Agent.
-8. **Convergence Loop:** Coder iterates until tests pass. On each tests failure, the **Results Judge** (default: ai) runs to distinguish spec ambiguity from genuine errors—if ambiguous, updates spec and regenerates tests; otherwise feeds back a sanitized hint. See [swf-spec-ambiguity.md](swf-spec-ambiguity.md).
+8. **Convergence Loop:** Coder iterates until tests pass. On each tests failure, the **Vague Specs Checker** (default: ai) runs to distinguish spec ambiguity from genuine errors—if ambiguous, updates spec and regenerates tests; otherwise feeds back a sanitized hint. See [swf-spec-ambiguity.md](swf-spec-ambiguity.md).
 9. **Mutual Verification:** Orchestrator runs holdout tests; if pass, apply patch and open PR.
 
 ### Commands (in order)
 
-| Step | Command                                                  | Purpose                                                                                     |
-| ---- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------- | --- |
-| 0    | `saif init`                                              | One-time: OpenSpec + Shotgun config + codebase index                                        |
-| 1    | `saif feat new`                                          | Create feature, optionally write `proposal.md`                                               |
-| 2    | (Edit `proposal.md` / spec dir as needed)                | Human refines proposal before design                                                        |
-| 3    | [`saif feat design`](feat-design.md)                     | Generate specs and tests from a feature's proposal (full design workflow)                   |
-| —    | [`saif feat design-specs`](feat-design-specs.md)         | Generate specs from a features's proposal only (first step of design).                      |
-| —    | [`saif feat design-tests`](feat-design-tests.md)         | Generate tests from existing specs (second step of design).                                 |     |
-| 5    | [`saif feat design-fail2pass`](feat-design-fail2pass.md) | Run tests against main; at least one feature test must fail (third step of design workflow) |
-| 6    | `saif feat run`                                          | Start an agent to implement the specs. Runs until it passes your tests.                     |
-| —    | `saif feat debug`                                        | Debug: spin up staging container only, stream logs until Ctrl+C                             |
-| 7    | (PR merged to main)                                      | Human or automation                                                                         |
-| 8    | `pnpm agents feat:finish`                                | Archive the feature                                                                          |
-| —    | `saif cache list`                                        | List sandbox dirs for this project (`--all`: all projects)                                  |
-| —    | `saif cache clear`                                       | Remove sandbox entries for this project (`--all`: everything)                               |
+| Step | Command                                                    | Purpose                                                                                     |
+| ---- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------- | --- |
+| 0    | `saifac init`                                              | One-time: OpenSpec + Shotgun config + codebase index                                        |
+| 1    | `saifac feat new`                                          | Create feature, optionally write `proposal.md`                                              |
+| 2    | (Edit `proposal.md` / spec dir as needed)                  | Human refines proposal before design                                                        |
+| 3    | [`saifac feat design`](feat-design.md)                     | Generate specs and tests from a feature's proposal (full design workflow)                   |
+| —    | [`saifac feat design-specs`](feat-design-specs.md)         | Generate specs from a features's proposal only (first step of design).                      |
+| —    | [`saifac feat design-tests`](feat-design-tests.md)         | Generate tests from existing specs (second step of design).                                 |     |
+| 5    | [`saifac feat design-fail2pass`](feat-design-fail2pass.md) | Run tests against main; at least one feature test must fail (third step of design workflow) |
+| 6    | `saifac feat run`                                          | Start an agent to implement the specs. Runs until it passes your tests.                     |
+| —    | `saifac feat debug`                                        | Debug: spin up staging container only, stream logs until Ctrl+C                             |
+| 7    | (PR merged to main)                                        | Human or automation                                                                         |
+| —    | `saifac cache list`                                        | List sandbox dirs for this project (`--all`: all projects)                                  |
+| —    | `saifac cache clear`                                       | Remove sandbox entries for this project (`--all`: everything)                               |
 
 ---
 

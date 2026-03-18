@@ -48,7 +48,7 @@ export const nameArg = {
 
 export const saifDirArg = {
   type: 'string' as const,
-  description: 'Path to saif directory (default: saif)',
+  description: 'Path to saifac directory (default: saifac)',
 };
 
 const testScriptArg = {
@@ -125,7 +125,7 @@ export const featAgentArgs = {
 // Run-specific args (run, resume)
 export const featRunArgs = {
   name: nameArg,
-  'saif-dir': saifDirArg,
+  'saifac-dir': saifDirArg,
   'project-dir': projectDirArg,
   project: projectArg,
   'test-profile': testProfileArg,

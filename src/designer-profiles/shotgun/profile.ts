@@ -9,7 +9,7 @@
  *                      (default: "python"). Example: SHOTGUN_PYTHON=$(uv run which python)
  *
  * The profile treats the `indexerTool` as unused — Shotgun manages its own codebase
- * querying internally (Context7 integration is configured via `saif init`).
+ * querying internally (Context7 integration is configured via `saifac init`).
  */
 
 import { existsSync, readFileSync } from 'node:fs';

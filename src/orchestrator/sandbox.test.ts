@@ -30,10 +30,10 @@ index abc1234..def5678 100644
 @@ -1,3 +1,4 @@
  export const greet = () => 'hello';
 +export const farewell = () => 'bye';
-diff --git a/saif/features/foo/tests/tests.json b/saif/features/foo/tests/tests.json
+diff --git a/saifac/features/foo/tests/tests.json b/saifac/features/foo/tests/tests.json
 index 111aaaa..222bbbb 100644
---- a/saif/features/foo/tests/tests.json
-+++ b/saif/features/foo/tests/tests.json
+--- a/saifac/features/foo/tests/tests.json
++++ b/saifac/features/foo/tests/tests.json
 @@ -1 +1 @@
 -{}
 +{"testCases":[]}
@@ -45,9 +45,9 @@ describe('filterPatchHunks', () => {
   });
 
   it('strips sections matching a glob exclude rule', () => {
-    const result = filterPatchHunks(PATCH_TWO_FILES, [{ type: 'glob', pattern: 'saif/**' }]);
+    const result = filterPatchHunks(PATCH_TWO_FILES, [{ type: 'glob', pattern: 'saifac/**' }]);
     expect(result).toContain('src/index.ts');
-    expect(result).not.toContain('saif/features/foo/tests/tests.json');
+    expect(result).not.toContain('saifac/features/foo/tests/tests.json');
   });
 
   it('strips sections matching a regex exclude rule', () => {
@@ -117,7 +117,7 @@ describe('createSandbox + destroySandbox (integration)', () => {
   const TEST_CATALOG = {
     version: '1.0',
     featureName: 'my-feature',
-    featureDir: 'saif/features/my-feature',
+    featureDir: 'saifac/features/my-feature',
     containers: {
       staging: { sidecarPort: 8080, sidecarPath: '/exec' },
       additional: [],
@@ -154,7 +154,7 @@ describe('createSandbox + destroySandbox (integration)', () => {
     const projectDir = mkdtempSync(join(process.cwd(), 'createSandbox-project-'));
     const sandboxBaseDir = mkdtempSync(join(process.cwd(), 'createSandbox-sandbox-'));
     try {
-      // 1. Build dummy codebase: .git, .gitignore, saif/features with public + hidden tests
+      // 1. Build dummy codebase: .git, .gitignore, saifac/features with public + hidden tests
       writeFileSync(join(projectDir, '.gitignore'), 'node_modules\n');
       execSync('git init', { cwd: projectDir });
       writeFileSync(join(projectDir, 'README.md'), 'dummy');
@@ -170,7 +170,7 @@ describe('createSandbox + destroySandbox (integration)', () => {
         },
       });
 
-      const saifDir = 'saif';
+      const saifDir = 'saifac';
       const featureTests = join(projectDir, saifDir, 'features', 'my-feature', 'tests');
       mkdirSync(join(featureTests, 'public'), { recursive: true });
       mkdirSync(join(featureTests, 'hidden'), { recursive: true });
@@ -198,7 +198,7 @@ describe('createSandbox + destroySandbox (integration)', () => {
       const feature = resolveFeature({
         input: 'my-feature',
         projectDir,
-        saifDir: 'saif',
+        saifDir: 'saifac',
       });
       const paths = createSandbox({
         feature,
@@ -280,7 +280,7 @@ describe('createSandbox + destroySandbox (integration)', () => {
     const projectDir = mkdtempSync(join(process.cwd(), 'createSandbox-project-'));
     const sandboxBaseDir = mkdtempSync(join(process.cwd(), 'createSandbox-sandbox-'));
     try {
-      // 1. Build dummy codebase with nested feature saif/features/(auth)/login
+      // 1. Build dummy codebase with nested feature saifac/features/(auth)/login
       writeFileSync(join(projectDir, '.gitignore'), 'node_modules\n');
       execSync('git init', { cwd: projectDir });
       writeFileSync(join(projectDir, 'README.md'), 'dummy');
@@ -296,11 +296,11 @@ describe('createSandbox + destroySandbox (integration)', () => {
         },
       });
 
-      const saifDir = 'saif';
+      const saifDir = 'saifac';
       const NESTED_CATALOG = {
         ...TEST_CATALOG,
         featureName: '(auth)/login',
-        featureDir: 'saif/features/(auth)/login',
+        featureDir: 'saifac/features/(auth)/login',
         testCases: [
           {
             id: 'tc-public-001',

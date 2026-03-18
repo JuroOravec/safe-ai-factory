@@ -2,7 +2,7 @@
 
 [Qwen Code](https://github.com/QwenLM/qwen-code) is Alibaba's terminal agent. Pre-installed in the Leash coder image.
 
-**Usage:** `saif feat run --agent qwen`
+**Usage:** `saifac feat run --agent qwen`
 
 ## How we call it
 

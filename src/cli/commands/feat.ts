@@ -2,7 +2,7 @@
 /**
  * Feat CLI — feature workflow scaffolding.
  *
- * Usage: saif feat <subcommand> [options]
+ * Usage: saifac feat <subcommand> [options]
  *   new               Create scaffolding for a new feature (prompts for name if not given)
  *   design-discovery  Gather context with MCP/tools, write discovery.md (optional step before design-specs).
  *   design-specs      Generate specs from a feature's proposal only (first step of design).
@@ -11,7 +11,7 @@
  *   design            Generate specs, tests, and validate the tests (full design workflow)
  *   run               Start an agent to implement the specs. Runs until it passes your tests.
  *   debug             Spin up staging container only, stream logs (Ctrl+C to stop)
- *   Alias: saif feature
+ *   Alias: saifac feature
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -62,6 +62,7 @@ import {
   parseAgentScripts,
   parseCedarPolicyPath,
   parseCoderImage,
+  parseCodingEnvironment,
   parseDangerousDebug,
   parseDesignerProfile,
   parseDiscoveryOptions,
@@ -81,6 +82,7 @@ import {
   parseSandboxBaseDir,
   parseSandboxProfile,
   parseStageScript,
+  parseStagingEnvironment,
   parseStartupScript,
   parseTestImage,
   parseTestProfile,
@@ -127,7 +129,7 @@ const newCommand = defineCommand({
       description: 'Feature name (kebab-case, e.g. add-greeting-cmd)',
     },
     yes: yesArg,
-    'saif-dir': saifDirArg,
+    'saifac-dir': saifDirArg,
     'project-dir': projectDirArg,
     desc: {
       type: 'string',
@@ -219,14 +221,14 @@ const designSpecsArgs = {
   },
   ...modelOverrideArgs,
   designer: designerArg,
-  'saif-dir': saifDirArg,
+  'saifac-dir': saifDirArg,
   'project-dir': projectDirArg,
 };
 
 const designDiscoveryArgs = {
   name: nameArg,
   yes: yesArg,
-  'saif-dir': saifDirArg,
+  'saifac-dir': saifDirArg,
   'project-dir': projectDirArg,
   ...modelOverrideArgs,
   'discovery-mcp': {
@@ -251,7 +253,7 @@ const designDiscoveryArgs = {
 
 async function _runDesignDiscovery(args: {
   name?: string;
-  'saif-dir'?: string;
+  'saifac-dir'?: string;
   'project-dir'?: string;
   model?: string;
   'base-url'?: string;
@@ -290,7 +292,7 @@ async function _runDesignSpecs(args: {
   model?: string;
   'base-url'?: string;
   designer?: string;
-  'saif-dir'?: string;
+  'saifac-dir'?: string;
   'project-dir'?: string;
   [key: string]: unknown;
 }) {
@@ -392,7 +394,7 @@ const designDiscoveryCommand = defineCommand({
 
 const designTestsArgs = {
   name: nameArg,
-  'saif-dir': saifDirArg,
+  'saifac-dir': saifDirArg,
   'project-dir': projectDirArg,
   'test-profile': testProfileArg,
   indexer: indexerArg,
@@ -521,7 +523,7 @@ const designTestsCommand = defineCommand({
 
 const designFail2passArgs = {
   name: nameArg,
-  'saif-dir': saifDirArg,
+  'saifac-dir': saifDirArg,
   'project-dir': projectDirArg,
   project: projectArg,
   'test-profile': testProfileArg,
@@ -558,6 +560,8 @@ async function _runDesignFail2pass(opts: {
       parseTestScript({ args, projectDir, profileId: testProfile.id, config }),
     ]);
 
+  const stagingEnvironment = parseStagingEnvironment(config);
+
   console.log(`\nFail2Pass verification: ${feature.name}`);
   const result = await runFail2Pass({
     sandboxProfileId: sandboxProfile.id,
@@ -567,6 +571,7 @@ async function _runDesignFail2pass(opts: {
     sandboxBaseDir,
     projectName,
     testImage,
+    stagingEnvironment,
     gateScript,
     agentStartScript,
     agentScript,
@@ -658,7 +663,7 @@ const designCommand = defineCommand({
 
 const featDebugArgs = {
   name: nameArg,
-  'saif-dir': saifDirArg,
+  'saifac-dir': saifDirArg,
   'project-dir': projectDirArg,
   project: projectArg,
   'sandbox-base-dir': sandboxBaseDirArg,
@@ -687,7 +692,7 @@ const runCommand = defineCommand({
     console.log(`\n${result.message}`);
     if (result.runId) {
       console.log(`\nResume with:`);
-      console.log(`  saif run resume ${result.runId}`);
+      console.log(`  saifac run resume ${result.runId}`);
     }
     if (!result.success) process.exit(1);
   },
@@ -737,6 +742,8 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
   const pr = parsePr(runArgs, config);
   const gitProvider = parseGitProvider(runArgs, config);
   const runStorage = parseRunStorage(runArgs, projectDir, config);
+  const stagingEnvironment = parseStagingEnvironment(config);
+  const codingEnvironment = parseCodingEnvironment(config);
 
   console.log(`\nStarting iterative loop: ${feature.name}`);
   console.log(`  Max runs: ${maxRuns}`);
@@ -789,6 +796,8 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
     pr,
     gitProvider,
     runStorage,
+    stagingEnvironment,
+    codingEnvironment,
     resume: null,
   };
 };
@@ -825,6 +834,8 @@ const debugCommand = defineCommand({
     );
     const agentScript = readFileSync(resolveAgentScriptPath(DEFAULT_AGENT_PROFILE.id), 'utf8');
 
+    const stagingEnvironment = parseStagingEnvironment(config);
+
     console.log(`\nDebug staging container: ${feature.name}`);
     console.log('  Ctrl+C to stop and clean up.\n');
 
@@ -835,6 +846,7 @@ const debugCommand = defineCommand({
       saifDir,
       sandboxBaseDir,
       projectName,
+      stagingEnvironment,
       startupScript,
       gateScript,
       agentStartScript,

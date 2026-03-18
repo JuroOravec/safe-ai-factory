@@ -18,7 +18,7 @@ import {
 import { loadSaifConfig } from './load.js';
 
 function makeTempDir(): string {
-  const dir = join(tmpdir(), `saif-config-int-${Math.random().toString(36).slice(2)}`);
+  const dir = join(tmpdir(), `saifac-config-int-${Math.random().toString(36).slice(2)}`);
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -36,7 +36,7 @@ describe('config integration', () => {
 
   describe('config.json', () => {
     it('parseStorageOverrides uses globalStorage and storages from config', () => {
-      const saifDir = join(projectDir, 'saif');
+      const saifDir = join(projectDir, 'saifac');
       mkdirSync(saifDir, { recursive: true });
       writeFileSync(
         join(saifDir, 'config.json'),
@@ -48,7 +48,7 @@ describe('config integration', () => {
         }),
       );
 
-      const config = loadSaifConfig('saif', projectDir);
+      const config = loadSaifConfig('saifac', projectDir);
       const overrides = parseStorageOverrides({}, config);
 
       expect(overrides.globalStorage).toBe('memory');
@@ -56,7 +56,7 @@ describe('config integration', () => {
     });
 
     it('parseStorageOverrides: CLI overrides config', () => {
-      const saifDir = join(projectDir, 'saif');
+      const saifDir = join(projectDir, 'saifac');
       mkdirSync(saifDir, { recursive: true });
       writeFileSync(
         join(saifDir, 'config.json'),
@@ -68,7 +68,7 @@ describe('config integration', () => {
         }),
       );
 
-      const config = loadSaifConfig('saif', projectDir);
+      const config = loadSaifConfig('saifac', projectDir);
       const overrides = parseStorageOverrides({ storage: 'runs=s3' }, config);
 
       expect(overrides.storages?.runs).toBe('s3');
@@ -76,68 +76,68 @@ describe('config integration', () => {
     });
 
     it('parseMaxRuns uses config when CLI has no value', () => {
-      const saifDir = join(projectDir, 'saif');
+      const saifDir = join(projectDir, 'saifac');
       mkdirSync(saifDir, { recursive: true });
       writeFileSync(join(saifDir, 'config.json'), JSON.stringify({ defaults: { maxRuns: 12 } }));
 
-      const config = loadSaifConfig('saif', projectDir);
+      const config = loadSaifConfig('saifac', projectDir);
       const maxRuns = parseMaxRuns({}, config);
 
       expect(maxRuns).toBe(12);
     });
 
     it('parseMaxRuns: CLI overrides config', () => {
-      const saifDir = join(projectDir, 'saif');
+      const saifDir = join(projectDir, 'saifac');
       mkdirSync(saifDir, { recursive: true });
       writeFileSync(join(saifDir, 'config.json'), JSON.stringify({ defaults: { maxRuns: 12 } }));
 
-      const config = loadSaifConfig('saif', projectDir);
+      const config = loadSaifConfig('saifac', projectDir);
       const maxRuns = parseMaxRuns({ 'max-runs': '3' }, config);
 
       expect(maxRuns).toBe(3);
     });
 
     it('parseResolveAmbiguity uses config when CLI has no value', () => {
-      const saifDir = join(projectDir, 'saif');
+      const saifDir = join(projectDir, 'saifac');
       mkdirSync(saifDir, { recursive: true });
       writeFileSync(
         join(saifDir, 'config.json'),
         JSON.stringify({ defaults: { resolveAmbiguity: 'off' } }),
       );
 
-      const config = loadSaifConfig('saif', projectDir);
+      const config = loadSaifConfig('saifac', projectDir);
       const val = parseResolveAmbiguity({}, config);
 
       expect(val).toBe('off');
     });
 
     it('parseModelOverrides uses globalModel and agentModels from config', () => {
-      const saifDir = join(projectDir, 'saif');
+      const saifDir = join(projectDir, 'saifac');
       mkdirSync(saifDir, { recursive: true });
       writeFileSync(
         join(saifDir, 'config.json'),
         JSON.stringify({
           defaults: {
             globalModel: 'anthropic/claude-sonnet-4',
-            agentModels: { coder: 'openai/gpt-4o', 'results-judge': 'openai/gpt-4o-mini' },
+            agentModels: { coder: 'openai/gpt-4o', 'vague-specs-check': 'openai/gpt-4o-mini' },
           },
         }),
       );
 
-      const config = loadSaifConfig('saif', projectDir);
+      const config = loadSaifConfig('saifac', projectDir);
       const overrides = parseModelOverrides({}, config);
 
       expect(overrides.globalModel).toBe('anthropic/claude-sonnet-4');
       expect(overrides.agentModels).toEqual({
         coder: 'openai/gpt-4o',
-        'results-judge': 'openai/gpt-4o-mini',
+        'vague-specs-check': 'openai/gpt-4o-mini',
       });
     });
   });
 
   describe('config.js', () => {
     it('loads config.js and parseStorageOverrides uses values', () => {
-      const saifDir = join(projectDir, 'saif');
+      const saifDir = join(projectDir, 'saifac');
       mkdirSync(saifDir, { recursive: true });
       // Use config.js (no config.json) so cosmiconfig picks .js
       writeFileSync(
@@ -145,7 +145,7 @@ describe('config integration', () => {
         "module.exports = { defaults: { globalStorage: 'memory', storages: { runs: 'local' } } };",
       );
 
-      const config = loadSaifConfig('saif', projectDir);
+      const config = loadSaifConfig('saifac', projectDir);
       expect(config.defaults?.globalStorage).toBe('memory');
 
       const overrides = parseStorageOverrides({}, config);
@@ -154,14 +154,14 @@ describe('config integration', () => {
     });
 
     it('loads config.js and parseMaxRuns uses value', () => {
-      const saifDir = join(projectDir, 'saif');
+      const saifDir = join(projectDir, 'saifac');
       mkdirSync(saifDir, { recursive: true });
       writeFileSync(
         join(saifDir, 'config.js'),
         "module.exports = { defaults: { maxRuns: 8, resolveAmbiguity: 'prompt' } };",
       );
 
-      const config = loadSaifConfig('saif', projectDir);
+      const config = loadSaifConfig('saifac', projectDir);
       expect(parseMaxRuns({}, config)).toBe(8);
       expect(parseResolveAmbiguity({}, config)).toBe('prompt');
     });

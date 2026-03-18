@@ -113,7 +113,6 @@ Output a single JSON object (no markdown fences). Shape:
   "version": "1.0",
   "featureName": "<feature>",
   "featureDir": "<path>",
-  "containers": { "staging": { "sidecarPort": 8080, "sidecarPath": "/exec" }, "additional": [] },
   "testCases": [
     {
       "id": "tc-001",

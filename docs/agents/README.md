@@ -13,8 +13,8 @@ The CLI tools receive the task and they edit files in the workspace.
 Use `--agent <id>`:
 
 ```bash
-saif feat run --agent aider
-saif feat run --agent claude
+saifac feat run --agent aider
+saifac feat run --agent claude
 ```
 
 | ID                                      | Name                | Project URL                                         |
@@ -40,7 +40,7 @@ saif feat run --agent claude
 For any CLI not in the list:
 
 ```bash
-saif feat run \
+saifac feat run \
   --agent-script ./my-agent-runner.sh \
   --agent-log-format raw
 ```

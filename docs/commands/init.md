@@ -1,13 +1,13 @@
-# saif init
+# saifac init
 
-Initialize Shotgun.
+Initialize Saifac config and Shotgun indexer.
 
-One-time setup: Configures Shotgun (optionally with Context7 for documentation lookup), and indexes the codebase for spec-driven workflows.
+One-time setup: Scaffolds `saifac/config.ts` (if no config exists), creates the `saifac/` directory, configures Shotgun (optionally with Context7 for documentation lookup), and indexes the codebase for spec-driven workflows.
 
 ## Usage
 
 ```bash
-saif init [options]
+saifac init [options]
 ```
 
 ## Arguments
@@ -15,7 +15,7 @@ saif init [options]
 | Argument        | Alias | Type   | Description                                            |
 | --------------- | ----- | ------ | ------------------------------------------------------ |
 | `--project`     | `-p`  | string | Project name override (default: `package.json` "name") |
-| `--saif-dir`    | —     | string | Path to saif directory (default: `saif`)               |
+| `--saifac-dir`  | —     | string | Path to saifac directory (default: `saifac`)           |
 | `--project-dir` | —     | string | Project directory (default: current working directory) |
 
 ## Examples
@@ -23,25 +23,25 @@ saif init [options]
 Basic init (uses `package.json` name as project):
 
 ```bash
-saif init
+saifac init
 ```
 
 Override project name:
 
 ```bash
-saif init -p my-project
+saifac init -p my-project
 ```
 
-Use a custom saif directory:
+Use a custom saifac directory:
 
 ```bash
-saif init --saif-dir ./my-saif
+saifac init --saifac-dir ./my-saifac
 ```
 
 Use a custom project directory (e.g. when running from a parent monorepo):
 
 ```bash
-saif init --project-dir ./packages/my-app
+saifac init --project-dir ./packages/my-app
 ```
 
 ## Environment variables
@@ -49,14 +49,50 @@ saif init --project-dir ./packages/my-app
 | Variable           | Required | Description                                                                                                      |
 | ------------------ | -------- | ---------------------------------------------------------------------------------------------------------------- |
 | `SHOTGUN_PYTHON`   | no       | Path to the Python binary that has `shotgun-sh` installed (default: `python`). Example: `$(uv run which python)` |
-| `CONTEXT7_API_KEY` | no       | API key for Context7 documentation lookup inside Shotgun. Configured once via `saif init`.                       |
+| `CONTEXT7_API_KEY` | no       | API key for Context7 documentation lookup inside Shotgun. Configured once via `saifac init`.                     |
 
 ## What it does
 
-1. Runs `python -m shotgun.main config init`
-2. Optionally configures Context7 via `python -m shotgun.main config set-context7 --api-key <key>` (if CONTEXT7_API_KEY is set)
-3. Indexes the codebase with `python -m shotgun.main codebase index . --name <project>`
+1. Scaffolds `saifac/config.ts` (if no config exists).
+2. Runs `python -m shotgun.main config init`
+3. Optionally configures Context7 via `python -m shotgun.main config set-context7 --api-key <key>` (if CONTEXT7_API_KEY is set)
+4. Indexes the codebase with `python -m shotgun.main codebase index . --name <project>`
+
+## Generated config
+
+When no config exists, `saifac init` creates `saifac/config.ts` with:
+
+```typescript
+import type { SaifConfig } from 'safe-ai-factory';
+
+const config: SaifConfig = {
+  defaults: {
+    // project: 'my-app',
+    // indexerProfile: 'shotgun',
+  },
+  environments: {
+    coding: {
+      provider: 'none',
+      agentEnvironment: {},
+    },
+    staging: {
+      provider: 'none',
+      app: {
+        sidecarPort: 8080,
+        sidecarPath: '/exec',
+        // baseUrl: 'http://staging:3000',
+        // build: { dockerfile: './Dockerfile.staging' },
+      },
+      appEnvironment: {},
+    },
+  },
+};
+
+export default config;
+```
+
+Set `provisioner: 'docker'` and add a `file` when you need ephemeral services (databases, queues, etc.). See [Environments and Infrastructure](../services.md) for details.
 
 ## Notes
 
-- **Custom Python path** - Use `SHOTGUN_PYTHON=$(uv run which python) saif init ...` if Python needs uv.
+- **Custom Python path** - Use `SHOTGUN_PYTHON=$(uv run which python) saifac init ...` if Python needs uv.

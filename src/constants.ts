@@ -7,9 +7,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Absolute path to the SAIF repository root.
+ * Absolute path to the SAIFAC repository root.
  *
- * Resolved from this file's location (src/constants.ts → one level up = SAIF root).
+ * Resolved from this file's location (src/constants.ts → one level up = SAIFAC root).
  * Use this instead of computing the root from import.meta.url in other modules —
  * that pattern breaks when files live at different depths (e.g. scripts/ vs src/).
  */

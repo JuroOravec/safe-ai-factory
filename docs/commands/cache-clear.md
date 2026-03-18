@@ -1,4 +1,4 @@
-# saif cache clear
+# saifac cache clear
 
 Remove sandbox entries for this project (--all: everything).
 
@@ -7,7 +7,7 @@ Deletes factory sandbox entries from `/tmp/factory-sandbox/` (or a custom path).
 ## Usage
 
 ```bash
-saif cache clear [options]
+saifac cache clear [options]
 ```
 
 ## Arguments
@@ -23,25 +23,25 @@ saif cache clear [options]
 Remove sandbox entries for the current project:
 
 ```bash
-saif cache clear
+saifac cache clear
 ```
 
 Remove sandbox entries for all projects:
 
 ```bash
-saif cache clear --all
+saifac cache clear --all
 ```
 
 Remove sandbox entries or specific project:
 
 ```bash
-saif cache clear -p my-project
+saifac cache clear -p my-project
 ```
 
 Use a custom sandbox base directory:
 
 ```bash
-saif cache clear --sandbox-base-dir /var/cache/factory
+saifac cache clear --sandbox-base-dir /var/cache/factory
 ```
 
 ## What it does

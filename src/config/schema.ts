@@ -1,15 +1,105 @@
 /**
- * Schema for saif/config.* file.
+ * Schema for saifac/config.* file.
  *
  * All configurable options can be specified under `defaults`. CLI flags override
  * config defaults. Config uses richer formats where applicable (e.g. model overrides
  * as object instead of comma-separated strings).
+ *
+ * The `environments` block defines service topology for the coding and staging phases.
+ * See docs/services.md (user guide) and docs/development/v0/swf-services.md (design).
  */
 
 import { z } from 'zod';
 
 import { isSupportedAgentName, SUPPORTED_AGENT_NAMES } from '../llm-config.js';
 import { isSupportedStorageKey, SUPPORTED_STORAGE_KEYS } from '../storage/types.js';
+
+/** Default staging app config. Applied when environments.staging.app is absent. */
+export const DEFAULT_STAGING_APP = {
+  sidecarPort: 8080,
+  sidecarPath: '/exec',
+} as const;
+
+/** Staging app container config (sidecar port/path, optional base URL and custom Dockerfile). */
+export const stagingAppSchema = z.object({
+  sidecarPort: z.number().default(8080),
+  sidecarPath: z.string().default('/exec'),
+  /** Base URL of the web app. Omit for pure CLI projects. Use "staging" as hostname. */
+  baseUrl: z.string().optional(),
+  build: z
+    .object({
+      dockerfile: z.string().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Docker provisioner — always the default runtime.
+ * Optionally points at a Docker Compose file for ephemeral services (databases, queues, etc.).
+ * When `file` is omitted, only the isolated bridge network and the core containers
+ * (staging, test-runner, coder) are created — no Compose stack is started.
+ */
+export const dockerEnvironmentSchema = z.object({
+  provisioner: z.literal('docker'),
+  /** Path to a Docker Compose file (relative to the project root). Optional. */
+  file: z.string().optional(),
+  agentEnvironment: z.record(z.string(), z.string()).optional(),
+});
+
+/** Helm provisioner — points at a chart. */
+export const helmEnvironmentSchema = z.object({
+  provisioner: z.literal('helm'),
+  chart: z.string(),
+  namespacePrefix: z.string().optional(),
+  agentEnvironment: z.record(z.string(), z.string()).optional(),
+});
+
+/** Staging-specific fields (app config and appEnvironment) shared across all environment types. */
+const stagingExtension = {
+  app: stagingAppSchema.optional(),
+  /**
+   * Environment variables injected directly into the staging application container.
+   * Use `environments.coding.agentEnvironment` for the agent (coding) container.
+   */
+  appEnvironment: z.record(z.string(), z.string()).optional(),
+};
+
+/** Environment block — discriminated by provisioner. */
+const codingEnvironmentSchema = z.discriminatedUnion('provisioner', [
+  dockerEnvironmentSchema,
+  helmEnvironmentSchema,
+]);
+
+const stagingEnvironmentSchema = z.discriminatedUnion('provisioner', [
+  dockerEnvironmentSchema.extend(stagingExtension),
+  helmEnvironmentSchema.extend(stagingExtension),
+]);
+
+export const environmentsSchema = z.object({
+  coding: codingEnvironmentSchema.optional(),
+  staging: stagingEnvironmentSchema.optional(),
+});
+
+export type StagingAppConfig = z.infer<typeof stagingAppSchema>;
+export type DockerEnvironment = z.infer<typeof dockerEnvironmentSchema>;
+export type HelmEnvironment = z.infer<typeof helmEnvironmentSchema>;
+export type EnvironmentsConfig = z.infer<typeof environmentsSchema>;
+
+type RawStagingEnvironment = NonNullable<EnvironmentsConfig['staging']>;
+
+/**
+ * Normalized staging environment.
+ * - Always present (defaults to `{ provisioner: 'docker' }` when omitted in config).
+ * - `app` is always present (defaults to DEFAULT_STAGING_APP).
+ * - `appEnvironment` is always present (defaults to `{}`).
+ */
+export type NormalizedStagingEnvironment = Omit<RawStagingEnvironment, 'app' | 'appEnvironment'> & {
+  app: StagingAppConfig;
+  appEnvironment: Record<string, string>;
+};
+
+/** Normalized coding environment — always present (defaults to `{ provisioner: 'docker' }` when omitted). */
+export type NormalizedCodingEnvironment = NonNullable<EnvironmentsConfig['coding']>;
 
 export const saifConfigDefaultsSchema = z.object({
   // Run params
@@ -93,6 +183,7 @@ export const saifConfigDefaultsSchema = z.object({
 
 export const saifConfigSchema = z.object({
   defaults: saifConfigDefaultsSchema.optional(),
+  environments: environmentsSchema.optional(),
 });
 
 export type SaifConfig = z.infer<typeof saifConfigSchema>;

@@ -11,12 +11,12 @@
  *     code/                  ← rsync copy of repo; workspace for OpenHands; build context/mount
  *                              for staging container (Container A) during tests
  *       .git/                ← fresh git repo for diffing
- *       saif/features/{feat}/tests/
+ *       saifac/features/{feat}/tests/
  *         tests.json         ← test catalog (public cases only; hidden/ dir stripped)
  *         public/            ← public spec files (from rsync, unchanged)
  *         helpers.ts         ← shared transport helpers
  *         infra.spec.ts      ← infra health checks
- *         (hidden/ removed)  ← ALL hidden/ dirs under saif/features/ deleted so agent
+ *         (hidden/ removed)  ← ALL hidden/ dirs under saifac/features/ deleted so agent
  *                             cannot see holdout tests from any feature (current or others)
  *       ...rest of repo...
  */
@@ -108,7 +108,7 @@ export interface CreateSandboxOpts {
   /** Caller-supplied runId; defaults to a random short id */
   runId?: string;
   /**
-   * Path to the saif directory, relative to project directory.
+   * Path to the saifac directory, relative to project directory.
    */
   saifDir: string;
   /**
@@ -176,7 +176,7 @@ export interface CreateSandboxOpts {
  * Creates an isolated sandbox for the feature.
  *
  * 1. rsync repo → sandboxBasePath/code/ (honoring .gitignore)
- * 2. Remove ALL hidden/ dirs under saif/features/ so the coder agent cannot see holdout
+ * 2. Remove ALL hidden/ dirs under saifac/features/ so the coder agent cannot see holdout
  *    tests from any feature (current or others)
  * 3. git init + initial commit inside code/ (clean baseline for diffing)
  * 4. Write gate.sh (user-supplied or default) to sandboxBasePath/gate.sh
@@ -221,12 +221,12 @@ export function createSandbox(opts: CreateSandboxOpts): SandboxPaths {
   const testsJsonPath = join(feature.absolutePath, 'tests', 'tests.json');
   if (!existsSync(testsJsonPath)) {
     throw new Error(
-      `tests.json not found at ${testsJsonPath}. Run 'saif feat design -n ${feature.name}' first.`,
+      `tests.json not found at ${testsJsonPath}. Run 'saifac feat design -n ${feature.name}' first.`,
     );
   }
   const catalog = JSON.parse(readFileSync(testsJsonPath, 'utf8')) as TestCatalog;
 
-  // Remove ALL hidden/ dirs from saif/features so the agent
+  // Remove ALL hidden/ dirs from saifac/features so the agent
   // cannot see holdout tests from any feature (current or others).
   const saifBase = join(codePath, saifDir);
   const featuresHidden = removeAllHiddenDirs(join(saifBase, 'features'));
@@ -324,7 +324,7 @@ export type PatchExcludeRule =
 export interface ExtractPatchOpts {
   /**
    * File sections whose path matches any rule are stripped from the patch.
-   * Paths are relative to the repo root (e.g. "saif/features/foo/tests/tests.json").
+   * Paths are relative to the repo root (e.g. "saifac/features/foo/tests/tests.json").
    * Glob patterns are matched with minimatch; regex patterns are tested directly.
    */
   exclude?: PatchExcludeRule[];

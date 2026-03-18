@@ -23,7 +23,7 @@ The original design document contained several Critical and High vulnerabilities
 
 **How it was fixed:**
 
-- Raw test runner output is **never forwarded** to OpenHands. Instead, the orchestrator emits a deliberately vague message: `"An external service attempted to use this project and failed."` The TestResultsJudge may append a sanitized behavioral hint, but never raw stderr.
+- Raw test runner output is **never forwarded** to OpenHands. Instead, the orchestrator emits a deliberately vague message: `"An external service attempted to use this project and failed."` The Vague Specs Checker may append a sanitized behavioral hint, but never raw stderr.
 - OpenHands is invoked with `spawn(cmd, args, ...)` where `taskPrompt` is an array element, not a shell-interpolated string. Shell injection via the task string is structurally impossible.
 - Leash mode further runs OpenHands inside a monitored container with Cedar policy enforcement.
 
@@ -73,7 +73,7 @@ The original design document contained several Critical and High vulnerabilities
 **How it was fixed:**
 
 - `validateFeatureName()` in `agents.ts` enforces `^[a-z0-9]+(-[a-z0-9]+)*$` at the CLI boundary. Any name containing path-traversal characters, spaces, or shell metacharacters is rejected immediately with a clear error.
-- This applies to all input paths: `--name`/`-n` flag and the interactive `saif feat new` prompt (which already had the regex).
+- This applies to all input paths: `--name`/`-n` flag and the interactive `saifac feat new` prompt (which already had the regex).
 - Shell commands that use `featureName` quote paths (e.g. `"${sandboxBasePath}"`) as a secondary layer, but the primary control is at the boundary.
 
 ---
@@ -148,7 +148,7 @@ Validation was added at two layers:
 | 1   | `stderr` → `execSync` shell injection    | CRITICAL          | ✅ Resolved — `spawn()` + sanitized feedback                      |
 | 2   | `git apply` hook injection               | CRITICAL          | ✅ Resolved — patch filter + pre-apply guard                      |
 | 3   | Docker socket mount → host root          | CRITICAL          | ✅ Resolved — HTTP sidecar, no socket mount                       |
-| 4   | Path traversal via `featureName`          | HIGH              | ✅ Resolved — strict regex at CLI boundary                        |
+| 4   | Path traversal via `featureName`         | HIGH              | ✅ Resolved — strict regex at CLI boundary                        |
 | 5   | Default container capabilities (root)    | HIGH              | ✅ Resolved — `User: node`, `CapDrop: ALL`, `no-new-privileges`   |
 | 6   | Host command injection via `.git/config` | CRITICAL          | ✅ Resolved — `forbid` write to `/workspace/.git` in Cedar policy |
 | 7   | Shell injection via CLI image flags      | LOW               | ✅ Resolved — `validateImageTag` at CLI + library boundaries      |

@@ -1,29 +1,29 @@
-# saif feat debug
+# saifac feat debug
 
 Spin up the staging container and stream its logs (Ctrl+C to stop).
 
-Useful for diagnosing startup failures: installation script output, sidecar boot errors, missing binaries, environment issues, etc. No test runner, no agent loop — only the staging container and any ephemeral sidecars from `tests.json`.
+Useful for diagnosing startup failures: installation script output, sidecar boot errors, missing binaries, environment issues, etc. No test runner, no agent loop — only the staging container. Staging config (sidecarPort, sidecarPath, build) comes from `saifac/config.ts` (`environments.staging.app`).
 
 Press **Ctrl+C** to stop and clean up (removes the network, staging image, and sandbox).
 
 ## Usage
 
 ```bash
-saif feat debug [options]
-saif feature debug [options]
+saifac feat debug [options]
+saifac feature debug [options]
 ```
 
 ## Requirements
 
-- **Docker daemon** — Starts the staging container and any sidecars from `tests.json`
-  — Must have run `saif feat design` first (or at least have `tests.json` in the feature dir)
+- **Docker daemon** — Starts the staging container (config from `saifac/config.ts` `environments.staging.app`)
+  — Must have run `saifac feat design` first (or at least have `tests.json` in the feature dir)
 
 ## Arguments
 
 | Argument             | Alias | Type   | Description                                                                                  |
 | -------------------- | ----- | ------ | -------------------------------------------------------------------------------------------- |
 | `--name`             | `-n`  | string | Feature name (kebab-case). Prompts with a list if omitted.                                   |
-| `--saif-dir`         | —     | string | Path to saif directory (default: `saif`)                                                     |
+| `--saifac-dir`       | —     | string | Path to saifac directory (default: `saifac`)                                                 |
 | `--project-dir`      | —     | string | Project directory (default: current working directory)                                       |
 | `--project`          | `-p`  | string | Project name override (default: package.json "name")                                         |
 | `--sandbox-base-dir` | —     | string | Base directory for sandbox entries (default: `/tmp/factory-sandbox`)                         |
@@ -36,36 +36,37 @@ saif feature debug [options]
 Interactive (prompts for feature name):
 
 ```bash
-saif feat debug
+saifac feat debug
 ```
 
 With name:
 
 ```bash
-saif feat debug -n add-login
+saifac feat debug -n add-login
 ```
 
 Use a different sandbox profile (e.g. Python-only):
 
 ```bash
-saif feat debug -n add-login --profile python-pip
+saifac feat debug -n add-login --profile python-pip
 ```
 
 Custom startup script (e.g. pip install):
 
 ```bash
-saif feat debug -n add-login --startup-script ./scripts/factory-startup.sh
+saifac feat debug -n add-login --startup-script ./scripts/factory-startup.sh
 ```
 
 ## What it does
 
 1. Creates an isolated sandbox with the current codebase (no patches).
-2. Builds/uses the staging image and any sidecar images from `tests.json`.
+2. Builds/uses the staging image (config from `saifac/config.ts` `environments.staging.app`).
 3. Starts the staging container and streams stdout/stderr live.
 4. Waits until Ctrl+C; then cleans up network, images, and sandbox.
 
 ## See also
 
+- [Environments and Infrastructure](../services.md) — How staging and provisioners work
 - [feat design](feat-design.md) — Generate specs and tests (run first)
 - [feat run](feat-run.md) — Implement specs with the agent loop
 - [feat design-fail2pass](feat-design-fail2pass.md) — Validate tests against main

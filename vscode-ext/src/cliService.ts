@@ -1,5 +1,5 @@
 /**
- * CLI execution wrapper for the saif command-line tool.
+ * CLI execution wrapper for the saifac command-line tool.
  *
  * Two execution modes:
  * - Background (child_process.exec): Quick, non-interactive commands — list runs,
@@ -19,7 +19,7 @@ import { saifLogger } from './logger';
 
 const execAsync = util.promisify(exec);
 
-/** Run artifact shape when reading from .saif/runs/*.json */
+/** Run artifact shape when reading from .saifac/runs/*.json */
 interface RunArtifact {
   runId: string;
   status: 'failed' | 'completed' | 'running';
@@ -32,7 +32,7 @@ export class SaifCliService {
   private terminals: Map<string, vscode.Terminal> = new Map();
 
   /**
-   * Checks if the `saif` CLI is installed and accessible in the system PATH.
+   * Checks if the `saifac` CLI is installed and accessible in the system PATH.
    * Returns true when SAIF_MOCK_RUNS=1 (allows UI testing without the CLI).
    */
   public async isCliInstalled(): Promise<boolean> {
@@ -40,7 +40,7 @@ export class SaifCliService {
       return true;
     }
     try {
-      await execAsync('saif --help');
+      await execAsync('saifac --help');
       return true;
     } catch {
       return false;
@@ -71,7 +71,7 @@ export class SaifCliService {
       if (stack) saifLogger.error(stack);
 
       const selection = await vscode.window.showErrorMessage(
-        'SAIF Error: Failed to execute command.',
+        'SAIFAC Error: Failed to execute command.',
         'View Logs',
       );
       if (selection === 'View Logs') {
@@ -106,30 +106,30 @@ export class SaifCliService {
   // ============================================================================
 
   public async createFeature(featureName: string, cwd: string): Promise<void> {
-    await this.executeInBackground(`saif feat new -y -n ${escapeArg(featureName)}`, cwd);
+    await this.executeInBackground(`saifac feat new -y -n ${escapeArg(featureName)}`, cwd);
     vscode.window.showInformationMessage(`Created new feature: ${featureName}`);
   }
 
   public runFeature(featureName: string, cwd: string): void {
     this.executeInTerminal({
-      command: `saif feat run ${escapeArg(featureName)}`,
-      terminalName: `SAIF Run: ${featureName}`,
+      command: `saifac feat run ${escapeArg(featureName)}`,
+      terminalName: `SAIFAC Run: ${featureName}`,
       cwd,
     });
   }
 
   public debugFeature(featureName: string, cwd: string): void {
     this.executeInTerminal({
-      command: `saif feat debug ${escapeArg(featureName)}`,
-      terminalName: `SAIF Debug: ${featureName}`,
+      command: `saifac feat debug ${escapeArg(featureName)}`,
+      terminalName: `SAIFAC Debug: ${featureName}`,
       cwd,
     });
   }
 
   public designFeature(featureName: string, cwd: string): void {
     this.executeInTerminal({
-      command: `saif feat design ${escapeArg(featureName)}`,
-      terminalName: `SAIF Design: ${featureName}`,
+      command: `saifac feat design ${escapeArg(featureName)}`,
+      terminalName: `SAIFAC Design: ${featureName}`,
       cwd,
     });
   }
@@ -139,18 +139,18 @@ export class SaifCliService {
   // ============================================================================
 
   /**
-   * Lists stored runs by reading .saif/runs/*.json directly.
+   * Lists stored runs by reading .saifac/runs/*.json directly.
    * Avoids relying on CLI --json output.
    *
    * When SAIF_MOCK_RUNS=1, returns hardcoded mock data for UI testing without
-   * the saif CLI or .saif/runs/ present.
+   * the saifac CLI or .saifac/runs/ present.
    */
   public async listRuns(cwd: string): Promise<RunArtifact[]> {
     if (process.env.SAIF_MOCK_RUNS === '1') {
       return this.getMockRuns(cwd);
     }
 
-    const runsDir = join(cwd, '.saif', 'runs');
+    const runsDir = join(cwd, '.saifac', 'runs');
     let files: string[];
     try {
       files = await readdir(runsDir);
@@ -217,20 +217,20 @@ export class SaifCliService {
 
   public resumeRun(runId: string, cwd: string): void {
     this.executeInTerminal({
-      command: `saif run resume ${escapeArg(runId)}`,
-      terminalName: `SAIF Resume: ${runId}`,
+      command: `saifac run resume ${escapeArg(runId)}`,
+      terminalName: `SAIFAC Resume: ${runId}`,
       cwd,
     });
   }
 
   public async removeRun(runId: string, cwd: string): Promise<void> {
-    await this.executeInBackground(`saif run rm ${escapeArg(runId)}`, cwd);
+    await this.executeInBackground(`saifac run rm ${escapeArg(runId)}`, cwd);
     vscode.window.showInformationMessage(`Removed run: ${runId}`);
   }
 
   public async clearAllRuns(cwd: string): Promise<void> {
-    await this.executeInBackground('saif run clear', cwd);
-    vscode.window.showInformationMessage('Cleared all SAIF runs.');
+    await this.executeInBackground('saifac run clear', cwd);
+    vscode.window.showInformationMessage('Cleared all SAIFAC runs.');
   }
 }
 

@@ -22,10 +22,10 @@ This document describes all the ways Git is used throughout the AI-Driven Softwa
 
 The Software Factory uses Git in three distinct phases:
 
-| Phase       | Where                                                     | Purpose                                                                                                                                                                         |
-| ----------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sandbox** | Isolated `code/` directory inside `/tmp/factory-sandbox/` | A _fresh_ Git repo (not a clone) used solely for diffing agent changes against a baseline. The host's `.git` is never mounted or copied, to avoid exposing git history          |
-| **Tests**   | Same sandbox                                              | The extracted patch is applied to the sandbox with `git apply` so the staging containers can verify the implementation.                                                         |
+| Phase       | Where                                                     | Purpose                                                                                                                                                                |
+| ----------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sandbox** | Isolated `code/` directory inside `/tmp/factory-sandbox/` | A _fresh_ Git repo (not a clone) used solely for diffing agent changes against a baseline. The host's `.git` is never mounted or copied, to avoid exposing git history |
+| **Tests**   | Same sandbox                                              | The extracted patch is applied to the sandbox with `git apply` so the staging containers can verify the implementation.                                                |
 | **Success** | Host repository                                           | A Git worktree is used to create a feature branch, apply the patch, commit, and optionally push/PR—_without ever changing the main working tree's checked-out branch_. |
 
 The host repository's working directory is **never** modified during the loop. All agent edits happen in the sandbox. Only after tests pass does the orchestrator create a separate worktree, apply the patch there, commit it, and optionally push. The user's current branch and uncommitted work remain untouched—enabling safe parallel runs of multiple agents.
@@ -43,7 +43,7 @@ The host repository's working directory is **never** modified during the loop. A
   tests.full.json     ← Full test catalog (public + hidden) for the Test Runner
   code/               ← rsync copy of the repo; workspace for OpenHands
     .git/             ← Fresh git repo (git init), NOT a clone of the host
-    saif/features/
+    saifac/features/
       (all hidden/ dirs removed — agent cannot see holdout tests from any feature)
       {featureName}/tests/tests.json  ← Public-only tests
     ...rest of repo...
@@ -59,7 +59,7 @@ The host repository's working directory is **never** modified during the loop. A
 
    The sandbox starts with no Git history from the host.
 
-2. **Remove all `hidden/` dirs** under `saif/features/` from the code copy. This strips holdout tests from _every_ feature (not just the current one), so the agent cannot read or infer them. The Test Runner later mounts the real `hidden/` dirs from the host when verifying the patch.
+2. **Remove all `hidden/` dirs** under `saifac/features/` from the code copy. This strips holdout tests from _every_ feature (not just the current one), so the agent cannot read or infer them. The Test Runner later mounts the real `hidden/` dirs from the host when verifying the patch.
 
 3. **Fresh Git repo inside `code/`:**
 
@@ -121,7 +121,7 @@ The agent must not be able to "cheat" by modifying tests or specs to fake a pass
 
 | Pattern         | Purpose                                                                          |
 | --------------- | -------------------------------------------------------------------------------- |
-| `saif/**`   | The agent must not modify its own test specifications or test cases.             |
+| `saifac/**`     | The agent must not modify its own test specifications or test cases.             |
 | `.git/hooks/**` | A malicious patch could install a git hook that runs arbitrary code on the host. |
 
 ### How filtering works
@@ -170,7 +170,7 @@ git apply "${patchPath}"
 
 **Location:** `modes.ts` → `runIterativeLoop()`
 
-In **saif feat run** and **saif run resume**, the flow is:
+In **saifac feat run** and **saifac run resume**, the flow is:
 
 1. OpenHands runs and modifies files in the sandbox.
 2. `extractPatch()` produces `patch.diff` and **resets** the sandbox (see [§3](#3-patch-extraction), [§5](#5-sandbox-reset-between-attempts)).
@@ -247,7 +247,7 @@ The sandbox and the worktree are populated from different sources. This asymmetr
 | **Sandbox `code/`** | `rsync` from the main working tree | Full working tree state: committed + UNCOMMITTED + **untracked** |
 | **Worktree**        | `git worktree add` from `HEAD`     | Only **COMMITTED** files at `HEAD`                               |
 
-- **Sandbox:** When `createSandbox()` runs, it uses `rsync -a --filter=':- .gitignore' --exclude='.git' "${projectDir}/" "${codePath}/"`. This copies everything from the main working tree that is not gitignored, including untracked files and directories. The agent (OpenHands) therefore sees and can rely on paths like `saif/features/<featureName>/` even if they have never been committed.
+- **Sandbox:** When `createSandbox()` runs, it uses `rsync -a --filter=':- .gitignore' --exclude='.git' "${projectDir}/" "${codePath}/"`. This copies everything from the main working tree that is not gitignored, including untracked files and directories. The agent (OpenHands) therefore sees and can rely on paths like `saifac/features/<featureName>/` even if they have never been committed.
 
 - **Worktree:** When `git worktree add "${wtPath}" -b "${branchName}"` runs, Git creates a new working tree for the branch starting at the current `HEAD` commit. A worktree contains only what is in that commit. Untracked and uncommitted files from the main working tree are not present.
 
@@ -315,7 +315,7 @@ Patches that modify `.git/hooks/` are **rejected** before application. A malicio
 
 ### Patch exclude rules
 
-By stripping `saif/**` and `.git/hooks/**` from every patch, we prevent:
+By stripping `saifac/**` and `.git/hooks/**` from every patch, we prevent:
 
 - **Reward hacking:** The agent cannot modify tests to force a pass.
 - **Hook injection:** The agent cannot install git hooks on the host.
@@ -324,22 +324,22 @@ By stripping `saif/**` and `.git/hooks/**` from every patch, we prevent:
 
 ## Summary: Git Command Reference
 
-| Phase             | Command                                                | Context      |
-| ----------------- | ------------------------------------------------------ | ------------ |
-| Sandbox creation  | `git init`                                             | `codePath`   |
-| Sandbox creation  | `git add .`                                            | `codePath`   |
-| Sandbox creation  | `git commit -m "Base state"`                           | `codePath`   |
-| Patch extraction  | `git add .`                                            | `codePath`   |
-| Patch extraction  | `git diff HEAD`                                        | `codePath`   |
-| Patch extraction  | `git reset --hard HEAD`                                | `codePath`   |
-| Patch extraction  | `git clean -fd`                                        | `codePath`   |
-| Tests / re-apply  | `git apply "${patchPath}"`                             | `codePath`   |
-| Failure reset     | `git reset --hard HEAD`                                | `codePath`   |
-| Failure reset     | `git clean -fd`                                        | `codePath`   |
-| Success: worktree | `git branch --show-current`                            | `projectDir` |
-| Success: worktree | `git worktree add "${wtPath}" -b "${branchName}"`      | `projectDir` |
-| Success: commit   | `git apply`, `git add .`, `git commit`                 | `wtPath`     |
-| Success: push     | `git push "${pushUrl}" "${branchName}"`                | `wtPath`     |
-| Success: cleanup  | `git worktree remove --force "${wtPath}"`              | `projectDir` |
-| Success: fallback | `git worktree prune`                                   | `projectDir` |
-| Push resolution   | `git remote get-url ${remote}`                         | `projectDir` |
+| Phase             | Command                                           | Context      |
+| ----------------- | ------------------------------------------------- | ------------ |
+| Sandbox creation  | `git init`                                        | `codePath`   |
+| Sandbox creation  | `git add .`                                       | `codePath`   |
+| Sandbox creation  | `git commit -m "Base state"`                      | `codePath`   |
+| Patch extraction  | `git add .`                                       | `codePath`   |
+| Patch extraction  | `git diff HEAD`                                   | `codePath`   |
+| Patch extraction  | `git reset --hard HEAD`                           | `codePath`   |
+| Patch extraction  | `git clean -fd`                                   | `codePath`   |
+| Tests / re-apply  | `git apply "${patchPath}"`                        | `codePath`   |
+| Failure reset     | `git reset --hard HEAD`                           | `codePath`   |
+| Failure reset     | `git clean -fd`                                   | `codePath`   |
+| Success: worktree | `git branch --show-current`                       | `projectDir` |
+| Success: worktree | `git worktree add "${wtPath}" -b "${branchName}"` | `projectDir` |
+| Success: commit   | `git apply`, `git add .`, `git commit`            | `wtPath`     |
+| Success: push     | `git push "${pushUrl}" "${branchName}"`           | `wtPath`     |
+| Success: cleanup  | `git worktree remove --force "${wtPath}"`         | `projectDir` |
+| Success: fallback | `git worktree prune`                              | `projectDir` |
+| Push resolution   | `git remote get-url ${remote}`                    | `projectDir` |

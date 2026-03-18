@@ -10,19 +10,18 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { RunStorage } from '../run-storage/types.js';
-import { CleanupRegistry, removeImageByTag, removeNetwork } from '../utils/docker.js';
-import { createSandboxNetwork } from './docker/network.js';
-import { debugStagingContainer, getStagingImageTag } from './docker/staging.js';
-import { hasFeatureTestFailures, runTeststWithContainers } from './docker/test-runner.js';
+import { hasFeatureTestFailures } from '../provisioners/docker/index.js';
+import { createProvisioner } from '../provisioners/index.js';
+import { type TestsResult } from '../provisioners/types.js';
+import type { RunStorage } from '../runs/index.js';
+import { CleanupRegistry } from '../utils/cleanup.js';
 import {
   applyPatchToHost,
   getTestRunnerOpts,
   type IterativeLoopOpts,
-  loadCatalog,
   type OrchestratorResult,
   runIterativeLoop,
-  runResultsJudgeForFailure,
+  runVagueSpecsCheckerForFailure,
   type RunStorageContext,
 } from './loop.js';
 import {
@@ -91,7 +90,7 @@ export interface OrchestratorOpts extends IterativeLoopOpts {
   stageScript: string;
   /**
    * Run storage for persisting failed runs. Resolved by CLI via parseRunStorage.
-   * Default: local (.saif/runs/) when --storage is omitted. Set to null for --storage runs=none.
+   * Default: local (.saifac/runs/) when --storage is omitted. Set to null for --storage runs=none.
    */
   runStorage: RunStorage | null;
   /**
@@ -191,6 +190,7 @@ type Fail2PassOpts = Pick<
   | 'projectName'
   | 'sandboxBaseDir'
   | 'testImage'
+  | 'stagingEnvironment'
   | 'startupScript'
   | 'gateScript'
   | 'agentStartScript'
@@ -211,6 +211,7 @@ async function runFail2PassCore(
     projectName,
     sandboxBaseDir,
     testImage,
+    stagingEnvironment,
     startupScript,
     gateScript,
     agentStartScript,
@@ -233,27 +234,41 @@ async function runFail2PassCore(
     agentScript,
     stageScript,
   });
-  const catalog = loadCatalog({ feature });
   const testRunnerOpts = getTestRunnerOpts({
     feature,
     sandboxBasePath: sandbox.sandboxBasePath,
     testScript,
   });
 
+  const provisioner = createProvisioner(stagingEnvironment);
+  registry.registerProvisioner(provisioner, sandbox.runId);
+
   try {
-    const result = await runTeststWithContainers({
+    await provisioner.setup({
+      runId: sandbox.runId,
+      projectName,
+      featureName: feature.name,
+      projectDir,
+    });
+
+    const stagingHandle = await provisioner.startStaging({
       sandboxProfileId,
       codePath: sandbox.codePath,
       projectDir,
+      stagingEnvironment,
       feature,
       projectName,
-      catalog,
-      testRunnerOpts,
-      registry,
-      testImage,
-      runId: sandbox.runId,
       startupPath: sandbox.startupPath,
       stagePath: sandbox.stagePath,
+    });
+
+    const result = await provisioner.runTests({
+      ...testRunnerOpts,
+      stagingHandle,
+      testImage,
+      runId: sandbox.runId,
+      feature,
+      projectName,
       reportPath: join(sandbox.sandboxBasePath, 'results.xml'),
     });
 
@@ -287,6 +302,8 @@ async function runFail2PassCore(
       };
     }
   } finally {
+    registry.deregisterProvisioner(provisioner);
+    await provisioner.teardown({ runId: sandbox.runId });
     destroySandbox(sandbox.sandboxBasePath);
   }
 }
@@ -326,14 +343,14 @@ async function runStartCore(
   // ─── Sandbox source directory ─────────────────────────────────────────────
   // Where createSandbox rsyncs FROM:
   // - Start:  The main project directory as-is
-  // - Resume: A worktree with recreated state in `.saif/worktrees/resume-<runId>` (see runResumeCore)
+  // - Resume: A worktree with recreated state in `.saifac/worktrees/resume-<runId>` (see runResumeCore)
   const sandboxSourceDir = opts.resume?.sandboxSourceDir ?? projectDir;
 
   // ─── Run context (for save-on-Ctrl+C / save-on-failure) ────────────────────
   // Capture all the relevant state so that we can resume the run later.
   // Thus, if `runIterativeLoop` throws or user aborts with CTRL+C, the loop
   // will persist an artifact with all the relevant state so the user can
-  // resume later with `saif run resume <runId>`.
+  // resume later with `saifac run resume <runId>`.
   let runContext: RunStorageContext;
   if (opts.resume) {
     // Resume: use the context from the stored artifact
@@ -358,7 +375,7 @@ async function runStartCore(
 
   // ─── Save run artifact (on Ctrl+C / failure) ───────────────────────────────
   // This runs before teardown. If the agent produced any diff (patch.diff exists and is non-empty),
-  // we persist an artifact to runStorage so the user can resume later with `saif run resume <runId>`.
+  // we persist an artifact to runStorage so the user can resume later with `saifac run resume <runId>`.
   if (runStorage) {
     registry.setBeforeCleanup(async () => {
       await saveRunOnError({
@@ -377,10 +394,10 @@ async function runStartCore(
   return runIterativeLoop(sandbox, {
     ...opts,
     saifDir,
-    registry,
     runStorage,
     runContext,
     initialErrorFeedback: opts.resume?.initialErrorFeedback ?? null,
+    registry,
   });
 }
 
@@ -406,12 +423,12 @@ async function runResumeCore(
 
   const artifact = await runStorage.getRun(runId);
   if (!artifact) {
-    throw new Error(`Run not found: ${runId}. List runs with: saif run ls`);
+    throw new Error(`Run not found: ${runId}. List runs with: saifac run ls`);
   }
 
   console.log(`\n[orchestrator] MODE: resume — ${artifact.config.featureName} (run ${runId})`);
 
-  // Create temp worktree in `.saif/worktrees/resume-<runId>`
+  // Create temp worktree in `.saifac/worktrees/resume-<runId>`
   // to reconstruct the state of the workspace at the time of the run (+ agent's changes)
   const { worktreePath, branchName } = createResumeWorktree({
     projectDir,
@@ -424,7 +441,7 @@ async function runResumeCore(
   // Load the original opts from the stored artifact and merge them with the CLI opts.
   // User gets all original settings by default but can override via CLI.
   // E.g. if user wants to keep all the same options except for the model, they can do:
-  // `saif run resume <runId> --model anthropic/claude-3-5-sonnet-latest`
+  // `saifac run resume <runId> --model anthropic/claude-3-5-sonnet-latest`
   //
   // NOTE: This also sets `resume.sandboxSourceDir` to `worktreePath`. Thus, telling
   // runStartCore to use the worktree as the sandbox source directory.
@@ -436,7 +453,7 @@ async function runResumeCore(
   });
 
   try {
-    // Finally, run the same flow as when we run `saif feat start <featureName>`
+    // Finally, run the same flow as when we run `saifac feat start <featureName>`
     return await runStartCore(mergedOpts, registry);
   } finally {
     cleanupResumeWorkspace({ worktreePath, projectDir, branchName }, () => {
@@ -459,6 +476,7 @@ type TestOpts = Pick<
   | 'projectName'
   | 'sandboxBaseDir'
   | 'testImage'
+  | 'stagingEnvironment'
   | 'resolveAmbiguity'
   | 'startupScript'
   | 'gateScript'
@@ -471,6 +489,7 @@ type TestOpts = Pick<
   | 'pr'
   | 'gitProvider'
   | 'overrides'
+  | 'reviewerEnabled'
 > & {
   /**
    * Required for mode='test': path to a patch file to apply before tests.
@@ -498,6 +517,7 @@ async function runTestsCore(
     projectName,
     sandboxBaseDir,
     testImage,
+    stagingEnvironment,
     resolveAmbiguity,
     startupScript,
     gateScript,
@@ -534,7 +554,6 @@ async function runTestsCore(
     agentScript,
     stageScript,
   });
-  const catalog = loadCatalog({ feature });
   const testRunnerOpts = getTestRunnerOpts({
     feature,
     sandboxBasePath: sandbox.sandboxBasePath,
@@ -553,22 +572,39 @@ async function runTestsCore(
       console.log(`\n[orchestrator] Test attempt ${attempts}/${testRetries}`);
 
       const runId = `${sandbox.runId}-${attempts}`;
+      const provisioner = createProvisioner(stagingEnvironment);
+      registry.registerProvisioner(provisioner, runId);
 
-      const result = await runTeststWithContainers({
-        sandboxProfileId,
-        codePath: sandbox.codePath,
-        projectDir,
-        feature,
-        projectName,
-        catalog,
-        testRunnerOpts,
-        registry,
-        testImage,
-        runId,
-        startupPath: sandbox.startupPath,
-        stagePath: sandbox.stagePath,
-        reportPath: join(sandbox.sandboxBasePath, 'results.xml'),
-      });
+      await provisioner.setup({ runId, projectName, featureName: feature.name, projectDir });
+
+      const result: TestsResult = await (async (): Promise<TestsResult> => {
+        try {
+          const stagingHandle = await provisioner.startStaging({
+            sandboxProfileId,
+            codePath: sandbox.codePath,
+            projectDir,
+            stagingEnvironment,
+            feature,
+            projectName,
+            startupPath: sandbox.startupPath,
+            stagePath: sandbox.stagePath,
+          });
+
+          return await provisioner.runTests({
+            ...testRunnerOpts,
+            stagingHandle,
+            testImage,
+            runId,
+            feature,
+            projectName,
+            reportPath: join(sandbox.sandboxBasePath, 'results.xml'),
+          });
+        } finally {
+          registry.deregisterProvisioner(provisioner);
+          await provisioner.teardown({ runId });
+        }
+      })();
+
       lastStderr = result.stderr;
 
       if (result.runnerError) {
@@ -602,7 +638,7 @@ async function runTestsCore(
       console.log(`\n[orchestrator] Test attempt ${attempts} FAILED`);
 
       if (resolveAmbiguity !== 'off' && result.testSuites) {
-        const resultsJudgeResult = await runResultsJudgeForFailure({
+        const VagueSpecsCheckResult = await runVagueSpecsCheckerForFailure({
           projectDir,
           feature,
           testSuites: result.testSuites,
@@ -612,7 +648,7 @@ async function runTestsCore(
           overrides,
         });
 
-        if (resultsJudgeResult.ambiguityResolved) {
+        if (VagueSpecsCheckResult.ambiguityResolved) {
           // Spec updated and tests regenerated — retry the same patch against the new tests.
           // Don't count this attempt against testRetries since the spec was at fault.
           console.log(
@@ -653,6 +689,7 @@ export async function runDebug(
     | 'saifDir'
     | 'projectName'
     | 'sandboxBaseDir'
+    | 'stagingEnvironment'
     | 'startupScript'
     | 'gateScript'
     | 'agentStartScript'
@@ -667,6 +704,7 @@ export async function runDebug(
     saifDir,
     projectName,
     sandboxBaseDir,
+    stagingEnvironment,
     startupScript,
     gateScript,
     agentStartScript,
@@ -688,10 +726,8 @@ export async function runDebug(
     agentScript,
     stageScript,
   });
-  const catalog = loadCatalog({ feature });
   const runId = sandbox.runId;
-
-  const net = await createSandboxNetwork({ projectName, featureName: feature.name, runId });
+  const provisioner = createProvisioner(stagingEnvironment);
 
   // pnpm forwards SIGTERM immediately after Ctrl+C. Ignore both signals while
   // the finally block is running so Docker API calls aren't cut short.
@@ -700,29 +736,32 @@ export async function runDebug(
   process.on('SIGTERM', ignoreSignal);
 
   try {
-    await debugStagingContainer({
+    await provisioner.setup({ runId, projectName, featureName: feature.name, projectDir });
+
+    const stagingHandle = await provisioner.startStaging({
       sandboxProfileId,
       codePath: sandbox.codePath,
       projectDir,
+      stagingEnvironment,
       feature,
       projectName,
-      catalog,
-      networkName: net.networkName,
       startupPath: sandbox.startupPath,
       stagePath: sandbox.stagePath,
-      runId,
+    });
+
+    console.log(`\n[debug] Staging app ready — target: ${stagingHandle.targetUrl}`);
+    console.log(`[debug] Sidecar: ${stagingHandle.sidecarUrl}`);
+    console.log('[debug] Press Ctrl+C to stop.\n');
+
+    // Block until SIGINT
+    await new Promise<void>((resolve) => {
+      process.once('SIGINT', () => {
+        console.log('\n[debug] SIGINT received — tearing down...');
+        resolve();
+      });
     });
   } finally {
-    await removeNetwork(net.networkName);
-    const stagingImageTagD = getStagingImageTag(catalog, {
-      projectName,
-      featureName: feature.name,
-      runId,
-    });
-    if (stagingImageTagD) {
-      console.log(`[debug] Removing staging image: ${stagingImageTagD}`);
-      await removeImageByTag({ imageTag: stagingImageTagD, missingOk: true });
-    }
+    await provisioner.teardown({ runId });
     destroySandbox(sandbox.sandboxBasePath);
     process.removeListener('SIGINT', ignoreSignal);
     process.removeListener('SIGTERM', ignoreSignal);

@@ -1,10 +1,10 @@
-# Software Factory: Spec Ambiguity & the Results Judge
+# Software Factory: Spec Ambiguity & the Vague Specs Checker
 
 ## Overview
 
 When the iterative loop runs (OpenHands → extract patch → Mutual Verification), the Test Runner container may report test failures. In some cases, these failures are **not** caused by the implementation agent getting the code wrong. They are caused by an **ambiguous or incomplete specification**: the test-writing agent wrote tests that assume behavior the spec never explicitly defined, while the implementation agent made a different (and equally reasonable) interpretation.
 
-This document describes that edge case, how the **Results Judge** detects it, and the three resolution modes: `off`, `prompt`, and `ai`.
+This document describes that edge case, how the **Vague Specs Checker** detects it, and the three resolution modes: `off`, `prompt`, and `ai`.
 
 ---
 
@@ -32,18 +32,18 @@ The Planner and Catalog share the same spec. The implementation agent (OpenHands
 
 ---
 
-## The Results Judge
+## The Vague Specs Checker
 
-After each tests failure, when `--resolve-ambiguity` is `prompt` or `ai`, the orchestrator invokes a **Results Judge** — a high-capability LLM (genius tier) that acts as an impartial judge.
+After each tests failure, when `--resolve-ambiguity` is `prompt` or `ai`, the orchestrator invokes a **Vague Specs Checker** — a high-capability LLM (genius tier) that acts as an impartial judge.
 
-### Inputs to the Results Judge
+### Inputs to the Vague Specs Checker
 
 1. **Feature specification** — Contents of `specification.md` (and shotgun spec files)
 2. **Failing test details** — From results.xml (JUnit XML report): test names, descriptions, failure messages
 
-The Judge does _not_ receive the implementation patch (git diff). Agent-controlled content would enable prompt-injection attacks to bias spec updates away from user intent.
+The Vague Specs Checker does _not_ receive the implementation patch (git diff). Agent-controlled content would enable prompt-injection attacks to bias spec updates away from user intent.
 
-### Results Judge Output (JSON)
+### Vague Specs Checker Output (JSON)
 
 ```json
 {
@@ -56,36 +56,36 @@ The Judge does _not_ receive the implementation patch (git diff). Agent-controll
 
 ### Decision Criteria
 
-- **`isAmbiguous: false`** — The spec explicitly or strongly implies the expected behavior. The implementation agent made a mistake. The Results Judge provides a `sanitizedHintForAgent` that describes _what_ is wrong in behavioral terms (e.g. "The command exits with code 1 when no arguments are provided, but should exit with code 0") without quoting hidden test code.
-- **`isAmbiguous: true`** — The expected behavior is nowhere in the spec, or it requires interpretation a reasonable engineer could make differently. The test is unfair. The Results Judge proposes a `proposedSpecAddition` to append to the spec.
-- **When in doubt** — The Results Judge leans toward ambiguous spec; it flags ambiguity when there is uncertainty, favoring spec improvement over blaming the agent.
+- **`isAmbiguous: false`** — The spec explicitly or strongly implies the expected behavior. The implementation agent made a mistake. The Vague Specs Checker provides a `sanitizedHintForAgent` that describes _what_ is wrong in behavioral terms (e.g. "The command exits with code 1 when no arguments are provided, but should exit with code 0") without quoting hidden test code.
+- **`isAmbiguous: true`** — The expected behavior is nowhere in the spec, or it requires interpretation a reasonable engineer could make differently. The test is unfair. The Vague Specs Checker proposes a `proposedSpecAddition` to append to the spec.
+- **When in doubt** — The Vague Specs Checker leans toward ambiguous spec; it flags ambiguity when there is uncertainty, favoring spec improvement over blaming the agent.
 
 ### Holdout Protection
 
-The Results Judge never leaks holdout test details to the implementation agent. The `sanitizedHintForAgent` describes the _observed_ problem (wrong exit code, wrong output shape) in abstract terms, not the literal assertions from the hidden tests.
+The Vague Specs Checker never leaks holdout test details to the implementation agent. The `sanitizedHintForAgent` describes the _observed_ problem (wrong exit code, wrong output shape) in abstract terms, not the literal assertions from the hidden tests.
 
 ---
 
 ## Resolution Modes
 
-The `--resolve-ambiguity` flag controls how the orchestrator handles tests failures. It applies to `saif feat run` and `saif run resume`.
+The `--resolve-ambiguity` flag controls how the orchestrator handles tests failures. It applies to `saifac feat run` and `saifac run resume`.
 
-| Mode       | Flag                               | Behavior                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ---------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **off**    | `--resolve-ambiguity off`          | Results Judge is disabled. On any failure, the agent receives a generic message ("An external consumer encountered unexpected behavior..."). No ambiguity check. Holdout protection: no specific feedback.                                                                                                                                                                                                            |
-| **prompt** | `--resolve-ambiguity prompt`       | Results Judge runs on every failure. If ambiguity is detected, the orchestrator **pauses**, shows the Results Judge's reasoning and suggestion, and asks the human: _"What is the correct behavior?"_ The human's answer (not the Results Judge's) is appended to `specification.md`, tests are regenerated, and the attempt counter is reset. If the human skips, treats as genuine failure and uses sanitized hint. |
-| **ai**     | `--resolve-ambiguity ai` (default) | Results Judge runs on every failure. If ambiguity is detected, the orchestrator **automatically** appends the proposed clarification to `specification.md`, re-runs the Black Box Design pipeline (Tests Planner + Tests Catalog), regenerates `runner.spec.ts`, resets the attempt counter, and continues the loop — all without human input. Fully autonomous.                                                      |
+| Mode       | Flag                               | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **off**    | `--resolve-ambiguity off`          | Vague Specs Checker is disabled. On any failure, the agent receives a generic message ("An external consumer encountered unexpected behavior..."). No ambiguity check. Holdout protection: no specific feedback.                                                                                                                                                                                                                        |
+| **prompt** | `--resolve-ambiguity prompt`       | Vague Specs Checker runs on every failure. If ambiguity is detected, the orchestrator **pauses**, shows the Vague Specs Checker's reasoning and suggestion, and asks the human: _"What is the correct behavior?"_ The human's answer (not the Vague Specs Checker's) is appended to `specification.md`, tests are regenerated, and the attempt counter is reset. If the human skips, treats as genuine failure and uses sanitized hint. |
+| **ai**     | `--resolve-ambiguity ai` (default) | Vague Specs Checker runs on every failure. If ambiguity is detected, the orchestrator **automatically** appends the proposed clarification to `specification.md`, re-runs the Black Box Design pipeline (Tests Planner + Tests Catalog), regenerates `runner.spec.ts`, resets the attempt counter, and continues the loop — all without human input. Fully autonomous.                                                                  |
 
 ### Mode Comparison
 
-| Aspect                          | off                                                | prompt                                      | ai                                  |
-| ------------------------------- | -------------------------------------------------- | ------------------------------------------- | ----------------------------------- |
-| Results Judge invoked           | No                                                 | Yes                                         | Yes                                 |
-| Human intervention on ambiguity | N/A                                                | Required                                    | None                                |
-| Feedback on genuine failure     | Generic only                                       | Sanitized hint from Results Judge           | Sanitized hint from Results Judge   |
-| Spec auto-updated               | No                                                 | Only if human accepts                       | Yes                                 |
-| Autonomous operation            | Yes (but may fail indefinitely on ambiguous specs) | No (blocks on ambiguity)                    | Yes                                 |
-| Use case                        | Debugging, or when you want no spec drift          | Review every ambiguity before changing spec | Production; fully hands-off factory |
+| Aspect                          | off                                                | prompt                                      | ai                                      |
+| ------------------------------- | -------------------------------------------------- | ------------------------------------------- | --------------------------------------- |
+| Vague Specs Checker invoked     | No                                                 | Yes                                         | Yes                                     |
+| Human intervention on ambiguity | N/A                                                | Required                                    | None                                    |
+| Feedback on genuine failure     | Generic only                                       | Sanitized hint from Vague Specs Checker     | Sanitized hint from Vague Specs Checker |
+| Spec auto-updated               | No                                                 | Only if human accepts                       | Yes                                     |
+| Autonomous operation            | Yes (but may fail indefinitely on ambiguous specs) | No (blocks on ambiguity)                    | Yes                                     |
+| Use case                        | Debugging, or when you want no spec drift          | Review every ambiguity before changing spec | Production; fully hands-off factory     |
 
 ---
 
@@ -102,12 +102,12 @@ Tests FAILED
        │ Yes                │ No (prompt or ai)
        ▼                    ▼
 ┌─────────────────┐   ┌─────────────────────────────────────────┐
-│ Generic message │   │ Run Results Judge (spec + failures)     │
-│ No Results Judge│   └─────────────────────────────────────────┘
+│ Generic message │   │ Run Vague Specs Checker (spec + failures)     │
+│ No Vague Specs Checker│   └─────────────────────────────────────────┘
 └─────────────────┘                      │
        │                                 ▼
        │                    ┌───────────────────────────────────┐
-       │                    │ Results Judge says isAmbiguous?   │
+       │                    │ Vague Specs Checker says isAmbiguous?   │
        │                    └───────────────────────────────────┘
        │                                 │
        │                    No (genuine) │          Yes
@@ -146,19 +146,19 @@ Tests FAILED
 **Example:**
 
 ```bash
-saif feat run                    # ai (default)
-saif feat run --resolve-ambiguity prompt
-saif feat run --resolve-ambiguity off
+saifac feat run                    # ai (default)
+saifac feat run --resolve-ambiguity prompt
+saifac feat run --resolve-ambiguity off
 ```
 
 ---
 
 ## Spec Updates (ai / prompt accept)
 
-When the Results Judge resolves ambiguity, it appends a block to `specification.md`:
+When the Vague Specs Checker resolves ambiguity, it appends a block to `specification.md`:
 
 ```markdown
-<!-- Results Judge clarification (auto-added) -->
+<!-- Vague Specs Checker clarification (auto-added) -->
 
 The greet command MUST output the name passed as an argument, e.g. "Hello, Alice".
 ```
@@ -175,6 +175,6 @@ The sandbox's `tests.full.json` (public + hidden) is rebuilt from the updated ca
 
 ## Security & Integrity
 
-- **No test leakage:** The Results Judge runs in the orchestrator process, which has access to results.xml (JUnit XML). It never passes raw test assertions to OpenHands. The `sanitizedHintForAgent` is behavioral, not literal.
+- **No test leakage:** The Vague Specs Checker runs in the orchestrator process, which has access to results.xml (JUnit XML). It never passes raw test assertions to OpenHands. The `sanitizedHintForAgent` is behavioral, not literal.
 - **Spec provenance:** Auto-added clarifications are wrapped in an HTML comment so humans can identify them during review.
 - **Regeneration atomicity:** If `runDesignTests` fails after appending to the spec, the orchestrator treats the failure as genuine and does not reset the attempt counter. The spec change remains; the next iteration will use it.

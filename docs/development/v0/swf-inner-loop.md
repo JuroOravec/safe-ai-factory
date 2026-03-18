@@ -59,15 +59,15 @@ A shell script that wraps each agent invocation with a post-run validation step.
 
 **Environment variables:**
 
-| Variable                 | Required | Default                       | Description                                                   |
-| ------------------------ | -------- | ----------------------------- | ------------------------------------------------------------- |
-| `FACTORY_INITIAL_TASK`   | yes      | —                             | Full task prompt; written to `FACTORY_TASK_PATH` each round   |
-| `FACTORY_GATE_RETRIES`   | no       | 5                             | Max inner loop rounds before giving up                        |
-| `FACTORY_GATE_SCRIPT`    | no       | `/factory/gate.sh`            | Path to the gate script                                       |
-| `FACTORY_REVIEWER_SCRIPT`| no       | —                             | Path to the semantic reviewer script; when set, runs after gate passes |
-| `FACTORY_AGENT_SCRIPT`   | no       | `/factory/agent.sh`           | Path to the agent runner script                               |
-| `FACTORY_TASK_PATH`      | no       | `/workspace/.factory_task.md` | Path where the current task is written before each invocation |
-| `FACTORY_STARTUP_SCRIPT` | yes      | —                             | Path to a script run once before the agent loop               |
+| Variable                  | Required | Default                       | Description                                                            |
+| ------------------------- | -------- | ----------------------------- | ---------------------------------------------------------------------- |
+| `FACTORY_INITIAL_TASK`    | yes      | —                             | Full task prompt; written to `FACTORY_TASK_PATH` each round            |
+| `FACTORY_GATE_RETRIES`    | no       | 5                             | Max inner loop rounds before giving up                                 |
+| `FACTORY_GATE_SCRIPT`     | no       | `/factory/gate.sh`            | Path to the gate script                                                |
+| `FACTORY_REVIEWER_SCRIPT` | no       | —                             | Path to the semantic reviewer script; when set, runs after gate passes |
+| `FACTORY_AGENT_SCRIPT`    | no       | `/factory/agent.sh`           | Path to the agent runner script                                        |
+| `FACTORY_TASK_PATH`       | no       | `/workspace/.factory_task.md` | Path where the current task is written before each invocation          |
+| `FACTORY_STARTUP_SCRIPT`  | yes      | —                             | Path to a script run once before the agent loop                        |
 
 ### 2. `Dockerfile.coder`
 
@@ -138,7 +138,7 @@ The default gate script used when no custom `--gate-script` is provided. Each sa
 
 ### 7. CLI (`scripts/commands/agents.ts`)
 
-**Flags for `saif feat run` and `saif run resume`:**
+**Flags for `saifac feat run` and `saifac run resume`:**
 
 | Flag                      | Description                                                                            | Default              |
 | ------------------------- | -------------------------------------------------------------------------------------- | -------------------- |
@@ -171,7 +171,7 @@ After sandbox creation:
   tests.full.json
   code/                ← rsync copy of repo; mounted as /workspace
     .git/
-    saif/...
+    saifac/...
     ...
 ```
 
@@ -193,7 +193,7 @@ After sandbox creation:
 ### Default gate (built-in)
 
 ```bash
-saif feat run
+saifac feat run
 # Gate runs the default script (e.g. npm run check) inside the container after each OpenHands round
 ```
 
@@ -206,7 +206,7 @@ set -euo pipefail
 cd /workspace
 pnpm check && python -m pytest tests/unit/
 
-saif feat run --gate-script ./my-gate.sh
+saifac feat run --gate-script ./my-gate.sh
 ```
 
 ### Disable gate (pass-through)
@@ -215,13 +215,13 @@ saif feat run --gate-script ./my-gate.sh
 # Create an empty script that exits 0
 echo '#!/bin/bash
 exit 0' > /tmp/noop-gate.sh
-saif feat run --gate-script /tmp/noop-gate.sh
+saifac feat run --gate-script /tmp/noop-gate.sh
 ```
 
 ### Tune gate retries
 
 ```bash
-saif feat run --gate-retries 3
+saifac feat run --gate-retries 3
 ```
 
 ### Custom agent script (Aider)
@@ -232,7 +232,7 @@ saif feat run --gate-retries 3
 set -euo pipefail
 aider --message-file "$FACTORY_TASK_PATH" --yes
 
-saif feat run --agent-script ./aider-runner.sh --agent-log-format raw
+saifac feat run --agent-script ./aider-runner.sh --agent-log-format raw
 ```
 
 ### Custom agent script (Claude Code)
@@ -243,26 +243,26 @@ saif feat run --agent-script ./aider-runner.sh --agent-log-format raw
 set -euo pipefail
 claude --print "$(cat "$FACTORY_TASK_PATH")"
 
-saif feat run --agent-script ./claude-runner.sh --agent-log-format raw
+saifac feat run --agent-script ./claude-runner.sh --agent-log-format raw
 ```
 
 ### Forwarding custom env vars
 
 ```bash
 # Pass individual vars
-saif feat run --agent-env AIDER_MODEL=gpt-4o --agent-env AIDER_YES=1
+saifac feat run --agent-env AIDER_MODEL=gpt-4o --agent-env AIDER_YES=1
 
 # Or use an env file
 # agent.env
 # AIDER_MODEL=gpt-4o
 # AIDER_YES=1
-saif feat run --agent-env-file ./agent.env
+saifac feat run --agent-env-file ./agent.env
 ```
 
 ### Dangerous-debug mode (host execution)
 
 ```bash
-saif feat run --dangerous-debug
+saifac feat run --dangerous-debug
 ```
 
 The inner loop runs on the host. The default gate assumes `/workspace`; for `--dangerous-debug`, use a custom gate that runs from the current directory (the spawn cwd is `codePath`).

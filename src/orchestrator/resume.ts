@@ -103,7 +103,7 @@ export function createResumeWorktree(
     GIT_COMMITTER_EMAIL: 'factory@localhost',
   };
 
-  const worktreeDir = join(projectDir, '.saif', 'worktrees');
+  const worktreeDir = join(projectDir, '.saifac', 'worktrees');
   mkdirSync(worktreeDir, { recursive: true });
   const worktreePath = join(worktreeDir, `resume-${runId}`);
   const branchName = `factory-resume-${runId}`;
@@ -122,7 +122,7 @@ export function createResumeWorktree(
   }
 
   const applyPatchFromString = (diff: string) => {
-    const tmpPath = join(worktreePath, '.saif-apply.patch');
+    const tmpPath = join(worktreePath, '.saifac-apply.patch');
     writeFileSync(tmpPath, diff, 'utf8');
     const applyResult = spawnSync('git', ['apply', tmpPath], { cwd: worktreePath, env: gitEnv });
     if (applyResult.status !== 0) {
@@ -191,7 +191,7 @@ export interface CreateSaveRunHandlerParams {
 /**
  * Returns an async handler for registry.setBeforeCleanup.
  * When the user hits Ctrl+C or the loop exits due to failure, the callback persists an artifact
- * if patch.diff exists and is non-empty, so the user can resume with saif run resume.
+ * if patch.diff exists and is non-empty, so the user can resume with saifac run resume.
  */
 export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promise<void> {
   const { sandbox, runContext, opts, runStorage, saifDir } = params;
@@ -217,7 +217,7 @@ export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promis
 
   // Save the artifact to runStorage so the user can resume later.
   await runStorage.saveRun(runId, artifact);
-  console.log(`[orchestrator] Run state saved (Ctrl+C). Resume with: saif run resume ${runId}`);
+  console.log(`[orchestrator] Run state saved (Ctrl+C). Resume with: saifac run resume ${runId}`);
 }
 
 // ---------------------------------------------------------------------------

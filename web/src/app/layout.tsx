@@ -2,6 +2,7 @@ import './globals.css';
 
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import PlausibleProvider from 'next-plausible';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -26,12 +27,16 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const domain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN ?? '';
+
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0F0F0F] text-white font-sans selection:bg-[#00FF66] selection:text-black`}
       >
-        {children}
+        <PlausibleProvider domain={domain} trackOutboundLinks enabled={!!domain}>
+          {children}
+        </PlausibleProvider>
       </body>
     </html>
   );

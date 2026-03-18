@@ -1,4 +1,4 @@
-# saif cache list
+# saifac cache list
 
 List sandbox dirs in the sandbox base dir for this project.
 
@@ -7,7 +7,7 @@ Shows factory sandbox entries in `/tmp/factory-sandbox/` (or a custom path). By 
 ## Usage
 
 ```bash
-saif cache list [options]
+saifac cache list [options]
 ```
 
 ## Arguments
@@ -23,25 +23,25 @@ saif cache list [options]
 List sandbox dirs for the current project:
 
 ```bash
-saif cache list
+saifac cache list
 ```
 
 List sandbox dirs for all projects:
 
 ```bash
-saif cache list --all
+saifac cache list --all
 ```
 
 Show sandbox dirs for specific project name:
 
 ```bash
-saif cache list -p my-project
+saifac cache list -p my-project
 ```
 
 Use a custom sandbox base directory:
 
 ```bash
-saif cache list --sandbox-base-dir /var/cache/factory
+saifac cache list --sandbox-base-dir /var/cache/factory
 ```
 
 ## What it does

@@ -9,14 +9,14 @@
    - How: `--profile <id>` or supply custom Docker images and installation scripts to adapt.
    - See [Sandbox profiles →](./sandbox-profiles.md)
    ```bash
-   saif feat run --profile python-uv
+   saifac feat run --profile python-uv
    ```
 2. **Any agentic CLI:**
    - Included: OpenHands (default), Aider, Claude Code, Forge, GitHub Copilot CLI, Terminus, Codex, Gemini, Qwen, OpenCode, KiloCode, mini-SWE-agent, Deep Agents.
    - How: `--agent <id>` or supply a custom agent script.
    - See [Agents →](./agents/README.md)
    ```bash
-   saif feat run --agent aider
+   saifac feat run --agent aider
    ```
 3. **Any LLM provider:**
    - Included: Anthropic, OpenAI, Google, xAI, Mistral, DeepSeek, Groq, Cohere, Together, Fireworks, DeepInfra, Cerebras, Hugging Face, Moonshot AI, Alibaba, Vertex, Baseten, Perplexity, Vercel, OpenRouter, and Ollama.
@@ -24,28 +24,28 @@
    - Set single model globally or target individual agents.
    - See [LLM configuration →](./models.md)
    ```bash
-   saif feat run --model openai/o3
+   saifac feat run --model openai/o3
    ```
 4. **Connect to any repository**
    - Included: Github, Gitlab, Gitea, Bitbucket, and Azure Repos
    - How: `--git-provider <id>`. To connect, pass your API token as env vars (e.g. `GITHUB_TOKEN`, ...)
    - See [Source control →](./source-control.md)
    ```bash
-   saif feat run --git-provider github
+   saifac feat run --git-provider github
    ```
 
 _Missing an integration? [Open an issue](https://github.com/JuroOravec/safe-ai-factory/issues)_
 
 ## Agent CLIs
 
-You aren't locked into a single AI coding tool. Use any CLI agent you prefer — we wrap it in our safety loop and handle the Docker isolation and testing. 
+You aren't locked into a single AI coding tool. Use any CLI agent you prefer — we wrap it in our safety loop and handle the Docker isolation and testing.
 
 Included: OpenHands (default), Aider, Claude Code, Forge, GitHub Copilot CLI, Terminus, Codex, Gemini, Qwen, OpenCode, KiloCode, mini-SWE-agent, Deep Agents.
 
 Use `--agent <id>` to switch:
 
 ```bash
-saif feat run --agent aider
+saifac feat run --agent aider
 ```
 
 See [Agents docs](./agents/README.md) for the full list and configuration options.
@@ -68,7 +68,7 @@ export OPENROUTER_API_KEY=sk-or-...
 Set a single model for the entire command:
 
 ```bash
-saif feat run --model openai/o3
+saifac feat run --model openai/o3
 ```
 
 Target a specific agent while keeping defaults for the rest:
@@ -76,40 +76,44 @@ Target a specific agent while keeping defaults for the rest:
 ```bash
 # Use o3 for the coding agent,
 # keep defaults for other agents
-saif feat run --model coder=openai/o3
+saifac feat run --model coder=openai/o3
 
 # Cheap model for PR summaries,
 # strong model for everything else
-saif feat run --model anthropic/claude-sonnet-4-6,pr-summarizer=openai/gpt-4o-mini
+saifac feat run --model anthropic/claude-sonnet-4-6,pr-summarizer=openai/gpt-4o-mini
 ```
 
 See [Models](./models.md) for the full reference and available agents.
 
 ## Configuration files
 
-You can store default options in `saif/config.*` so you don't have to pass them via CLI every time.
+You can store default options in `saifac/config.*` so you don't have to pass them via CLI every time.
 
 `safe-ai-factory` uses [Cosmiconfig](https://github.com/cosmiconfig/cosmiconfig), so you can write your config in JSON, YAML, JS, or TS:
 
-- `saif/config.json`
-- `saif/config.yaml` / `config.yml`
-- `saif/config.js` / `config.cjs`
-- `saif/config.ts`
+- `saifac/config.json`
+- `saifac/config.yaml` / `config.yml`
+- `saifac/config.js` / `config.cjs`
+- `saifac/config.ts`
 
 Any CLI flag you pass overrides the corresponding config default.
 
 ```json
-// saif/config.json
+// saifac/config.json
 {
   "defaults": {
     "maxRuns": 5,
     "globalModel": "anthropic/claude-sonnet-4",
-    "globalStorage": "s3://my-bucket/saif-runs"
+    "globalStorage": "s3://my-bucket/saifac-runs"
   }
 }
 ```
 
 See the [Configuration guide](./config.md) for the full schema and details.
+
+### Ephemeral services
+
+You can configure which ephemeral services (postgres, redis, etc.) run alongside 1) the agent while it codes and runs tests, and 2) your application during black-box validation. Services are provisioned per run and torn down afterward—no shared state between runs. See [Environments and Infrastructure](services.md).
 
 ## Sandbox profiles: Configure coding containers
 
@@ -122,7 +126,7 @@ You don't need to build anything. The factory ships pre-built coder and stage im
 Use `--profile` CLI option:
 
 ```bash
-saif feat run --profile python-uv
+saifac feat run --profile python-uv
 ```
 
 [See all available profiles and step-by-step usage →](./sandbox-profiles.md)
@@ -154,12 +158,12 @@ See [Test profiles →](./test-profiles.md) for step-by-step usage.
 
 ## Connect to any repository
 
-SAIF natively integrates with your source control. You can configure it to automatically open a PR or push to a remote branch when the tests finally pass.
+SAIFAC natively integrates with your source control. You can configure it to automatically open a PR or push to a remote branch when the tests finally pass.
 
 Use `--push origin --pr` when running the agent:
 
 ```bash
-saif feat run --push origin --pr
+saifac feat run --push origin --pr
 ```
 
 Included integrations: Github, Gitlab, Gitea, Bitbucket, and Azure Repos.
@@ -168,7 +172,7 @@ See [Source control docs](./source-control.md) for details and configuration.
 
 ## Security & Isolation
 
-SAIF runs agents in a zero-trust, sandboxed environment. Docker isolation, hidden tests, Cedar policies, and prompt-injection defenses ensure the agent cannot cheat, reward-hack, or break out.
+SAIFAC runs agents in a zero-trust, sandboxed environment. Docker isolation, hidden tests, Cedar policies, and prompt-injection defenses ensure the agent cannot cheat, reward-hack, or break out.
 
 See [Security & Isolation](./security.md) for the full architecture.
 
@@ -182,14 +186,14 @@ By default, the coding agents' permissions are:
 
 - Filesystem:
   - Read and write anywhere in the workspace.
-  - Except `saif/` (reward-hacking prevention) and `.git/` (sandbox-escape prevention).
+  - Except `saifac/` (reward-hacking prevention) and `.git/` (sandbox-escape prevention).
 - Network:
   - Unrestricted.
 
 Override with `--cedar` to supply your own Cedar policy:
 
 ```bash
-saif feat run --cedar ./my-policy.cedar
+saifac feat run --cedar ./my-policy.cedar
 ```
 
 [See the full default policy and customization guide here](./cedar-access-control.md).
@@ -204,10 +208,10 @@ Use `--designer` to switch:
 
 ```bash
 # Default:
-saif feat design
+saifac feat design
 
 # Explicit:
-saif feat design --designer shotgun
+saifac feat design --designer shotgun
 ```
 
 | Designer          | Switch with          |
@@ -228,13 +232,13 @@ Use `--indexer` to switch or disable:
 
 ```bash
 # Index is built automatically during init:
-saif init
+saifac init
 
 # Use during spec generation:
-saif feat design --indexer shotgun
+saifac feat design --indexer shotgun
 
 # Disable:
-saif feat design --indexer none
+saifac feat design --indexer none
 ```
 
 | Indexer           | Switch with         |

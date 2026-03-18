@@ -41,11 +41,7 @@ function imperativeCatalog(extra: object = {}): string {
   return JSON.stringify({
     version: '1.0',
     featureName: 'test-feature',
-    featureDir: 'saif/features/test-feature',
-    containers: {
-      staging: { sidecarPort: 8080, sidecarPath: '/exec' },
-      additional: [],
-    },
+    featureDir: 'saifac/features/test-feature',
     testCases: [
       {
         id: 'tc-001',
@@ -77,7 +73,7 @@ function imperativeCatalog(extra: object = {}): string {
 describe('generateTests', () => {
   let projectDir: string;
   let feature: Awaited<ReturnType<typeof resolveFeature>>;
-  const saifDir = 'saif';
+  const saifDir = 'saifac';
   const featureName = 'test-feature';
 
   beforeEach(() => {
@@ -178,11 +174,7 @@ describe('generateTests', () => {
     const webCatalog = JSON.stringify({
       version: '1.0',
       featureName: 'test-feature',
-      featureDir: 'saif/features/test-feature',
-      containers: {
-        staging: { baseUrl: 'http://staging:3000' },
-        additional: [],
-      },
+      featureDir: 'saifac/features/test-feature',
       testCases: [
         {
           id: 'tc-001',
@@ -212,9 +204,9 @@ describe('generateTests', () => {
 describe('generateTests (error cases)', () => {
   it('throws when tests.json does not exist', async () => {
     const projectDir = makeTempDir();
-    const featureDir = join(projectDir, 'saif', 'features', 'missing');
+    const featureDir = join(projectDir, 'saifac', 'features', 'missing');
     mkdirSync(featureDir, { recursive: true });
-    const feature = resolveFeature({ input: 'missing', projectDir, saifDir: 'saif' });
+    const feature = resolveFeature({ input: 'missing', projectDir, saifDir: 'saifac' });
     await expect(
       generateTests({
         feature,
@@ -225,12 +217,12 @@ describe('generateTests (error cases)', () => {
 
   it('throws when tests.json fails schema validation', async () => {
     const projectDir = makeTempDir();
-    const featureDir = join(projectDir, 'saif', 'features', 'bad-feature');
+    const featureDir = join(projectDir, 'saifac', 'features', 'bad-feature');
     mkdirSync(featureDir, { recursive: true });
     const testsDir = join(featureDir, 'tests');
     mkdirSync(testsDir, { recursive: true });
     writeFileSync(join(testsDir, 'tests.json'), '{"invalid": true}', 'utf8');
-    const feature = resolveFeature({ input: 'bad-feature', projectDir, saifDir: 'saif' });
+    const feature = resolveFeature({ input: 'bad-feature', projectDir, saifDir: 'saifac' });
     await expect(
       generateTests({
         feature,

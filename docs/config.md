@@ -1,14 +1,14 @@
 # Configuration
 
-You can store default options in `saif/config.*` so you don't have to pass them via CLI every time.
+You can store default options in `saifac/config.*` so you don't have to pass them via CLI every time.
 
 ## File location
 
-Config is loaded from `saif/config.*` using [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig).
+Config is loaded from `saifac/config.*` using [cosmiconfig](https://github.com/cosmiconfig/cosmiconfig).
 
 ```
 project-root/
-├── saif/
+├── saifac/
 │   ├── config.json
 │   └── features/
 │       └── add-login/
@@ -26,7 +26,7 @@ Supported formats:
 
 ## Structure
 
-Config has a top-level `defaults` object. All fields are optional. CLI flags override config defaults.
+Config has a top-level `defaults` object and an optional `environments` object. All fields are optional. CLI flags override config defaults.
 
 ```json
 {
@@ -41,19 +41,42 @@ Config has a top-level `defaults` object. All fields are optional. CLI flags ove
     },
     "agentEnv": {
       "OPENAI_API_KEY": "sk-..."
+    }
+  },
+  "environments": {
+    "coding": {
+      "provisioner": "docker",
+      "file": "./docker/docker-compose.dev.yml",
+      "agentEnvironment": {
+        "DATABASE_URL": "postgres://user:pass@postgres-db:5432/db"
+      }
     },
-    "globalStorage": "local",
-    "storages": {
-      "runs": "local",
-      "tasks": "s3://my-bucket/tasks"
-    },
-    "testProfile": "node-vitest",
-    "push": "origin",
-    "pr": true,
-    "gitProvider": "github"
+    "staging": {
+      "provisioner": "docker",
+      "file": "./docker/docker-compose.staging.yml",
+      "app": {
+        "sidecarPort": 8080,
+        "sidecarPath": "/exec"
+      },
+      "appEnvironment": {
+        "DATABASE_URL": "postgres://user:pass@postgres-db:5432/db"
+      }
+    }
   }
 }
 ```
+
+### The `environments` Block (Provisioners)
+
+The `environments` block defines external service infrastructure (databases, queues, etc.) needed during the Coding phase and the Staging phase. SAIFAC delegates the orchestration of these services to "Provisioners" (currently supporting `docker`).
+
+- **`environments.coding`**: Services running while the agent writes code.
+  - `agentEnvironment`: Environment variables injected directly into the agent container. These provide connection strings (like `DATABASE_URL`) to reach the services.
+- **`environments.staging`**: Services running while the test runner validates the app.
+  - `app`: Configuration for the main application under test (`sidecarPort`, `sidecarPath`, `baseUrl`, and an optional `build.dockerfile`).
+  - `appEnvironment`: Environment variables injected into the staging application container to reach its services.
+
+See [Environments and Infrastructure](services.md) for a user guide. See [Software Factory Services](development/v0/swf-services.md) for the architectural rationale.
 
 ## Supported fields
 

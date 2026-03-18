@@ -44,14 +44,14 @@ This phase runs directly on the developer's machine and is NOT automated. It exi
 1. **Trigger OpenSpec:** The PM/Engineer uses `/opsx:propose` to create `proposal.md` and writes the initial feature requirements.
 2. **Invoke Shotgun:** The developer runs `shotgun specify --input proposal.md` to generate a codebase-aware `plan.md` and `spec.md`.
 3. **Invoke Black Box Testing Agent:** The developer runs the Black Box Testing Mastra Worker, which reads `plan.md` and generates strict TDD constraints.
-   - _Crucial step:_ The black box testing agent saves the **Public Tests** and **Holdout Tests** directly into the project's real `saif/features/<feature-name>/tests/` folder.
+   - _Crucial step:_ The black box testing agent saves the **Public Tests** and **Holdout Tests** directly into the project's real `saifac/features/<feature-name>/tests/` folder.
 4. **Human Review:** The developer reviews `plan.md` and the generated tests. If they correctly reflect the desired feature, the developer commits these constraints and triggers the automated factory execution.
 
 ### Phase 2: The Factory Floor (Automated Execution)
 
 Once the constraints are approved, the autonomous loop begins. To prevent polluting the active workspace, the Orchestrator isolates this work.
 
-5. **Isolate via Pure File Copy:** The Orchestrator creates a true air-gap by copying the current repository to a disposable folder (e.g., `/tmp/factory-sandbox/feature-x`). It uses tools like `rsync` with `--filter=':- .gitignore'` to ensure it doesn't copy `node_modules` or build artifacts. After rsync, it recursively removes _all_ `hidden/` directories under `saif/features/` from the code copy so the agent cannot see holdout tests from any feature (current or others). This guarantees that even if the agent maliciously deletes `.git` or corrupts files, the host repository is 100% safe, and the agent has no access to hidden tests.
+5. **Isolate via Pure File Copy:** The Orchestrator creates true isolation by copying the current repository to a disposable folder (e.g., `/tmp/factory-sandbox/feature-x`). It uses tools like `rsync` with `--filter=':- .gitignore'` to ensure it doesn't copy `node_modules` or build artifacts. After rsync, it recursively removes _all_ `hidden/` directories under `saifac/features/` from the code copy so the agent cannot see holdout tests from any feature (current or others). This guarantees that even if the agent maliciously deletes `.git` or corrupts files, the host repository is 100% safe, and the agent has no access to hidden tests.
 6. **Fail2Pass Check (Sanity Check):**
    - Within the isolated sandbox, the Orchestrator runs the Black-Box test harness (e.g., Playwright or HTTP request to the Sidecar) against the holdout tests. For a web app or CLI wrapped in a Sidecar, this requires spinning up the app and invoking the test runner.
    - It parses the Vitest JSON report to check that _at least one_ feature test (excluding infrastructure health checks) failed. If all feature tests pass, the loop aborts — the feature already exists or the tests are invalid.
@@ -62,7 +62,7 @@ Once the constraints are approved, the autonomous loop begins. To prevent pollut
    - OpenHands runs autonomously. The Orchestrator waits for the process to exit.
 8. **Extract Artifact:**
    - Once OpenHands completes, the Orchestrator uses `git diff HEAD` inside the sandbox to capture all changes since the base commit.
-   - **Patch filtering (reward-hacking prevention):** Before the diff is written to `patch.diff` or applied to the host, any file sections that touch the `saif/` directory (or the path configured via `--saif-dir`) are stripped. The agent cannot cheat by modifying test specs or constraints — those changes are dropped and logged as a warning.
+   - **Patch filtering (reward-hacking prevention):** Before the diff is written to `patch.diff` or applied to the host, any file sections that touch the `saifac/` directory (or the path configured via `--saifac-dir`) are stripped. The agent cannot cheat by modifying test specs or constraints — those changes are dropped and logged as a warning.
    - The filtered patch is saved as `patch.diff`; the sandbox is then reset to base state for the next attempt.
 
 ### Phase 3: Mutual Verification (The Test Runner & The Air Gap)
@@ -105,14 +105,14 @@ Here is a more robust pseudocode sketch of the core loop. It addresses the pract
 
 1. **Separation of Concerns:** The process is split into two distinct functions. Generation (`generateSpecsAndTests`) runs first so a human can review the `plan.md` and tests. Execution (`runFactoryFloor`) runs the isolated loop.
 2. **Pure File Copy Isolation:** The Execution loop copies the repository to a temporary `/tmp/` folder using `rsync` **honoring** `.gitignore` (so it skips `node_modules`, build artifacts, etc.). This guarantees the agent cannot accidentally delete or corrupt the host's real `.git` history or files.
-3. **The Sandbox Illusion:** Inside the disposable copy, we remove all `hidden/` dirs under `saif/features/` from the code copy before the agent runs. The agent's workspace contains only public tests; holdout tests are physically absent.
+3. **The Sandbox Illusion:** Inside the disposable copy, we remove all `hidden/` dirs under `saifac/features/` from the code copy before the agent runs. The agent's workspace contains only public tests; holdout tests are physically absent.
    ```
    /tmp/
      |- factory-sandbox/
          |- {featName}-{runId}/
              |- code/                      (Mounted to Agent)
                  |- .git
-                 |- saif/features/
+                 |- saifac/features/
                  │   └── (hidden/ dirs removed from every feature)
                  |- src/
                  |- ...
@@ -139,8 +139,8 @@ async function generateSpecsAndTests(featureName: string, proposalPath: string) 
   console.log('Generating strict TDD constraints...');
   const tests = await runBlackBoxTestingAgent(plan);
 
-  const publicTestPath = `saif/features/${featureName}/tests/public.spec.ts`;
-  const holdoutTestPath = `saif/features/${featureName}/tests/holdout.spec.ts`;
+  const publicTestPath = `saifac/features/${featureName}/tests/public.spec.ts`;
+  const holdoutTestPath = `saifac/features/${featureName}/tests/holdout.spec.ts`;
 
   fs.writeFileSync(publicTestPath, tests.publicTests);
   fs.writeFileSync(holdoutTestPath, tests.holdoutTests);
@@ -164,14 +164,14 @@ async function runFactoryFloor(featureName: string) {
   // NOTE 1: OpenSpec supports nested paths (e.g. /specs/accounts/feat.md).
   // In a real implementation, this path should be dynamically resolved
   // rather than assuming the test is always at the root of a tests dir
-  const relativeHoldoutPath = `saif/features/${featureName}/tests/holdout.spec.ts`;
+  const relativeHoldoutPath = `saifac/features/${featureName}/tests/holdout.spec.ts`;
   const holdoutTestName = `${featureName}.holdout.spec.ts`;
 
   // NOTE 2: A production script must wrap this entire execution block in a
   // try/finally block to guarantee the disposable sandbox is deleted
   // (rm -rf) even if a terminal command throws an unexpected error.
 
-  // 1. Setup via Pure File Copy (Air-Gap)
+  // 1. Setup via Pure File Copy
   // We create a structure where the agent only mounts the inner "code" directory
   // so the holdout test is physically outside its container.
   console.log(`Creating isolated sandbox at ${sandboxBasePath}...`);
@@ -257,7 +257,7 @@ async function runFactoryFloor(featureName: string) {
     const testRunnerContainer = await docker.createContainer({
       Image: 'playwright:focal', // Or whichever runner is required (e.g. 'node:20' for Newman/API tests)
       Binds: [
-        `${sandboxBasePath}/${holdoutTestName}:/workspace/saif/features/${featureName}/tests/holdout.spec.ts:ro`,
+        `${sandboxBasePath}/${holdoutTestName}:/workspace/saifac/features/${featureName}/tests/holdout.spec.ts:ro`,
       ],
       HostConfig: { Links: [`app-${runId}:app`] }, // Network link to Staging container
       Env: [
@@ -268,7 +268,7 @@ async function runFactoryFloor(featureName: string) {
         '-c',
         `
         # Execute tests over HTTP, whether testing a Web App or a CLI wrapped in a Sidecar
-        npm run test:e2e -- /workspace/saif/features/${featureName}/tests/holdout.spec.ts
+        npm run test:e2e -- /workspace/saifac/features/${featureName}/tests/holdout.spec.ts
       `,
       ],
     });

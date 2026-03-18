@@ -1,4 +1,4 @@
-# saif feat design-fail2pass
+# saifac feat design-fail2pass
 
 Validate generated tests. Runs tests against main; at least one feature test must fail (third step of design workflow).
 
@@ -9,8 +9,8 @@ Use this after `feat design-tests` to verify the tests are valid before starting
 ## Usage
 
 ```bash
-saif feat design-fail2pass [options]
-saif feature design-fail2pass [options]
+saifac feat design-fail2pass [options]
+saifac feature design-fail2pass [options]
 ```
 
 ## Requirements
@@ -22,7 +22,7 @@ saif feature design-fail2pass [options]
 | Argument             | Alias | Type   | Description                                                                                     |
 | -------------------- | ----- | ------ | ----------------------------------------------------------------------------------------------- |
 | `--name`             | `-n`  | string | Feature name (kebab-case). Prompts with a list if omitted.                                      |
-| `--saif-dir`         | —     | string | Path to saif directory (default: `saif`)                                                        |
+| `--saifac-dir`       | —     | string | Path to saifac directory (default: `saifac`)                                                    |
 | `--project-dir`      | —     | string | Project directory (default: current working directory)                                          |
 | `--project`          | `-p`  | string | Project name override (default: package.json "name")                                            |
 | `--sandbox-base-dir` | —     | string | Base directory for sandbox entries (default: `/tmp/factory-sandbox`)                            |
@@ -38,25 +38,25 @@ saif feature design-fail2pass [options]
 Interactive (prompts for feature name):
 
 ```bash
-saif feat design-fail2pass
+saifac feat design-fail2pass
 ```
 
 With name:
 
 ```bash
-saif feat design-fail2pass -n add-login
+saifac feat design-fail2pass -n add-login
 ```
 
 Change language or framework for the sandbox container (e.g. your codebse is in Golang):
 
 ```bash
-saif feat design-fail2pass --profile go-node
+saifac feat design-fail2pass --profile go-node
 ```
 
 Change language or framework for the test runner (e.g. if you wrote tests in Golang):
 
 ```bash
-saif feat design-fail2pass --test-profile go-gotest
+saifac feat design-fail2pass --test-profile go-gotest
 ```
 
 ## What it does

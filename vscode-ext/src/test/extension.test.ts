@@ -17,8 +17,8 @@ suite('Safe AI Factory Extension Test Suite', () => {
 
   test('Core commands should be registered', async () => {
     const commands = await vscode.commands.getCommands(true);
-    assert.ok(commands.includes('saif.createFeature'), 'createFeature command is missing');
-    assert.ok(commands.includes('saif.runFeature'), 'runFeature command is missing');
-    assert.ok(commands.includes('saif.showLogs'), 'showLogs command is missing');
+    assert.ok(commands.includes('saifac.createFeature'), 'createFeature command is missing');
+    assert.ok(commands.includes('saifac.runFeature'), 'runFeature command is missing');
+    assert.ok(commands.includes('saifac.showLogs'), 'showLogs command is missing');
   });
 });

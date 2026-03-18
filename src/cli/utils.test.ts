@@ -40,12 +40,12 @@ describe('parseModelOverrides', () => {
 
   it('accepts valid agent names', () => {
     const overrides = parseModelOverrides({
-      model: 'coder=openai/gpt-4o,results-judge=openai/gpt-4o-mini',
+      model: 'coder=openai/gpt-4o,vague-specs-check=openai/gpt-4o-mini',
     });
     expect(exitSpy).not.toHaveBeenCalled();
     expect(overrides.agentModels).toEqual({
       coder: 'openai/gpt-4o',
-      'results-judge': 'openai/gpt-4o-mini',
+      'vague-specs-check': 'openai/gpt-4o-mini',
     });
   });
 });

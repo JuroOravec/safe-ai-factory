@@ -53,13 +53,13 @@ flowchart TB
 
 The Orchestrator passes these environment variables to the Test Runner container. Your `test.sh` (or custom entrypoint) must read them.
 
-| Variable              | Description                                                                                                                                                          |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FACTORY_TARGET_URL`  | URL of the application under test. For CLI projects = sidecar URL; for web projects = app base URL (e.g. `http://staging:3000`).                                     |
-| `FACTORY_SIDECAR_URL` | URL of the HTTP sidecar that executes CLI commands. Format: `http://staging:<port><path>` (e.g. `http://staging:8080/exec`). Always defined — even for web projects. |
-| `FACTORY_FEATURE_NAME` | SAIF feature name (e.g. `greet-cmd`).                                                                                                                             |
-| `FACTORY_TESTS_DIR`   | Absolute path inside the container where test files are mounted. Default: `/tests`.                                                                                  |
-| `FACTORY_OUTPUT_FILE` | Absolute path where the container **must write the JUnit XML report**. Default: `/test-runner-output/results.xml`.                                                   |
+| Variable               | Description                                                                                                                                                          |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FACTORY_TARGET_URL`   | URL of the application under test. For CLI projects = sidecar URL; for web projects = app base URL (e.g. `http://staging:3000`).                                     |
+| `FACTORY_SIDECAR_URL`  | URL of the HTTP sidecar that executes CLI commands. Format: `http://staging:<port><path>` (e.g. `http://staging:8080/exec`). Always defined — even for web projects. |
+| `FACTORY_FEATURE_NAME` | SAIFAC feature name (e.g. `greet-cmd`).                                                                                                                              |
+| `FACTORY_TESTS_DIR`    | Absolute path inside the container where test files are mounted. Default: `/tests`.                                                                                  |
+| `FACTORY_OUTPUT_FILE`  | Absolute path where the container **must write the JUnit XML report**. Default: `/test-runner-output/results.xml`.                                                   |
 
 ### Volume Mounts
 
@@ -178,8 +178,8 @@ Pre-built test runner images are published to `ghcr.io/JuroOravec/safe-ai-factor
 When `--test-image` is omitted, the orchestrator uses the default profile (`node-vitest`). Docker pulls the image from GHCR automatically when not present locally. To use another profile:
 
 ```bash
-saif feat run --test-profile python-pytest   # Uses GHCR python-pytest image
-saif feat run --test-image ghcr.io/JuroOravec/safe-ai-factory/factory-test-node-playwright:latest
+saifac feat run --test-profile python-pytest   # Uses GHCR python-pytest image
+saifac feat run --test-image ghcr.io/JuroOravec/safe-ai-factory/factory-test-node-playwright:latest
 ```
 
 Use `:v1.0.0` (or another tag) to pin a release. See [docs/development/docker.md](../../../docs/development/docker.md).
@@ -189,7 +189,7 @@ Use `:v1.0.0` (or another tag) to pin a release. See [docs/development/docker.md
 Use the default profile image but run a different command:
 
 ```bash
-saif feat run --test-script ./my-test.sh
+saifac feat run --test-script ./my-test.sh
 ```
 
 `my-test.sh` must:
@@ -247,7 +247,7 @@ Build and run (only needed for custom setups; for standard pytest use `--test-pr
 
 ```bash
 docker build -f Dockerfile.test.python -t my-test-python .
-saif feat run --test-image my-test-python --test-script ./test-pytest.sh
+saifac feat run --test-image my-test-python --test-script ./test-pytest.sh
 ```
 
 ### Option 3: Fully Custom Test Runner Image (Ignore test.sh Mount)
@@ -287,7 +287,7 @@ Your Go tests use `os.Getenv("FACTORY_SIDECAR_URL")` to call the sidecar. Build 
 
 ```bash
 docker build -f Dockerfile.test.go -t my-test-go .
-saif feat run --test-image my-test-go
+saifac feat run --test-image my-test-go
 ```
 
 ### Option 4: Playwright / Browser Tests
@@ -313,15 +313,15 @@ Use `--test-script` with a script that runs Playwright/Vitest browser tests. You
 
 ## CLI Reference
 
-| Command                                                 | Purpose                                                                                |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `saif feat run --test-profile <id>`                     | Use a specific profile. Default: `node-vitest`. Image pulled from GHCR when not local. |
-| `saif feat run --test-image <tag>`                      | Use a custom Test Runner image (GHCR or local). Must exist or be pullable.             |
-| `saif feat run --test-script <path>`                    | Override the default `test-default.sh` with a custom script.                           |
-| `saif feat run --test-image <tag> --test-script <path>` | Combine both. Script is bind-mounted; image provides runtime.                          |
-| `pnpm docker build test [--all]`                        | Build test images locally (for development or offline; default images are on GHCR).    |
+| Command                                                   | Purpose                                                                                |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `saifac feat run --test-profile <id>`                     | Use a specific profile. Default: `node-vitest`. Image pulled from GHCR when not local. |
+| `saifac feat run --test-image <tag>`                      | Use a custom Test Runner image (GHCR or local). Must exist or be pullable.             |
+| `saifac feat run --test-script <path>`                    | Override the default `test-default.sh` with a custom script.                           |
+| `saifac feat run --test-image <tag> --test-script <path>` | Combine both. Script is bind-mounted; image provides runtime.                          |
+| `pnpm docker build test [--all]`                          | Build test images locally (for development or offline; default images are on GHCR).    |
 
-`--test-image` and `--test-script` apply to `saif feat run`, `saif run resume`, `feat:test`, and `saif feat design-fail2pass`.
+`--test-image` and `--test-script` apply to `saifac feat run`, `saifac run resume`, `feat:test`, and `saifac feat design-fail2pass`.
 
 ---
 
@@ -353,7 +353,7 @@ For non-JS tests (Python, Go, etc.), implement equivalent helpers that read `os.
 The Orchestrator parses JUnit XML for:
 
 - Per-suite analysis (`hasFeatureTestFailures` — skips `sidecar:health` infra tests in fail2pass).
-- TestsResultsJudge input (failing test names and messages for ambiguity detection).
+- Vague Specs Checker input (failing test names and messages for ambiguity detection).
 
 Your runner's JUnit output should follow the standard structure:
 
@@ -369,4 +369,4 @@ The parser tolerates minor variations across runners (Vitest, pytest, go-junit-r
 
 - [swf-docker.md](./swf-docker.md) — Overall Docker architecture, staging container, build modes.
 - [swf-comp-b-black-box-testing.md](./swf-comp-b-black-box-testing.md) — Test design, sidecar protocol, helpers.
-- [swf-spec-ambiguity.md](./swf-spec-ambiguity.md) — TestsResultsJudge use of JUnit report for failure analysis.
+- [swf-spec-ambiguity.md](./swf-spec-ambiguity.md) — Vague Specs Checker use of JUnit report for failure analysis.

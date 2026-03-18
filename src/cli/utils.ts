@@ -14,7 +14,13 @@ import {
   resolveAgentScriptPath,
   resolveAgentStartScriptPath,
 } from '../agent-profiles/index.js';
-import { type SaifConfig } from '../config/schema.js';
+import {
+  DEFAULT_STAGING_APP,
+  type NormalizedCodingEnvironment,
+  type NormalizedStagingEnvironment,
+  type SaifConfig,
+  type StagingAppConfig,
+} from '../config/schema.js';
 import { getSaifRoot } from '../constants.js';
 import {
   DEFAULT_DESIGNER_PROFILE,
@@ -27,7 +33,7 @@ import {
   type IndexerProfile,
   resolveIndexerProfile,
 } from '../indexer-profiles/index.js';
-import { type ModelOverrides } from '../llm-config.js';
+import { isSupportedAgentName, type ModelOverrides, SUPPORTED_AGENT_NAMES } from '../llm-config.js';
 import { DEFAULT_SANDBOX_BASE_DIR } from '../orchestrator/sandbox.js';
 import { createRunStorage } from '../run-storage/index.js';
 import {
@@ -221,11 +227,11 @@ export function parseProjectDir(args: { 'project-dir'?: string }): string {
 }
 
 /**
- * Resolves the saif directory from --saif-dir. Returns 'saif' when omitted or empty.
+ * Resolves the saifac directory from --saifac-dir. Returns 'saifac' when omitted or empty.
  */
-export function parseSaifDir(args: { 'saif-dir'?: string }): string {
-  const raw = args['saif-dir'];
-  return typeof raw === 'string' && raw.trim() ? raw.trim() : 'saif';
+export function parseSaifDir(args: { 'saifac-dir'?: string }): string {
+  const raw = args['saifac-dir'];
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : 'saifac';
 }
 
 /**
@@ -274,7 +280,7 @@ export function getFeatNameFromArgs(args: { name?: string }): string | undefined
  * object (name, absolutePath, relativePath).
  */
 export async function getFeatOrPrompt(
-  args: { name?: string; 'saif-dir'?: string },
+  args: { name?: string; 'saifac-dir'?: string },
   projectDir: string,
 ): Promise<Feature> {
   const saifDir = parseSaifDir(args);
@@ -282,7 +288,7 @@ export async function getFeatOrPrompt(
   const features = [...featuresMap.keys()];
 
   if (features.length === 0) {
-    console.error('No features found. Run `saif feat new` first.');
+    console.error('No features found. Run `saifac feat new` first.');
     process.exit(1);
   }
 
@@ -529,14 +535,14 @@ export async function parseTestScript(opts: {
  *
  * --model: single global or comma-separated agent=model (same pattern as --storage).
  *   Single global: --model anthropic/claude-opus-4-5
- *   Agent-specific: --model results-judge=anthropic/claude-opus-4-5
+ *   Agent-specific: --model vague-specs-check=anthropic/claude-opus-4-5
  *   Multiple: --model coder=openai/o3,pr-summarizer=openai/gpt-4o-mini
  *   Mixed: --model anthropic/claude-sonnet-4-6,pr-summarizer=openai/gpt-4o-mini
  *
  * --base-url: same pattern as --model (single global or agent=url). At most one global.
  *   Single global: --base-url https://api.example.com/v1
- *   Agent-specific: --base-url results-judge=https://api.example.com/v1
- *   Multiple: --base-url results-judge=https://..,pr-summarizer=https://..
+ *   Agent-specific: --base-url vague-specs-check=https://api.example.com/v1
+ *   Multiple: --base-url vague-specs-check=https://..,pr-summarizer=https://..
  *   Mixed: --base-url https://..,pr-summarizer=https://..
  *   Uses KEY_EQ_PATTERN (^\w+=) so URLs with query params (?x=y) are treated as globals.
  */
@@ -613,7 +619,7 @@ export function parseModelOverrides(
   return overrides;
 }
 
-// ── Feat run parsers (used by saif feat run) ────────────────────────
+// ── Feat run parsers (used by saifac feat run) ────────────────────────
 
 /** Args shape for feat run. Extends OrchestratorArgs with run-specific flags. */
 export interface FeatRunArgs extends OrchestratorArgs {
@@ -736,7 +742,16 @@ export function parseAgentEnv(opts: {
   config?: SaifConfig;
 }): Record<string, string> {
   const { args, projectDir, config } = opts;
-  const result: Record<string, string> = { ...(config?.defaults?.agentEnv ?? {}) };
+  // Merge order (lowest → highest priority):
+  //   1. environments.coding.agentEnvironment — service-level baseline from config
+  //   2. defaults.agentEnv — project-level defaults from config
+  //   3. --agent-env-file — file-based overrides
+  //   4. --agent-env    — CLI flag overrides (highest)
+  const codingAgentEnv = config?.environments?.coding?.agentEnvironment ?? {};
+  const result: Record<string, string> = {
+    ...codingAgentEnv,
+    ...(config?.defaults?.agentEnv ?? {}),
+  };
 
   // --agent-env-file: single or comma-separated paths, merged left-to-right (later overrides earlier)
   // NOTE: If --agent-env-file is a single value, it's treated as an array of one.
@@ -969,4 +984,33 @@ export function parseDiscoveryOptions(
     prompt: prompt || undefined,
     promptFile,
   };
+}
+
+/**
+ * Returns a normalized staging environment — always non-null.
+ * When `environments.staging` is absent in config, defaults to `{ provisioner: 'docker' }`.
+ * Guarantees that `app` (with DEFAULT_STAGING_APP defaults) and `appEnvironment`
+ * are always present, eliminating the need for a separate `stagingAppConfig`.
+ */
+export function parseStagingEnvironment(
+  config: SaifConfig | undefined,
+): NormalizedStagingEnvironment {
+  const raw = config?.environments?.staging ?? { provisioner: 'docker' as const };
+  const app: StagingAppConfig = {
+    ...DEFAULT_STAGING_APP,
+    ...('app' in raw ? raw.app : undefined),
+  };
+  const appEnvironment: Record<string, string> =
+    ('appEnvironment' in raw ? raw.appEnvironment : undefined) ?? {};
+  return { ...raw, app, appEnvironment };
+}
+
+/**
+ * Returns a normalized coding environment — always non-null.
+ * When `environments.coding` is absent in config, defaults to `{ provisioner: 'docker' }`.
+ */
+export function parseCodingEnvironment(
+  config: SaifConfig | undefined,
+): NormalizedCodingEnvironment {
+  return config?.environments?.coding ?? { provisioner: 'docker' as const };
 }

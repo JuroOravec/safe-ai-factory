@@ -21,7 +21,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!workspaceRoot) {
-    vscode.window.showWarningMessage('SAIF: Please open a workspace folder to use the extension.');
+    vscode.window.showWarningMessage(
+      'SAIFAC: Please open a workspace folder to use the extension.',
+    );
     return;
   }
 
@@ -35,7 +37,7 @@ export async function activate(context: vscode.ExtensionContext) {
     isCliCurrentlyInstalled = await cliService.isCliInstalled();
     await vscode.commands.executeCommand(
       'setContext',
-      'saif.isCliInstalled',
+      'saifac.isCliInstalled',
       isCliCurrentlyInstalled,
     );
     return isCliCurrentlyInstalled;
@@ -45,10 +47,10 @@ export async function activate(context: vscode.ExtensionContext) {
     return async (...args: T) => {
       if (!isCliCurrentlyInstalled) {
         const selection = await vscode.window.showWarningMessage(
-          'The SAIF CLI is required to perform this action.',
-          'Install SAIF',
+          'The SAIFAC CLI is required to perform this action.',
+          'Install SAIFAC',
         );
-        if (selection === 'Install SAIF') {
+        if (selection === 'Install SAIFAC') {
           await vscode.env.openExternal(
             vscode.Uri.parse('https://github.com/JuroOravec/safe-ai-factory'),
           );
@@ -66,23 +68,23 @@ export async function activate(context: vscode.ExtensionContext) {
   // ============================================================================
 
   const featuresProvider = new FeaturesTreeProvider(workspaceRoot);
-  vscode.window.registerTreeDataProvider('saif-features', featuresProvider);
+  vscode.window.registerTreeDataProvider('saifac-features', featuresProvider);
 
-  // File watcher for saif/features
-  const watcher = vscode.workspace.createFileSystemWatcher('**/saif/features/**');
+  // File watcher for saifac/features
+  const watcher = vscode.workspace.createFileSystemWatcher('**/saifac/features/**');
   watcher.onDidCreate(() => featuresProvider.refresh());
   watcher.onDidChange(() => featuresProvider.refresh());
   watcher.onDidDelete(() => featuresProvider.refresh());
   context.subscriptions.push(watcher);
 
-  // Watcher for saif dir creation/deletion to automatically pick up new projects
-  const saifWatcher = vscode.workspace.createFileSystemWatcher('**/saif');
+  // Watcher for saifac dir creation/deletion to automatically pick up new projects
+  const saifWatcher = vscode.workspace.createFileSystemWatcher('**/saifac');
   saifWatcher.onDidCreate(() => featuresProvider.refresh());
   saifWatcher.onDidDelete(() => featuresProvider.refresh());
   context.subscriptions.push(saifWatcher);
 
   const runsProvider = new RunsTreeProvider(workspaceRoot, cliService);
-  vscode.window.registerTreeDataProvider('saif-runs', runsProvider);
+  vscode.window.registerTreeDataProvider('saifac-runs', runsProvider);
 
   const getItemName = (item: vscode.TreeItem | undefined): string | undefined => {
     if (!item) return undefined;
@@ -94,7 +96,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // ============================================================================
 
   const createFeatureCmd = vscode.commands.registerCommand(
-    'saif.createFeature',
+    'saifac.createFeature',
     withCliGuard(async () => {
       let targetCwd = workspaceRoot;
 
@@ -126,12 +128,12 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   const createDirCmd = vscode.commands.registerCommand(
-    'saif.createDir',
+    'saifac.createDir',
     async (item?: vscode.TreeItem) => {
       const dirName = await vscode.window.showInputBox({
         prompt: 'Enter folder name',
       });
-      const basePath = item?.resourceUri?.fsPath ?? path.join(workspaceRoot, 'saif', 'features');
+      const basePath = item?.resourceUri?.fsPath ?? path.join(workspaceRoot, 'saifac', 'features');
       if (dirName) {
         const newDirPath = vscode.Uri.file(path.join(basePath, dirName));
         await vscode.workspace.fs.createDirectory(newDirPath);
@@ -141,12 +143,12 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   const createFileCmd = vscode.commands.registerCommand(
-    'saif.createFile',
+    'saifac.createFile',
     async (item?: vscode.TreeItem) => {
       const fileName = await vscode.window.showInputBox({
         prompt: 'Enter file name',
       });
-      const basePath = item?.resourceUri?.fsPath ?? path.join(workspaceRoot, 'saif', 'features');
+      const basePath = item?.resourceUri?.fsPath ?? path.join(workspaceRoot, 'saifac', 'features');
       if (fileName) {
         const newFilePath = vscode.Uri.file(path.join(basePath, fileName));
         await vscode.workspace.fs.writeFile(newFilePath, new Uint8Array());
@@ -155,7 +157,7 @@ export async function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  const refreshFeaturesCmd = vscode.commands.registerCommand('saif.refreshFeatures', () => {
+  const refreshFeaturesCmd = vscode.commands.registerCommand('saifac.refreshFeatures', () => {
     featuresProvider.refresh();
   });
 
@@ -163,7 +165,7 @@ export async function activate(context: vscode.ExtensionContext) {
     item instanceof FeatureItem ? item.projectPath : workspaceRoot;
 
   const runFeatureCmd = vscode.commands.registerCommand(
-    'saif.runFeature',
+    'saifac.runFeature',
     withCliGuard((item?: vscode.TreeItem) => {
       const name = getItemName(item);
       const cwd = getCwdForFeature(item);
@@ -172,7 +174,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   const debugFeatureCmd = vscode.commands.registerCommand(
-    'saif.debugFeature',
+    'saifac.debugFeature',
     withCliGuard((item?: vscode.TreeItem) => {
       const name = getItemName(item);
       const cwd = getCwdForFeature(item);
@@ -181,7 +183,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   const designFeatureCmd = vscode.commands.registerCommand(
-    'saif.designFeature',
+    'saifac.designFeature',
     withCliGuard((item?: vscode.TreeItem) => {
       const name = getItemName(item);
       const cwd = getCwdForFeature(item);
@@ -194,7 +196,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // ============================================================================
 
   const refreshRunsCmd = vscode.commands.registerCommand(
-    'saif.refreshRuns',
+    'saifac.refreshRuns',
     withCliGuard(() => {
       runsProvider.refresh();
     }),
@@ -204,7 +206,7 @@ export async function activate(context: vscode.ExtensionContext) {
     item instanceof RunItem ? item.projectPath : workspaceRoot;
 
   const resumeRunCmd = vscode.commands.registerCommand(
-    'saif.resumeRun',
+    'saifac.resumeRun',
     withCliGuard((item?: vscode.TreeItem) => {
       const runId = item?.id ?? getItemName(item);
       const cwd = getCwdForRun(item);
@@ -213,7 +215,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   const removeRunCmd = vscode.commands.registerCommand(
-    'saif.removeRun',
+    'saifac.removeRun',
     withCliGuard(async (item?: vscode.TreeItem) => {
       const runId = item?.id ?? getItemName(item);
       const cwd = getCwdForRun(item);
@@ -225,7 +227,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   const clearAllRunsCmd = vscode.commands.registerCommand(
-    'saif.clearAllRuns',
+    'saifac.clearAllRuns',
     withCliGuard(async (item?: vscode.TreeItem) => {
       const targetCwd =
         item instanceof RunProjectItem ? path.join(workspaceRoot, item.projectName) : workspaceRoot;
@@ -235,19 +237,19 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   const revealRunInFinderCmd = vscode.commands.registerCommand(
-    'saif.revealRunInFinder',
+    'saifac.revealRunInFinder',
     (item?: vscode.TreeItem) => {
       const runId = item?.id ?? getItemName(item);
       const cwd = getCwdForRun(item);
       if (runId) {
-        const runFilePath = vscode.Uri.file(path.join(cwd, '.saif', 'runs', `${runId}.json`));
+        const runFilePath = vscode.Uri.file(path.join(cwd, '.saifac', 'runs', `${runId}.json`));
         void vscode.commands.executeCommand('revealFileInOS', runFilePath);
       }
     },
   );
 
   const copyRunIdCmd = vscode.commands.registerCommand(
-    'saif.copyRunId',
+    'saifac.copyRunId',
     async (item?: vscode.TreeItem) => {
       const runId = item?.id ?? getItemName(item);
       if (runId) {
@@ -258,7 +260,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   const copyRunNameCmd = vscode.commands.registerCommand(
-    'saif.copyRunName',
+    'saifac.copyRunName',
     async (item?: vscode.TreeItem) => {
       const name = item instanceof RunItem ? item.runData.name : getItemName(item);
       if (name) {
@@ -268,18 +270,18 @@ export async function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  const showLogsCmd = vscode.commands.registerCommand('saif.showLogs', () => {
+  const showLogsCmd = vscode.commands.registerCommand('saifac.showLogs', () => {
     saifLogger.show();
   });
 
-  const recheckInstallCmd = vscode.commands.registerCommand('saif.recheckInstall', async () => {
+  const recheckInstallCmd = vscode.commands.registerCommand('saifac.recheckInstall', async () => {
     const installed = await checkCliStatus();
     if (installed) {
-      vscode.window.showInformationMessage('SAIF CLI detected successfully!');
+      vscode.window.showInformationMessage('SAIFAC CLI detected successfully!');
       featuresProvider.refresh();
       runsProvider.refresh();
     } else {
-      vscode.window.showErrorMessage('SAIF CLI still not found in PATH.');
+      vscode.window.showErrorMessage('SAIFAC CLI still not found in PATH.');
     }
   });
 

@@ -1,18 +1,18 @@
-# saif feat design-discovery
+# saifac feat design-discovery
 
 Gather context using MCP servers and/or local tool scripts — optional step before `design-specs`.
 
-Runs an AI discovery agent with your configured tools to produce `discovery.md` in the feature directory (`saif/features/<name>/discovery.md`).
+Runs an AI discovery agent with your configured tools to produce `discovery.md` in the feature directory (`saifac/features/<name>/discovery.md`).
 
-Once this file exists, any subsequent runs of `saif feat design-specs` (or `saif feat design`) will automatically inject the contents of `discovery.md` as additional context alongside your `proposal.md`.
+Once this file exists, any subsequent runs of `saifac feat design-specs` (or `saifac feat design`) will automatically inject the contents of `discovery.md` as additional context alongside your `proposal.md`.
 
 **Requires** `discoveryMcps` or `discoveryTools` (via CLI or config). Without either, the command errors.
 
 ## Usage
 
 ```bash
-saif feat design-discovery [options]
-saif feature design-discovery [options]
+saifac feat design-discovery [options]
+saifac feature design-discovery [options]
 ```
 
 ## Arguments
@@ -27,7 +27,7 @@ saif feature design-discovery [options]
 | `--discovery-prompt-file` | —     | string  | Path to heuristic prompt file. Mutually exclusive with `--discovery-prompt`.                        |
 | `--model`                 | —     | string  | LLM model for the discovery agent (see [models.md](../models.md)).                                  |
 | `--base-url`              | —     | string  | LLM base URL.                                                                                       |
-| `--saif-dir`              | —     | string  | Path to saif directory (default: `saif`)                                                            |
+| `--saifac-dir`            | —     | string  | Path to saifac directory (default: `saifac`)                                                        |
 | `--project-dir`           | —     | string  | Project directory (default: current working directory)                                              |
 
 ## Examples
@@ -54,16 +54,16 @@ export default { myTool };
 ```
 
 ```bash
-saif feat design-discovery -n add-login --discovery-tool ./scripts/my-tools.ts
+saifac feat design-discovery -n add-login --discovery-tool ./scripts/my-tools.ts
 ```
 
 ### With an MCP server
 
 ```bash
-saif feat design-discovery --discovery-mcp schema=http://internal-mcp/schema
+saifac feat design-discovery --discovery-mcp schema=http://internal-mcp/schema
 ```
 
-Config-based (in `saif/config.json`):
+Config-based (in `saifac/config.json`):
 
 ```json
 {
@@ -76,5 +76,5 @@ Config-based (in `saif/config.json`):
 ```
 
 ```bash
-saif feat design-discovery -n add-login
+saifac feat design-discovery -n add-login
 ```

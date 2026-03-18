@@ -68,7 +68,7 @@ async function loadMcpTools(mcpName: string, urlOrValue: string): Promise<Record
   const url = parseMcpUrl(urlOrValue);
   const transport = new StreamableHTTPClientTransport(url);
 
-  const client = new Client({ name: 'saif-discovery', version: '1.0.0' }, { capabilities: {} });
+  const client = new Client({ name: 'saifac-discovery', version: '1.0.0' }, { capabilities: {} });
 
   await client.connect(transport);
 

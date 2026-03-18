@@ -18,15 +18,15 @@ export OPENAI_API_KEY=sk-...
 # picks openrouter/anthropic/claude-sonnet-4-6
 export OPENROUTER_API_KEY=sk-or-...
 
-saif feat run
+saifac feat run
 ```
 
 To use a specific model, add `--model` to any command:
 
 ```sh
-saif feat design-specs --model anthropic/claude-opus-4-5
+saifac feat design-specs --model anthropic/claude-opus-4-5
 
-saif feat run --model openai/gpt-4o
+saifac feat run --model openai/gpt-4o
 ```
 
 ---
@@ -82,19 +82,19 @@ Set the model. Same pattern as `--storage`: single global or comma-separated `ag
 
 ```sh
 # Single global — all agents use Claude
-saif feat design --model anthropic/claude-sonnet-4-6
+saifac feat design --model anthropic/claude-sonnet-4-6
 
 # Use GPT-4o for the coding agent loop
-saif feat run --model openai/gpt-4o
+saifac feat run --model openai/gpt-4o
 
 # Agent-specific — override one agent
-saif feat run --model pr-summarizer=openai/gpt-4o-mini
+saifac feat run --model pr-summarizer=openai/gpt-4o-mini
 
 # Multiple agent-specific (comma-separated)
-saif feat run --model coder=openai/o3,results-judge=anthropic/claude-opus-4-5
+saifac feat run --model coder=openai/o3,vague-specs-check=anthropic/claude-opus-4-5
 
 # Mixed — global default + overrides
-saif feat run --model anthropic/claude-sonnet-4-6,pr-summarizer=openai/gpt-4o-mini
+saifac feat run --model anthropic/claude-sonnet-4-6,pr-summarizer=openai/gpt-4o-mini
 ```
 
 ### `--base-url <url>`
@@ -103,25 +103,25 @@ Override the API endpoint. Same pattern as `--model`: single global, agent-speci
 
 ```sh
 # Single global — all agents
-saif feat run \
+saifac feat run \
   --model ollama/qwen2.5-coder:32b \
   --base-url http://localhost:11434/v1
 
 # Custom proxy (global)
-saif feat design \
+saifac feat design \
   --model myproxy/claude-3-5-sonnet \
   --base-url https://myproxy.example.com/v1
 
 # Agent-specific
-saif feat run \
+saifac feat run \
   --model coder=qwen2.5-coder:32b \
   --base-url coder=http://localhost:11434/v1
 
 # Multiple agent-specific
-saif feat run --base-url coder=http://localhost:11434/v1,results-judge=https://api.openai.com/v1
+saifac feat run --base-url coder=http://localhost:11434/v1,vague-specs-check=https://api.openai.com/v1
 
 # Mixed — global + agent override
-saif feat run --base-url https://myproxy.example.com/v1,pr-summarizer=https://api.openai.com/v1
+saifac feat run --base-url https://myproxy.example.com/v1,pr-summarizer=https://api.openai.com/v1
 ```
 
 At most one global value (e.g. `--base-url https://a,https://b` errors). URLs with query params (`?x=y`) are correctly treated as globals.
@@ -174,28 +174,28 @@ Keys are checked in the order listed above; the first match wins.
 
 ## Agent reference
 
-| Agent                             | ID              | Commands                                         |
-| --------------------------------- | --------------- | ------------------------------------------------ |
-| Coding agent<br/>(e.g. OpenHands) | `coder`         | `feat run`<br/>`feat run resume`                 |
-| Tests planner                     | `tests-planner` | `feat design-tests`<br/>`feat design`            |
-| Tests cataloger                   | `tests-catalog` | `feat design-tests`<br/>`feat design`            |
-| Tests writer                      | `tests-writer`  | `feat design-tests`<br/>`feat design`            |
-| Results judge                     | `results-judge` | `feat run`<br/>`feat run resume`<br/>`feat test` |
-| PR summarizer                     | `pr-summarizer` | `feat run`<br/>`feat run resume`<br/>`feat test` |
-| Semantic reviewer                 | `reviewer`      | `feat run`<br/>`feat run resume`                 |
+| Agent                             | ID                  | Commands                                         |
+| --------------------------------- | ------------------- | ------------------------------------------------ |
+| Coding agent<br/>(e.g. OpenHands) | `coder`             | `feat run`<br/>`feat run resume`                 |
+| Tests planner                     | `tests-planner`     | `feat design-tests`<br/>`feat design`            |
+| Tests cataloger                   | `tests-catalog`     | `feat design-tests`<br/>`feat design`            |
+| Tests writer                      | `tests-writer`      | `feat design-tests`<br/>`feat design`            |
+| Vague Specs checker               | `vague-specs-check` | `feat run`<br/>`feat run resume`<br/>`feat test` |
+| PR summarizer                     | `pr-summarizer`     | `feat run`<br/>`feat run resume`<br/>`feat test` |
+| Semantic reviewer                 | `reviewer`          | `feat run`<br/>`feat run resume`                 |
 
 **Example — override agents individually:**
 
 ```sh
-saif feat run --model coder=openai/o3,results-judge=anthropic/claude-opus-4-5
+saifac feat run --model coder=openai/o3,vague-specs-check=anthropic/claude-opus-4-5
 ```
 
 **Typical pattern — strong model for reasoning, cheaper model for utility tasks:**
 
 ```sh
-# Flagship model for the coder + results judge,
+# Flagship model for the coder + vague specs checker,
 # mini model for PR summaries
-saif feat run --model anthropic/claude-sonnet-4-6,pr-summarizer=openai/gpt-4o-mini
+saifac feat run --model anthropic/claude-sonnet-4-6,pr-summarizer=openai/gpt-4o-mini
 ```
 
 ---
