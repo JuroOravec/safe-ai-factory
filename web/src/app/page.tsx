@@ -17,7 +17,8 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { WaitlistModal } from '../components/WaitlistModal';
 import { GITHUB_REPO } from '../constants';
-import { type SectionId, track } from '../lib/analytics';
+import { track } from '../lib/analytics';
+import { type SectionId } from '../lib/analytics/types';
 
 // URLs
 const GITHUB_REPO_TRY_IT = `${GITHUB_REPO}#try-it-out-now`;
@@ -459,7 +460,7 @@ export default function Home() {
             </motion.div>
           </div>
 
-          {/* saif prove CTA */}
+          {/* saifac prove CTA */}
           <ProveItCTA />
         </section>
 
@@ -882,7 +883,7 @@ export default function Home() {
             </a>
           </div>
 
-          {/* saif prove CTA */}
+          {/* saifac prove CTA */}
           <ProveItCTA />
         </section>
       </main>
