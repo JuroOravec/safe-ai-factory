@@ -5,7 +5,6 @@
  * or the filesystem. Also includes filesystem-based tests for removeAllHiddenDirs.
  */
 
-import { execSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -20,7 +19,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { resolveFeature } from '../specs/discover.js';
-import { gitAdd, gitCommit, gitInit } from '../utils/git.js';
+import { git, gitAdd, gitCommit, gitInit } from '../utils/git.js';
 import { createSandbox, destroySandbox, filterPatchHunks, removeAllHiddenDirs } from './sandbox.js';
 
 const PATCH_TWO_FILES = `\
@@ -68,7 +67,7 @@ describe('filterPatchHunks', () => {
 });
 
 describe('removeAllHiddenDirs', () => {
-  it('removes all hidden/ dirs recursively under baseDir', () => {
+  it('removes all hidden/ dirs recursively under baseDir', async () => {
     const tmp = mkdtempSync(join(process.cwd(), 'sandbox-test-'));
     try {
       // feat-a/tests/public, feat-a/tests/hidden
@@ -82,7 +81,7 @@ describe('removeAllHiddenDirs', () => {
       mkdirSync(join(tmp, 'feat-c', 'nested', 'hidden'), { recursive: true });
       writeFileSync(join(tmp, 'feat-c', 'nested', 'hidden', 'deep.ts'), '');
 
-      const removed = removeAllHiddenDirs(tmp);
+      const removed = await removeAllHiddenDirs(tmp);
 
       expect(removed).toBe(3);
       expect(existsSync(join(tmp, 'feat-a', 'tests', 'hidden'))).toBe(false);
@@ -94,18 +93,18 @@ describe('removeAllHiddenDirs', () => {
     }
   });
 
-  it('returns 0 when baseDir does not exist', () => {
-    const removed = removeAllHiddenDirs('/nonexistent/path/xyz');
+  it('returns 0 when baseDir does not exist', async () => {
+    const removed = await removeAllHiddenDirs('/nonexistent/path/xyz');
     expect(removed).toBe(0);
   });
 
-  it('returns 0 when no hidden dirs are present', () => {
+  it('returns 0 when no hidden dirs are present', async () => {
     const tmp = mkdtempSync(join(process.cwd(), 'sandbox-test-'));
     try {
       mkdirSync(join(tmp, 'feat', 'tests', 'public'), { recursive: true });
       writeFileSync(join(tmp, 'feat', 'tests', 'public', 'foo.spec.ts'), '');
 
-      const removed = removeAllHiddenDirs(tmp);
+      const removed = await removeAllHiddenDirs(tmp);
 
       expect(removed).toBe(0);
     } finally {
@@ -242,11 +241,11 @@ describe('createSandbox + destroySandbox (integration)', () => {
       expect(copiedCatalog.testCases[0].id).toBe('tc-public-001');
 
       // 5. Assert clean git (one commit "Base state")
-      const commitCount = execSync('git rev-list --count HEAD', { cwd: codePath })
-        .toString()
-        .trim();
+      const commitCount = (
+        await git({ cwd: codePath, args: ['rev-list', '--count', 'HEAD'] })
+      ).trim();
       expect(commitCount).toBe('1');
-      const lastMsg = execSync('git log -1 --format=%s', { cwd: codePath }).toString().trim();
+      const lastMsg = (await git({ cwd: codePath, args: ['log', '-1', '--format=%s'] })).trim();
       expect(lastMsg).toBe('Base state');
 
       // 6. Assert .git from source was NOT copied (fresh init), and code has .git
@@ -266,7 +265,7 @@ describe('createSandbox + destroySandbox (integration)', () => {
       }
 
       // 8. Destroy sandbox
-      destroySandbox(sandboxBasePath);
+      await destroySandbox(sandboxBasePath);
 
       // 9. Assert sandbox dir is gone
       expect(existsSync(sandboxBasePath)).toBe(false);
@@ -401,13 +400,13 @@ describe('createSandbox + destroySandbox (integration)', () => {
       expect(copiedCatalog.testCases[0].id).toBe('tc-public-001');
 
       // 5. Assert clean git
-      const commitCount = execSync('git rev-list --count HEAD', { cwd: codePath })
-        .toString()
-        .trim();
+      const commitCount = (
+        await git({ cwd: codePath, args: ['rev-list', '--count', 'HEAD'] })
+      ).trim();
       expect(commitCount).toBe('1');
 
       // 6. Destroy sandbox
-      destroySandbox(sandboxBasePath);
+      await destroySandbox(sandboxBasePath);
       expect(existsSync(sandboxBasePath)).toBe(false);
     } finally {
       rmSync(projectDir, { recursive: true, force: true });

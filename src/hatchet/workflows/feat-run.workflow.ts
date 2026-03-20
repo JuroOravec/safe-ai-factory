@@ -422,7 +422,7 @@ export function createFeatRunWorkflow() {
       const sandboxRaw = await ctx.parentOutput(provisionTask);
       const opts = deserializeOrchestratorOpts(input.serializedOpts);
 
-      destroySandbox(sandboxRaw.sandboxBasePath);
+      await destroySandbox(sandboxRaw.sandboxBasePath);
 
       if (!loopResult.success) {
         return { applied: false };

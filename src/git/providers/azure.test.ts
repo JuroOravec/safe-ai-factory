@@ -47,69 +47,72 @@ describe('AzureReposProvider.resolvePushUrl', () => {
     vi.restoreAllMocks();
   });
 
-  it('passes through a full HTTPS URL unchanged when no token is set', () => {
+  it('passes through a full HTTPS URL unchanged when no token is set', async () => {
     const p = makeProvider();
     const url = 'https://dev.azure.com/myorg/myproject/_git/myrepo';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('injects AZURE_DEVOPS_TOKEN into a dev.azure.com HTTPS URL', () => {
+  it('injects AZURE_DEVOPS_TOKEN into a dev.azure.com HTTPS URL', async () => {
     process.env.AZURE_DEVOPS_TOKEN = 'mytoken';
     const p = makeProvider();
-    const result = p.resolvePushUrl('https://dev.azure.com/myorg/myproject/_git/myrepo', FAKE_ROOT);
+    const result = await p.resolvePushUrl(
+      'https://dev.azure.com/myorg/myproject/_git/myrepo',
+      FAKE_ROOT,
+    );
     expect(result).toContain('pat:mytoken@dev.azure.com');
   });
 
-  it('does not inject token into non-Azure HTTPS URLs', () => {
+  it('does not inject token into non-Azure HTTPS URLs', async () => {
     process.env.AZURE_DEVOPS_TOKEN = 'mytoken';
     const p = makeProvider();
     const url = 'https://github.com/owner/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('passes through git@ SSH URLs unchanged even when token is set', () => {
+  it('passes through git@ SSH URLs unchanged even when token is set', async () => {
     process.env.AZURE_DEVOPS_TOKEN = 'mytoken';
     const p = makeProvider();
     const url = 'git@ssh.dev.azure.com:v3/myorg/myproject/myrepo';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('passes through ssh:// URLs unchanged even when token is set', () => {
+  it('passes through ssh:// URLs unchanged even when token is set', async () => {
     process.env.AZURE_DEVOPS_TOKEN = 'mytoken';
     const p = makeProvider();
     const url = 'ssh://git@ssh.dev.azure.com:22/myorg/myproject/myrepo';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('injects AZURE_DEVOPS_TOKEN into a legacy visualstudio.com HTTPS URL', () => {
+  it('injects AZURE_DEVOPS_TOKEN into a legacy visualstudio.com HTTPS URL', async () => {
     process.env.AZURE_DEVOPS_TOKEN = 'mytoken';
     const p = makeProvider();
-    const result = p.resolvePushUrl(
+    const result = await p.resolvePushUrl(
       'https://myorg.visualstudio.com/myproject/_git/myrepo',
       FAKE_ROOT,
     );
     expect(result).toContain('pat:mytoken@myorg.visualstudio.com');
   });
 
-  it('expands an org/project/repo slug to a full dev.azure.com URL', () => {
+  it('expands an org/project/repo slug to a full dev.azure.com URL', async () => {
     const p = makeProvider();
-    const result = p.resolvePushUrl('myorg/myproject/myrepo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('myorg/myproject/myrepo', FAKE_ROOT);
     expect(result).toBe('https://dev.azure.com/myorg/myproject/_git/myrepo');
   });
 
-  it('injects token when expanding a slug', () => {
+  it('injects token when expanding a slug', async () => {
     process.env.AZURE_DEVOPS_TOKEN = 'tok';
     const p = makeProvider();
-    const result = p.resolvePushUrl('myorg/myproject/myrepo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('myorg/myproject/myrepo', FAKE_ROOT);
     expect(result).toContain('pat:tok@dev.azure.com');
     expect(result).toContain('/myorg/myproject/_git/myrepo');
   });
 
-  it('throws for an unknown remote name when git remote get-url fails', () => {
+  it('throws for an unknown remote name when git remote get-url fails', async () => {
     const p = makeProvider();
-    expect(() => p.resolvePushUrl('nonexistent-remote', '/tmp/not-a-real-git-repo')).toThrow(
-      /Cannot resolve push target "nonexistent-remote"/,
-    );
+    await expect(
+      p.resolvePushUrl('nonexistent-remote', '/tmp/not-a-real-git-repo'),
+    ).rejects.toThrow(/Cannot resolve push target "nonexistent-remote"/);
   });
 });
 
@@ -118,79 +121,84 @@ describe('AzureReposProvider.resolvePushUrl', () => {
 // ---------------------------------------------------------------------------
 
 describe('AzureReposProvider.extractRepoSlug', () => {
-  it('extracts org/project/repo from an HTTPS URL', () => {
+  it('extracts org/project/repo from an HTTPS URL', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('https://dev.azure.com/myorg/myproject/_git/myrepo', FAKE_ROOT)).toBe(
+    expect(
+      await p.extractRepoSlug('https://dev.azure.com/myorg/myproject/_git/myrepo', FAKE_ROOT),
+    ).toBe('myorg/myproject/myrepo');
+  });
+
+  it('extracts org/project/repo from an HTTPS URL with .git suffix', async () => {
+    const p = makeProvider();
+    expect(
+      await p.extractRepoSlug('https://dev.azure.com/myorg/myproject/_git/myrepo.git', FAKE_ROOT),
+    ).toBe('myorg/myproject/myrepo');
+  });
+
+  it('extracts org/project/repo from a git@ SSH SCP URL', async () => {
+    const p = makeProvider();
+    expect(
+      await p.extractRepoSlug('git@ssh.dev.azure.com:v3/myorg/myproject/myrepo', FAKE_ROOT),
+    ).toBe('myorg/myproject/myrepo');
+  });
+
+  it('extracts org/project/repo from a git@ SSH SCP URL with .git suffix', async () => {
+    const p = makeProvider();
+    expect(
+      await p.extractRepoSlug('git@ssh.dev.azure.com:v3/myorg/myproject/myrepo.git', FAKE_ROOT),
+    ).toBe('myorg/myproject/myrepo');
+  });
+
+  it('extracts org/project/repo from an ssh:// URL with port', async () => {
+    const p = makeProvider();
+    expect(
+      await p.extractRepoSlug('ssh://git@ssh.dev.azure.com:22/myorg/myproject/myrepo', FAKE_ROOT),
+    ).toBe('myorg/myproject/myrepo');
+  });
+
+  it('extracts org/project/repo from an ssh:// URL without port', async () => {
+    const p = makeProvider();
+    expect(
+      await p.extractRepoSlug('ssh://git@ssh.dev.azure.com/myorg/myproject/myrepo.git', FAKE_ROOT),
+    ).toBe('myorg/myproject/myrepo');
+  });
+
+  it('returns a slug shorthand as-is', async () => {
+    const p = makeProvider();
+    expect(await p.extractRepoSlug('myorg/myproject/myrepo', FAKE_ROOT)).toBe(
       'myorg/myproject/myrepo',
     );
   });
 
-  it('extracts org/project/repo from an HTTPS URL with .git suffix', () => {
+  it('extracts org/project/repo from a legacy visualstudio.com HTTPS URL', async () => {
     const p = makeProvider();
     expect(
-      p.extractRepoSlug('https://dev.azure.com/myorg/myproject/_git/myrepo.git', FAKE_ROOT),
+      await p.extractRepoSlug('https://myorg.visualstudio.com/myproject/_git/myrepo', FAKE_ROOT),
     ).toBe('myorg/myproject/myrepo');
   });
 
-  it('extracts org/project/repo from a git@ SSH SCP URL', () => {
-    const p = makeProvider();
-    expect(p.extractRepoSlug('git@ssh.dev.azure.com:v3/myorg/myproject/myrepo', FAKE_ROOT)).toBe(
-      'myorg/myproject/myrepo',
-    );
-  });
-
-  it('extracts org/project/repo from a git@ SSH SCP URL with .git suffix', () => {
+  it('extracts org/project/repo from a legacy visualstudio.com URL with .git suffix', async () => {
     const p = makeProvider();
     expect(
-      p.extractRepoSlug('git@ssh.dev.azure.com:v3/myorg/myproject/myrepo.git', FAKE_ROOT),
+      await p.extractRepoSlug(
+        'https://myorg.visualstudio.com/myproject/_git/myrepo.git',
+        FAKE_ROOT,
+      ),
     ).toBe('myorg/myproject/myrepo');
   });
 
-  it('extracts org/project/repo from an ssh:// URL with port', () => {
+  it('throws when the URL does not match Azure Repos patterns', async () => {
     const p = makeProvider();
-    expect(
-      p.extractRepoSlug('ssh://git@ssh.dev.azure.com:22/myorg/myproject/myrepo', FAKE_ROOT),
-    ).toBe('myorg/myproject/myrepo');
-  });
-
-  it('extracts org/project/repo from an ssh:// URL without port', () => {
-    const p = makeProvider();
-    expect(
-      p.extractRepoSlug('ssh://git@ssh.dev.azure.com/myorg/myproject/myrepo.git', FAKE_ROOT),
-    ).toBe('myorg/myproject/myrepo');
-  });
-
-  it('returns a slug shorthand as-is', () => {
-    const p = makeProvider();
-    expect(p.extractRepoSlug('myorg/myproject/myrepo', FAKE_ROOT)).toBe('myorg/myproject/myrepo');
-  });
-
-  it('extracts org/project/repo from a legacy visualstudio.com HTTPS URL', () => {
-    const p = makeProvider();
-    expect(
-      p.extractRepoSlug('https://myorg.visualstudio.com/myproject/_git/myrepo', FAKE_ROOT),
-    ).toBe('myorg/myproject/myrepo');
-  });
-
-  it('extracts org/project/repo from a legacy visualstudio.com URL with .git suffix', () => {
-    const p = makeProvider();
-    expect(
-      p.extractRepoSlug('https://myorg.visualstudio.com/myproject/_git/myrepo.git', FAKE_ROOT),
-    ).toBe('myorg/myproject/myrepo');
-  });
-
-  it('throws when the URL does not match Azure Repos patterns', () => {
-    const p = makeProvider();
-    expect(() => p.extractRepoSlug('https://github.com/owner/repo.git', FAKE_ROOT)).toThrow(
+    await expect(p.extractRepoSlug('https://github.com/owner/repo.git', FAKE_ROOT)).rejects.toThrow(
       /Cannot extract Azure org\/project\/repo/,
     );
   });
 
-  it('throws for an unresolvable remote name', () => {
+  it('throws for an unresolvable remote name', async () => {
     const p = makeProvider();
-    expect(() => p.extractRepoSlug('nonexistent-remote', '/tmp/not-a-real-git-repo')).toThrow(
-      /Cannot resolve remote/,
-    );
+    await expect(
+      p.extractRepoSlug('nonexistent-remote', '/tmp/not-a-real-git-repo'),
+    ).rejects.toThrow(/Cannot resolve remote/);
   });
 });
 

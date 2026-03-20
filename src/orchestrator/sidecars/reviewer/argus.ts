@@ -5,12 +5,12 @@
  * Binaries are stored at src/orchestrator/argus/out/argus-linux-{arch}.
  */
 
-import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { arch } from 'node:os';
 import { join } from 'node:path';
 
 import { getSaifRoot } from '../../../constants.js';
+import { spawnAsync } from '../../../utils/io.js';
 
 const ARGUS_VERSION = '0.5.2';
 /** GitHub release tag. Argus uses argus-review-vX.Y.Z for the review CLI. */
@@ -38,7 +38,7 @@ function getBinaryPath(hostArch: 'arm64' | 'x64'): string {
  * @param hostArch - 'arm64' (Apple Silicon) or 'x64' (Intel/AMD). Docker on macOS uses
  *   the same arch as the host, so we fetch the matching Linux binary.
  */
-export function ensureArgusBinary(hostArch: 'arm64' | 'x64'): string {
+export async function ensureArgusBinary(hostArch: 'arm64' | 'x64'): Promise<string> {
   const binaryPath = getBinaryPath(hostArch);
   if (existsSync(binaryPath)) {
     return binaryPath;
@@ -57,7 +57,12 @@ export function ensureArgusBinary(hostArch: 'arm64' | 'x64'): string {
 
   console.log(`[argus] Downloading v${ARGUS_VERSION} for Linux ${hostArch}...`);
   try {
-    execSync(`curl -sfL -o "${tmpTar}" "${url}"`, { stdio: 'inherit' });
+    await spawnAsync({
+      command: 'curl',
+      args: ['-sfL', '-o', tmpTar, url],
+      cwd: outDir,
+      stdio: 'inherit',
+    });
   } catch {
     throw new Error(
       `[argus] Failed to download binary from ${url}. ` +
@@ -69,18 +74,23 @@ export function ensureArgusBinary(hostArch: 'arm64' | 'x64'): string {
   // Extract the 'argus' binary from the tarball. The archive contains a single file named 'argus'.
   const tmpExtract = join(outDir, `tmp-extract-${hostArch}`);
   mkdirSync(tmpExtract, { recursive: true });
-  execSync(`tar -xzf "${tmpTar}" -C "${tmpExtract}"`, { stdio: 'inherit' });
+  await spawnAsync({
+    command: 'tar',
+    args: ['-xzf', tmpTar, '-C', tmpExtract],
+    cwd: outDir,
+    stdio: 'inherit',
+  });
 
   // Find the binary (could be at root or in a subdir)
   const extracted = findArgusBinary(tmpExtract);
   if (!extracted) {
-    execSync(`rm -rf "${tmpExtract}" "${tmpTar}"`);
+    await spawnAsync({ command: 'rm', args: ['-rf', tmpExtract, tmpTar], cwd: process.cwd() });
     throw new Error(`Could not find argus binary in archive from ${url}`);
   }
 
-  execSync(`mv "${extracted}" "${binaryPath}"`);
-  execSync(`chmod +x "${binaryPath}"`);
-  execSync(`rm -rf "${tmpExtract}" "${tmpTar}"`);
+  await spawnAsync({ command: 'mv', args: [extracted, binaryPath], cwd: process.cwd() });
+  await spawnAsync({ command: 'chmod', args: ['+x', binaryPath], cwd: process.cwd() });
+  await spawnAsync({ command: 'rm', args: ['-rf', tmpExtract, tmpTar], cwd: process.cwd() });
 
   console.log(`[argus] Installed to ${binaryPath}`);
   return binaryPath;
@@ -103,7 +113,7 @@ function findArgusBinary(dir: string): string | null {
  * Returns the path to the Argus binary for the current host architecture.
  * Ensures it exists (downloads if missing).
  */
-export function getArgusBinaryPath(): string {
+export async function getArgusBinaryPath(): Promise<string> {
   const hostArch = arch();
   const targetArch = hostArch === 'arm64' ? 'arm64' : 'x64';
   return ensureArgusBinary(targetArch);

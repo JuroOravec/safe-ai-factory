@@ -5,7 +5,7 @@
  * Exported as runCheck() for use by the commands CLI.
  */
 
-import { spawn } from 'node:child_process';
+import { spawnUserCmd, spawnUserCmdCapture } from '../utils/io.js';
 
 const phases = [
   { name: 'Types', command: 'npx tsc --noEmit' },
@@ -22,38 +22,21 @@ async function runPhase(opts: {
   captureOutput: boolean;
 }): Promise<string> {
   const { name, command, captureOutput } = opts;
-  return new Promise((resolve, reject) => {
-    const [cmd, ...cmdArgs] = command.split(' ');
-
-    const child = spawn(cmd, cmdArgs, {
-      stdio: captureOutput ? 'pipe' : 'inherit',
-      // Ensure commands like 'npm' and 'npx' can be spawned properly,
-      // especially on windows, but generally shell:true helps cross-platform with npm
-      shell: true,
-    });
-
-    let output = '';
-    if (captureOutput) {
-      child.stdout?.on('data', (data: string | Buffer) => {
-        output += String(data);
-      });
-      child.stderr?.on('data', (data: string | Buffer) => {
-        output += String(data);
-      });
+  if (captureOutput) {
+    try {
+      return await spawnUserCmdCapture(command, { cwd: process.cwd() });
+    } catch (error: unknown) {
+      const err = error as { output?: string; code?: number; command?: string };
+      throw { name, command, output: err.output ?? '', code: err.code ?? 1 };
     }
-
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve(output);
-      } else {
-        reject({ name, command, output, code });
-      }
-    });
-
-    child.on('error', (err) => {
-      reject({ name, command, output: output + err.message, code: 1 });
-    });
-  });
+  }
+  try {
+    await spawnUserCmd({ script: command, cwd: process.cwd(), stdio: 'inherit' });
+    return '';
+  } catch (error: unknown) {
+    const err = error as Error & { code?: number };
+    throw { name, command, output: err.message ?? '', code: err.code ?? 1 };
+  }
 }
 
 /**

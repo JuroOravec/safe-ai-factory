@@ -32,7 +32,7 @@ export interface GitProvider {
    *   - A provider-style slug (e.g. 'owner/repo') — expanded to the provider's HTTPS URL
    *   - A named git remote (e.g. 'origin') — resolved via `git remote get-url`
    */
-  resolvePushUrl(push: string, projectDir: string): string;
+  resolvePushUrl(push: string, projectDir: string): Promise<string>;
 
   /**
    * Extracts the repository identifier from a push target, in the format
@@ -42,7 +42,7 @@ export interface GitProvider {
    * For GitLab a full project path like 'group/subgroup/repo' may be needed —
    * each provider implementation handles its own slug format.
    */
-  extractRepoSlug(push: string, projectDir: string): string;
+  extractRepoSlug(push: string, projectDir: string): Promise<string>;
 
   /**
    * Opens a Pull Request (or Merge Request) via the provider's REST API.

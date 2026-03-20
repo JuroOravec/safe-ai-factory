@@ -2,22 +2,19 @@
  * CLI execution wrapper for the saifac command-line tool.
  *
  * Two execution modes:
- * - Background (child_process.exec): Quick, non-interactive commands — list runs,
+ * - Background (spawnUserCmdCapture): Quick, non-interactive commands — list runs,
  *   finish feature, remove run. Output parsed without disturbing the workspace.
  * - Terminal (vscode.window.createTerminal): Long-running agent tasks — run,
  *   debug, design. User sees streaming output and can interact.
  */
 
-import { exec } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import * as util from 'node:util';
 
 import * as vscode from 'vscode';
 
 import { saifLogger } from './logger';
-
-const execAsync = util.promisify(exec);
+import { spawnUserCmdCapture } from './userCmdCapture.js';
 
 /** Run artifact shape when reading from .saifac/runs/*.json */
 interface RunArtifact {
@@ -40,7 +37,7 @@ export class SaifCliService {
       return true;
     }
     try {
-      await execAsync('saifac --help');
+      await spawnUserCmdCapture('saifac --help', { cwd: process.cwd() });
       return true;
     } catch {
       return false;
@@ -56,13 +53,9 @@ export class SaifCliService {
       saifLogger.info(`Executing: ${command}`);
       saifLogger.debug(`CWD: ${cwd}`);
 
-      const { stdout, stderr } = await execAsync(command, { cwd });
-
-      if (stderr && stderr.trim().length > 0) {
-        saifLogger.warn(`CLI Warning/Stderr: ${stderr}`);
-      }
-      saifLogger.trace(`Stdout: ${stdout}`);
-      return stdout.trim();
+      const out = await spawnUserCmdCapture(command, { cwd });
+      saifLogger.trace(`Output: ${out}`);
+      return out.trim();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;

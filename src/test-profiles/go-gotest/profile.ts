@@ -1,6 +1,6 @@
-import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
+import { spawnWait } from '../../utils/io.js';
 import type { TestProfile, ValidateFilesOpts } from '../types.js';
 
 /**
@@ -8,7 +8,7 @@ import type { TestProfile, ValidateFilesOpts } from '../types.js';
  * Runs against the public/ and hidden/ subdirectories so the package context
  * is correct. Skips silently if `go` is not on PATH.
  */
-function gotestValidateFiles(opts: ValidateFilesOpts): void {
+async function gotestValidateFiles(opts: ValidateFilesOpts): Promise<void> {
   const { testsDir, generatedFiles } = opts;
   if (generatedFiles.length === 0) return;
   if (!generatedFiles.some((f) => f.endsWith('_test.go'))) return;
@@ -26,14 +26,14 @@ function gotestValidateFiles(opts: ValidateFilesOpts): void {
 
   try {
     for (const dir of subdirs) {
-      const result = spawnSync('go', ['vet', './...'], {
+      const result = await spawnWait({
+        command: 'go',
+        args: ['vet', './...'],
         cwd: dir,
-        encoding: 'utf8',
-        timeout: 30_000,
+        timeoutMs: 30_000,
       });
-      if (result.error) throw result.error; // binary not found → ENOENT
-      if (result.status !== 0) {
-        const output = (result.stdout ?? '') + (result.stderr ?? '');
+      if (result.code !== 0) {
+        const output = result.stdout + result.stderr;
         console.error(`  ${opts.errMessage}`);
         for (const line of output.split('\n').filter(Boolean).slice(0, 20)) {
           console.error(`    ${line}`);

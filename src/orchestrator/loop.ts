@@ -260,7 +260,7 @@ export async function runIterativeLoop(
       ? {
           llmConfig: resolveAgentLlmConfig('reviewer', overrides),
           scriptPath: join(getSaifRoot(), 'src', 'orchestrator', 'scripts', 'reviewer.sh'),
-          argusBinaryPath: getArgusBinaryPath(),
+          argusBinaryPath: await getArgusBinaryPath(),
         }
       : null;
   // Always exclude saifac/ and .git/hooks/ regardless of any additional caller-supplied rules.
@@ -306,7 +306,7 @@ export async function runIterativeLoop(
       }
     }
     if (!sandboxDestroyed) {
-      destroySandbox(sandbox.sandboxBasePath);
+      await destroySandbox(sandbox.sandboxBasePath);
     }
   };
 
@@ -460,7 +460,7 @@ export async function runIterativeLoop(
             overrides,
             verbose: opts.verbose,
           });
-          destroySandbox(sandbox.sandboxBasePath);
+          await destroySandbox(sandbox.sandboxBasePath);
           sandboxDestroyed = true;
 
           return {
@@ -470,7 +470,7 @@ export async function runIterativeLoop(
           };
         } else if (result.status === 'aborted') {
           console.log(`\n[orchestrator] Tests aborted after ${attempts} attempt(s).`);
-          destroySandbox(sandbox.sandboxBasePath);
+          await destroySandbox(sandbox.sandboxBasePath);
           sandboxDestroyed = true;
           return {
             success: false,

@@ -122,14 +122,14 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
 
     // 4. Push
     if (push) {
-      const pushUrl = gitProvider.resolvePushUrl(push, projectDir);
+      const pushUrl = await gitProvider.resolvePushUrl(push, projectDir);
       console.log(`[orchestrator] Pushing ${branchName} to remote...`);
       await gitPush({ cwd: wtPath, env: gitEnv, remote: pushUrl, branch: branchName });
       console.log(`[orchestrator] Branch ${branchName} pushed.`);
 
       // 5. Create PR
       if (pr) {
-        const repoSlug = gitProvider.extractRepoSlug(push, projectDir);
+        const repoSlug = await gitProvider.extractRepoSlug(push, projectDir);
 
         // 5a. Generate AI title + body; fall back to generic strings on any error.
         let prTitle = `feat(${feature.name}): auto-generated implementation`;

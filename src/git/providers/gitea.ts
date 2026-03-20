@@ -1,5 +1,4 @@
-import { execSync } from 'node:child_process';
-
+import { gitRemoteGetUrl } from '../../utils/git.js';
 import type { GitProvider, PullRequestOpts } from '../types.js';
 
 const DEFAULT_GITEA_HOST = 'gitea.com';
@@ -40,7 +39,7 @@ export class GiteaProvider implements GitProvider {
    * env vars must be set; if either is absent, the URL is returned unchanged.
    * SSH URLs (git@...) are always passed through unchanged.
    */
-  resolvePushUrl(push: string, projectDir: string): string {
+  async resolvePushUrl(push: string, projectDir: string): Promise<string> {
     if (push.startsWith('https://') || push.startsWith('git@') || push.startsWith('ssh://')) {
       return this.injectToken(push);
     }
@@ -54,7 +53,7 @@ export class GiteaProvider implements GitProvider {
 
     // Treat as a named remote — resolve its URL from the local git config
     try {
-      const url = execSync(`git remote get-url ${push}`, { cwd: projectDir }).toString().trim();
+      const url = await gitRemoteGetUrl({ cwd: projectDir, remote: push });
       return this.injectToken(url);
     } catch {
       throw new Error(
@@ -83,14 +82,14 @@ export class GiteaProvider implements GitProvider {
    *   Slug:     owner/repo[.git]  (uses GITEA_URL as host)
    *   Remote:   origin  (resolved via git remote get-url)
    */
-  extractRepoSlug(push: string, projectDir: string): string {
+  async extractRepoSlug(push: string, projectDir: string): Promise<string> {
     let url = push;
 
     // Resolve remote name to URL first
     if (!push.startsWith('https://') && !push.startsWith('git@') && !push.startsWith('ssh://')) {
       if (!this.isOwnerRepoSlug(push)) {
         try {
-          url = execSync(`git remote get-url ${push}`, { cwd: projectDir }).toString().trim();
+          url = await gitRemoteGetUrl({ cwd: projectDir, remote: push });
         } catch {
           throw new Error(`[orchestrator] Cannot resolve remote "${push}" to extract repo slug.`);
         }

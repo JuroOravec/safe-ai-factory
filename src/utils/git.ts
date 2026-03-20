@@ -166,6 +166,24 @@ export async function gitPush(opts: GitPushOpts): Promise<void> {
   await spawnAsync({ command: GIT, ...opts, args: ['push', opts.remote, opts.branch] });
 }
 
+export interface GitRemoteGetUrlOpts {
+  cwd: string;
+  /** Named remote (e.g. `origin`). */
+  remote: string;
+  env?: NodeJS.ProcessEnv;
+}
+
+/** Resolves `git remote get-url <remote>` (trimmed). Rejects if git fails. */
+export async function gitRemoteGetUrl(opts: GitRemoteGetUrlOpts): Promise<string> {
+  const out = await spawnCapture({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    args: ['remote', 'get-url', opts.remote],
+  });
+  return out.trim();
+}
+
 export interface GitResetHardOpts {
   cwd: string;
   /** Commit or ref to reset to. Default: `HEAD`. */

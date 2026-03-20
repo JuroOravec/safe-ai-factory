@@ -1,8 +1,8 @@
 /**
  * Unit tests for GitHubProvider and the getGitProvider factory.
  *
- * All tests are pure/side-effect-free: execSync calls are mocked so no real
- * git repo is required, and fetch is mocked so no real HTTP calls are made.
+ * Most tests avoid the network; fetch is mocked for createPullRequest.
+ * Remote-resolution tests invoke real `git` when exercising failure paths.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -57,52 +57,51 @@ describe('GitHubProvider.resolvePushUrl', () => {
     vi.restoreAllMocks();
   });
 
-  it('passes through a full https URL unchanged when no token is set', () => {
+  it('passes through a full https URL unchanged when no token is set', async () => {
     const p = makeProvider();
     const url = 'https://github.com/owner/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('injects GITHUB_TOKEN into a github.com https URL', () => {
+  it('injects GITHUB_TOKEN into a github.com https URL', async () => {
     process.env.GITHUB_TOKEN = 'tok123';
     const p = makeProvider();
-    const result = p.resolvePushUrl('https://github.com/owner/repo.git', FAKE_ROOT);
+    const result = await p.resolvePushUrl('https://github.com/owner/repo.git', FAKE_ROOT);
     expect(result).toContain('x-access-token:tok123@github.com');
   });
 
-  it('does not inject token into non-github.com https URLs', () => {
+  it('does not inject token into non-github.com https URLs', async () => {
     process.env.GITHUB_TOKEN = 'tok123';
     const p = makeProvider();
     const url = 'https://gitlab.com/owner/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('passes through git@ SSH URLs unchanged', () => {
+  it('passes through git@ SSH URLs unchanged', async () => {
     process.env.GITHUB_TOKEN = 'tok123';
     const p = makeProvider();
     const url = 'git@github.com:owner/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('expands an owner/repo slug to a full github.com URL', () => {
+  it('expands an owner/repo slug to a full github.com URL', async () => {
     const p = makeProvider();
-    const result = p.resolvePushUrl('owner/repo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('owner/repo', FAKE_ROOT);
     expect(result).toBe('https://github.com/owner/repo.git');
   });
 
-  it('injects token when expanding an owner/repo slug', () => {
+  it('injects token when expanding an owner/repo slug', async () => {
     process.env.GITHUB_TOKEN = 'tok456';
     const p = makeProvider();
-    const result = p.resolvePushUrl('owner/repo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('owner/repo', FAKE_ROOT);
     expect(result).toContain('x-access-token:tok456@github.com');
   });
 
-  it('throws for an unknown remote name when git remote get-url fails', () => {
-    // Uses a non-existent projectDir so git fails — covers the execSync error branch.
+  it('throws for an unknown remote name when git remote get-url fails', async () => {
     const p = makeProvider();
-    expect(() => p.resolvePushUrl('nonexistent-remote', '/tmp/not-a-real-git-repo')).toThrow(
-      /Cannot resolve push target "nonexistent-remote"/,
-    );
+    await expect(
+      p.resolvePushUrl('nonexistent-remote', '/tmp/not-a-real-git-repo'),
+    ).rejects.toThrow(/Cannot resolve push target "nonexistent-remote"/);
   });
 });
 
@@ -113,34 +112,36 @@ describe('GitHubProvider.resolvePushUrl', () => {
 describe('GitHubProvider.extractRepoSlug', () => {
   const FAKE_ROOT = '/tmp/repo';
 
-  it('extracts slug from a github.com https URL', () => {
+  it('extracts slug from a github.com https URL', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('https://github.com/owner/repo.git', FAKE_ROOT)).toBe('owner/repo');
-    expect(p.extractRepoSlug('https://github.com/owner/repo', FAKE_ROOT)).toBe('owner/repo');
+    expect(await p.extractRepoSlug('https://github.com/owner/repo.git', FAKE_ROOT)).toBe(
+      'owner/repo',
+    );
+    expect(await p.extractRepoSlug('https://github.com/owner/repo', FAKE_ROOT)).toBe('owner/repo');
   });
 
-  it('extracts slug from a git@ SSH URL', () => {
+  it('extracts slug from a git@ SSH URL', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('git@github.com:owner/repo.git', FAKE_ROOT)).toBe('owner/repo');
+    expect(await p.extractRepoSlug('git@github.com:owner/repo.git', FAKE_ROOT)).toBe('owner/repo');
   });
 
-  it('returns an owner/repo slug shorthand as-is', () => {
+  it('returns an owner/repo slug shorthand as-is', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('owner/repo', FAKE_ROOT)).toBe('owner/repo');
+    expect(await p.extractRepoSlug('owner/repo', FAKE_ROOT)).toBe('owner/repo');
   });
 
-  it('throws for unresolvable remote names', () => {
+  it('throws for unresolvable remote names', async () => {
     const p = makeProvider();
-    expect(() => p.extractRepoSlug('nonexistent-remote', FAKE_ROOT)).toThrow(
+    await expect(p.extractRepoSlug('nonexistent-remote', FAKE_ROOT)).rejects.toThrow(
       /Cannot resolve remote/,
     );
   });
 
-  it('throws when the URL cannot be parsed as a github.com address', () => {
+  it('throws when the URL cannot be parsed as a github.com address', async () => {
     const p = makeProvider();
-    expect(() => p.extractRepoSlug('https://bitbucket.org/owner/repo.git', FAKE_ROOT)).toThrow(
-      /Cannot extract GitHub owner\/repo/,
-    );
+    await expect(
+      p.extractRepoSlug('https://bitbucket.org/owner/repo.git', FAKE_ROOT),
+    ).rejects.toThrow(/Cannot extract GitHub owner\/repo/);
   });
 });
 

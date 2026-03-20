@@ -21,7 +21,6 @@
  *       ...rest of repo...
  */
 
-import { execSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -45,9 +44,10 @@ import {
   gitInit,
   gitResetHard,
 } from '../utils/git.js';
+import { spawnAsync } from '../utils/io.js';
 
 /** Recursively removes all directories named "hidden" under baseDir. Exported for testing. */
-export function removeAllHiddenDirs(baseDir: string): number {
+export async function removeAllHiddenDirs(baseDir: string): Promise<number> {
   let removed = 0;
   if (!existsSync(baseDir)) return removed;
 
@@ -56,10 +56,10 @@ export function removeAllHiddenDirs(baseDir: string): number {
     if (!entry.isDirectory()) continue;
     const fullPath = join(baseDir, entry.name);
     if (entry.name === 'hidden') {
-      execSync(`rm -rf "${fullPath}"`);
+      await spawnAsync({ command: 'rm', args: ['-rf', fullPath], cwd: process.cwd() });
       removed++;
     } else {
-      removed += removeAllHiddenDirs(fullPath);
+      removed += await removeAllHiddenDirs(fullPath);
     }
   }
   return removed;
@@ -228,7 +228,10 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   mkdirSync(codePath, { recursive: true });
 
   // rsync the repo into code/, respecting .gitignore to skip node_modules etc.
-  execSync(`rsync -a --filter=':- .gitignore' --exclude='.git' "${projectDir}/" "${codePath}/"`, {
+  await spawnAsync({
+    command: 'rsync',
+    args: ['-a', '--filter=:- .gitignore', '--exclude=.git', `${projectDir}/`, `${codePath}/`],
+    cwd: projectDir,
     stdio: 'inherit',
   });
 
@@ -244,7 +247,7 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   // Remove ALL hidden/ dirs from saifac/features so the agent
   // cannot see holdout tests from any feature (current or others).
   const saifBase = join(codePath, saifDir);
-  const featuresHidden = removeAllHiddenDirs(join(saifBase, 'features'));
+  const featuresHidden = await removeAllHiddenDirs(join(saifBase, 'features'));
   if (featuresHidden > 0) {
     console.log(
       `[sandbox] Removed ${featuresHidden} hidden/ dir(s) from code copy (agent cannot see holdout tests)`,
@@ -328,9 +331,13 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
  * Removes the disposable sandbox directory.
  * Safe to call even if the directory does not exist.
  */
-export function destroySandbox(sandboxBasePath: string): void {
+export async function destroySandbox(sandboxBasePath: string): Promise<void> {
   console.log(`[sandbox] Removing sandbox ${sandboxBasePath}`);
-  execSync(`rm -rf "${sandboxBasePath}"`);
+  await spawnAsync({
+    command: 'rm',
+    args: ['-rf', sandboxBasePath],
+    cwd: process.cwd(),
+  });
 }
 
 /** A pattern used to exclude files from the extracted patch. */

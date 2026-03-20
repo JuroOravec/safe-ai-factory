@@ -3,7 +3,8 @@
  *
  * Encapsulates all Docker API calls, `docker compose` CLI invocations, log demuxing,
  * sidecar injection, and the Leash network attachment workaround.
- * The orchestrator (loop.ts, modes.ts) never imports dockerode or child_process for Docker purposes.
+ * The orchestrator (loop.ts, modes.ts) never imports dockerode or child_process for Docker purposes
+ * (Docker CLI here uses `spawnAsync`/`spawnWait`; the Leash agent still uses `spawn` for streaming I/O).
  *
  * Lifecycle per run:
  *   setup()        → create bridge network + `docker compose up`
@@ -13,7 +14,7 @@
  *   teardown()     → containers + images + compose down + network
  */
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { arch } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -29,6 +30,7 @@ import {
 } from '../../sandbox-profiles/index.js';
 import type { Feature } from '../../specs/discover.js';
 import { createTarArchive } from '../../utils/archive.js';
+import { spawnAsync, spawnWait } from '../../utils/io.js';
 import type {
   AgentResult,
   Provisioner,
@@ -50,39 +52,38 @@ import { filterAgentEnv, printOpenHandsSegment } from './agent-log.js';
 const docker = new Docker();
 
 // ---------------------------------------------------------------------------
-// runDocker — spawnSync wrapper (no shell, avoids injection)
+// runDocker — async spawn wrapper (no shell, avoids injection)
 // ---------------------------------------------------------------------------
 
 interface RunDockerOptions {
   /** 'inherit' streams output to parent; 'pipe' captures stdout/stderr */
   stdio?: 'inherit' | 'pipe';
-  encoding?: BufferEncoding;
 }
 
 /**
- * Runs a docker CLI command via spawnSync. No shell invocation — avoids injection.
+ * Runs a docker CLI command via spawn. No shell invocation — avoids injection.
  * Throws on non-zero exit. Returns { stdout, stderr } when stdio is 'pipe'.
  */
-function runDocker(
+async function runDocker(
   args: string[],
   options: RunDockerOptions = {},
-): { stdout: string; stderr: string } {
-  const { stdio = 'pipe', encoding = 'utf8' } = options;
-  const result = spawnSync('docker', args, {
-    stdio,
-    encoding: stdio === 'pipe' ? encoding : undefined,
-  });
-  if (result.status !== 0 && result.status != null) {
-    const msg =
-      (typeof result.stderr === 'string' ? result.stderr : undefined) ??
-      (result.error as Error)?.message ??
-      `docker exited with ${result.status}`;
+): Promise<{ stdout: string; stderr: string }> {
+  const { stdio = 'pipe' } = options;
+  if (stdio === 'inherit') {
+    await spawnAsync({
+      command: 'docker',
+      args,
+      cwd: process.cwd(),
+      stdio: 'inherit',
+    });
+    return { stdout: '', stderr: '' };
+  }
+  const r = await spawnWait({ command: 'docker', args, cwd: process.cwd() });
+  if (r.code !== 0) {
+    const msg = r.stderr.trim() || r.stdout.trim() || `docker exited with ${r.code}`;
     throw new Error(msg);
   }
-  return {
-    stdout: (result.stdout ?? '') as string,
-    stderr: (result.stderr ?? '') as string,
-  };
+  return { stdout: r.stdout, stderr: r.stderr };
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +207,7 @@ export class DockerProvisioner implements Provisioner {
       console.log(
         `[docker] Starting compose project "${this.composeProjectName}" (file: ${absoluteFile})`,
       );
-      runDocker(
+      await runDocker(
         ['compose', '-p', this.composeProjectName, '-f', absoluteFile, 'up', '-d', '--wait'],
         { stdio: 'inherit' },
       );
@@ -214,7 +215,7 @@ export class DockerProvisioner implements Provisioner {
       // Attach every compose service to the SAIFAC bridge network
       await this.attachComposeSvcToNetwork(absoluteFile);
 
-      const serviceNames = this.listComposeServices(absoluteFile);
+      const serviceNames = await this.listComposeServices(absoluteFile);
       console.log(
         `[docker] Compose project "${this.composeProjectName}" up — services: ${serviceNames.join(', ')}`,
       );
@@ -730,7 +731,7 @@ export class DockerProvisioner implements Provisioner {
     if (this.composeFile && this.composeProjectName) {
       console.log(`[docker] Tearing down compose project "${this.composeProjectName}"`);
       try {
-        runDocker(
+        await runDocker(
           [
             'compose',
             '-p',
@@ -796,13 +797,15 @@ export class DockerProvisioner implements Provisioner {
     );
 
     console.log(`[docker] Building staging container image: ${imageTag}`);
-    runDocker(['build', '-f', dockerfilePath, '-t', imageTag, codePath], { stdio: 'inherit' });
+    await runDocker(['build', '-f', dockerfilePath, '-t', imageTag, codePath], {
+      stdio: 'inherit',
+    });
     console.log(`[docker] Staging container image built: ${imageTag}`);
   }
 
-  private listComposeServices(absoluteFile: string): string[] {
+  private async listComposeServices(absoluteFile: string): Promise<string[]> {
     try {
-      const { stdout } = runDocker([
+      const { stdout } = await runDocker([
         'compose',
         '-p',
         this.composeProjectName,
@@ -821,10 +824,10 @@ export class DockerProvisioner implements Provisioner {
   }
 
   private async attachComposeSvcToNetwork(absoluteFile: string): Promise<void> {
-    const serviceNames = this.listComposeServices(absoluteFile);
+    const serviceNames = await this.listComposeServices(absoluteFile);
     for (const service of serviceNames) {
       try {
-        const { stdout } = runDocker([
+        const { stdout } = await runDocker([
           'compose',
           '-p',
           this.composeProjectName,
@@ -837,9 +840,12 @@ export class DockerProvisioner implements Provisioner {
         const containerName = stdout.trim();
         if (!containerName) continue;
 
-        runDocker(['network', 'connect', '--alias', service, this.networkName, containerName], {
-          stdio: 'inherit',
-        });
+        await runDocker(
+          ['network', 'connect', '--alias', service, this.networkName, containerName],
+          {
+            stdio: 'inherit',
+          },
+        );
         console.log(
           `[docker] Connected compose service "${service}" (${containerName}) to network "${this.networkName}"`,
         );
@@ -1075,27 +1081,27 @@ function startLeashNetworkAttach(networkName: string, workspaceId: string): Netw
   let cancelled = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
-  const poll = () => {
+  const poll = async () => {
     if (cancelled) return;
     try {
-      const { stdout } = runDocker(['inspect', '-f', '{{.State.Running}}', containerName]);
+      const { stdout } = await runDocker(['inspect', '-f', '{{.State.Running}}', containerName]);
       const out = stdout.trim();
 
       if (out === 'true') {
         console.log(
           `[agent-runner] Attaching container "${containerName}" to network "${networkName}"...`,
         );
-        runDocker(['network', 'connect', networkName, containerName], { stdio: 'inherit' });
+        await runDocker(['network', 'connect', networkName, containerName], { stdio: 'inherit' });
         console.log(`[agent-runner] Container "${containerName}" attached to "${networkName}".`);
         return;
       }
     } catch {
       // Container doesn't exist yet — retry
     }
-    if (!cancelled) timer = setTimeout(poll, 500);
+    if (!cancelled) timer = setTimeout(() => void poll(), 500);
   };
 
-  timer = setTimeout(poll, 500);
+  timer = setTimeout(() => void poll(), 500);
 
   return {
     cancel() {

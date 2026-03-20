@@ -1,5 +1,4 @@
-import { execSync } from 'node:child_process';
-
+import { gitRemoteGetUrl } from '../../utils/git.js';
 import type { GitProvider, PullRequestOpts } from '../types.js';
 
 /**
@@ -19,7 +18,7 @@ export class GitHubProvider implements GitProvider {
    *   - A GitHub slug (owner/repo)              → expanded to https://github.com/owner/repo.git
    *   - A git remote name (e.g. 'origin')       → resolved via `git remote get-url`
    */
-  resolvePushUrl(push: string, projectDir: string): string {
+  async resolvePushUrl(push: string, projectDir: string): Promise<string> {
     if (push.startsWith('https://') || push.startsWith('git@') || push.startsWith('ssh://')) {
       return this.injectToken(push);
     }
@@ -31,7 +30,7 @@ export class GitHubProvider implements GitProvider {
 
     // Treat as a named remote — resolve its URL from the local git config
     try {
-      const url = execSync(`git remote get-url ${push}`, { cwd: projectDir }).toString().trim();
+      const url = await gitRemoteGetUrl({ cwd: projectDir, remote: push });
       return this.injectToken(url);
     } catch {
       throw new Error(
@@ -43,13 +42,13 @@ export class GitHubProvider implements GitProvider {
   /**
    * Extracts the "owner/repo" slug from a push target string or URL.
    */
-  extractRepoSlug(push: string, projectDir: string): string {
+  async extractRepoSlug(push: string, projectDir: string): Promise<string> {
     let url = push;
 
     // Resolve remote name to URL first
     if (!push.startsWith('https://') && !push.startsWith('git@') && !push.includes('/')) {
       try {
-        url = execSync(`git remote get-url ${push}`, { cwd: projectDir }).toString().trim();
+        url = await gitRemoteGetUrl({ cwd: projectDir, remote: push });
       } catch {
         throw new Error(`[orchestrator] Cannot resolve remote "${push}" to extract repo slug.`);
       }

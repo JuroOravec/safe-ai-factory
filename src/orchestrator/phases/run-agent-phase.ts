@@ -84,7 +84,7 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
       ? {
           llmConfig: resolveAgentLlmConfig('reviewer', overrides),
           scriptPath: join(getSaifRoot(), 'src', 'orchestrator', 'scripts', 'reviewer.sh'),
-          argusBinaryPath: getArgusBinaryPath(),
+          argusBinaryPath: await getArgusBinaryPath(),
         }
       : null;
 

@@ -49,75 +49,75 @@ describe('BitbucketProvider.resolvePushUrl', () => {
     vi.restoreAllMocks();
   });
 
-  it('passes through a full HTTPS URL unchanged when no credentials are set', () => {
+  it('passes through a full HTTPS URL unchanged when no credentials are set', async () => {
     const p = makeProvider();
     const url = 'https://bitbucket.org/workspace/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('injects BITBUCKET_USERNAME and BITBUCKET_TOKEN into a bitbucket.org HTTPS URL', () => {
+  it('injects BITBUCKET_USERNAME and BITBUCKET_TOKEN into a bitbucket.org HTTPS URL', async () => {
     process.env.BITBUCKET_TOKEN = 'mytoken';
     process.env.BITBUCKET_USERNAME = 'myuser';
     const p = makeProvider();
-    const result = p.resolvePushUrl('https://bitbucket.org/workspace/repo.git', FAKE_ROOT);
+    const result = await p.resolvePushUrl('https://bitbucket.org/workspace/repo.git', FAKE_ROOT);
     expect(result).toContain('myuser:mytoken@bitbucket.org');
   });
 
-  it('does not inject credentials when only BITBUCKET_TOKEN is set (username missing)', () => {
+  it('does not inject credentials when only BITBUCKET_TOKEN is set (username missing)', async () => {
     process.env.BITBUCKET_TOKEN = 'mytoken';
     const p = makeProvider();
     const url = 'https://bitbucket.org/workspace/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('does not inject credentials when only BITBUCKET_USERNAME is set (token missing)', () => {
+  it('does not inject credentials when only BITBUCKET_USERNAME is set (token missing)', async () => {
     process.env.BITBUCKET_USERNAME = 'myuser';
     const p = makeProvider();
     const url = 'https://bitbucket.org/workspace/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('passes through git@ SSH URLs unchanged even when credentials are set', () => {
+  it('passes through git@ SSH URLs unchanged even when credentials are set', async () => {
     process.env.BITBUCKET_TOKEN = 'mytoken';
     process.env.BITBUCKET_USERNAME = 'myuser';
     const p = makeProvider();
     const url = 'git@bitbucket.org:workspace/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('does not inject credentials into non-bitbucket.org HTTPS URLs', () => {
+  it('does not inject credentials into non-bitbucket.org HTTPS URLs', async () => {
     process.env.BITBUCKET_TOKEN = 'mytoken';
     process.env.BITBUCKET_USERNAME = 'myuser';
     const p = makeProvider();
     const url = 'https://github.com/owner/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('expands a workspace/repo slug to a full bitbucket.org URL', () => {
+  it('expands a workspace/repo slug to a full bitbucket.org URL', async () => {
     const p = makeProvider();
-    const result = p.resolvePushUrl('workspace/repo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('workspace/repo', FAKE_ROOT);
     expect(result).toBe('https://bitbucket.org/workspace/repo.git');
   });
 
-  it('strips an existing .git suffix from a slug before expanding', () => {
+  it('strips an existing .git suffix from a slug before expanding', async () => {
     const p = makeProvider();
-    const result = p.resolvePushUrl('workspace/repo.git', FAKE_ROOT);
+    const result = await p.resolvePushUrl('workspace/repo.git', FAKE_ROOT);
     expect(result).toBe('https://bitbucket.org/workspace/repo.git');
   });
 
-  it('injects credentials when expanding a slug', () => {
+  it('injects credentials when expanding a slug', async () => {
     process.env.BITBUCKET_TOKEN = 'tok';
     process.env.BITBUCKET_USERNAME = 'usr';
     const p = makeProvider();
-    const result = p.resolvePushUrl('workspace/repo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('workspace/repo', FAKE_ROOT);
     expect(result).toContain('usr:tok@bitbucket.org');
   });
 
-  it('throws for an unknown remote name when git remote get-url fails', () => {
+  it('throws for an unknown remote name when git remote get-url fails', async () => {
     const p = makeProvider();
-    expect(() => p.resolvePushUrl('nonexistent-remote', '/tmp/not-a-real-git-repo')).toThrow(
-      /Cannot resolve push target "nonexistent-remote"/,
-    );
+    await expect(
+      p.resolvePushUrl('nonexistent-remote', '/tmp/not-a-real-git-repo'),
+    ).rejects.toThrow(/Cannot resolve push target "nonexistent-remote"/);
   });
 });
 
@@ -126,68 +126,70 @@ describe('BitbucketProvider.resolvePushUrl', () => {
 // ---------------------------------------------------------------------------
 
 describe('BitbucketProvider.extractRepoSlug', () => {
-  it('extracts workspace/repo from an HTTPS URL with .git suffix', () => {
+  it('extracts workspace/repo from an HTTPS URL with .git suffix', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('https://bitbucket.org/workspace/repo.git', FAKE_ROOT)).toBe(
+    expect(await p.extractRepoSlug('https://bitbucket.org/workspace/repo.git', FAKE_ROOT)).toBe(
       'workspace/repo',
     );
   });
 
-  it('extracts workspace/repo from an HTTPS URL without .git suffix', () => {
+  it('extracts workspace/repo from an HTTPS URL without .git suffix', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('https://bitbucket.org/workspace/repo', FAKE_ROOT)).toBe(
+    expect(await p.extractRepoSlug('https://bitbucket.org/workspace/repo', FAKE_ROOT)).toBe(
       'workspace/repo',
     );
   });
 
-  it('extracts workspace/repo from a git@ SSH URL', () => {
+  it('extracts workspace/repo from a git@ SSH URL', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('git@bitbucket.org:workspace/repo.git', FAKE_ROOT)).toBe(
+    expect(await p.extractRepoSlug('git@bitbucket.org:workspace/repo.git', FAKE_ROOT)).toBe(
       'workspace/repo',
     );
   });
 
-  it('extracts workspace/repo from a git@ SSH URL without .git suffix', () => {
+  it('extracts workspace/repo from a git@ SSH URL without .git suffix', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('git@bitbucket.org:workspace/repo', FAKE_ROOT)).toBe('workspace/repo');
-  });
-
-  it('returns a slug shorthand as-is', () => {
-    const p = makeProvider();
-    expect(p.extractRepoSlug('workspace/repo', FAKE_ROOT)).toBe('workspace/repo');
-  });
-
-  it('strips .git from a slug shorthand', () => {
-    const p = makeProvider();
-    expect(p.extractRepoSlug('workspace/repo.git', FAKE_ROOT)).toBe('workspace/repo');
-  });
-
-  it('extracts workspace/repo from an ssh:// URL', () => {
-    const p = makeProvider();
-    expect(p.extractRepoSlug('ssh://git@bitbucket.org/workspace/repo.git', FAKE_ROOT)).toBe(
+    expect(await p.extractRepoSlug('git@bitbucket.org:workspace/repo', FAKE_ROOT)).toBe(
       'workspace/repo',
     );
   });
 
-  it('extracts workspace/repo from an ssh:// URL without .git suffix', () => {
+  it('returns a slug shorthand as-is', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('ssh://git@bitbucket.org/workspace/repo', FAKE_ROOT)).toBe(
+    expect(await p.extractRepoSlug('workspace/repo', FAKE_ROOT)).toBe('workspace/repo');
+  });
+
+  it('strips .git from a slug shorthand', async () => {
+    const p = makeProvider();
+    expect(await p.extractRepoSlug('workspace/repo.git', FAKE_ROOT)).toBe('workspace/repo');
+  });
+
+  it('extracts workspace/repo from an ssh:// URL', async () => {
+    const p = makeProvider();
+    expect(await p.extractRepoSlug('ssh://git@bitbucket.org/workspace/repo.git', FAKE_ROOT)).toBe(
       'workspace/repo',
     );
   });
 
-  it('throws when the URL does not match bitbucket.org patterns', () => {
+  it('extracts workspace/repo from an ssh:// URL without .git suffix', async () => {
     const p = makeProvider();
-    expect(() => p.extractRepoSlug('https://github.com/owner/repo.git', FAKE_ROOT)).toThrow(
+    expect(await p.extractRepoSlug('ssh://git@bitbucket.org/workspace/repo', FAKE_ROOT)).toBe(
+      'workspace/repo',
+    );
+  });
+
+  it('throws when the URL does not match bitbucket.org patterns', async () => {
+    const p = makeProvider();
+    await expect(p.extractRepoSlug('https://github.com/owner/repo.git', FAKE_ROOT)).rejects.toThrow(
       /Cannot extract Bitbucket workspace\/repo/,
     );
   });
 
-  it('throws for an unresolvable remote name', () => {
+  it('throws for an unresolvable remote name', async () => {
     const p = makeProvider();
-    expect(() => p.extractRepoSlug('nonexistent-remote', '/tmp/not-a-real-git-repo')).toThrow(
-      /Cannot resolve remote/,
-    );
+    await expect(
+      p.extractRepoSlug('nonexistent-remote', '/tmp/not-a-real-git-repo'),
+    ).rejects.toThrow(/Cannot resolve remote/);
   });
 });
 

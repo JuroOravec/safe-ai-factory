@@ -1,9 +1,12 @@
-import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+import { spawnCapture } from '../../utils/io.js';
+
 export default async function validateDocstrings() {
-  const output = execSync('git ls-files "src/**/*.ts"', {
-    encoding: 'utf-8',
+  const output = await spawnCapture({
+    command: 'git',
+    args: ['ls-files', 'src/**/*.ts'],
+    cwd: process.cwd(),
   });
   const files = output.split('\n').filter((f) => {
     return (

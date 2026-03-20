@@ -49,93 +49,93 @@ describe('GitLabProvider.resolvePushUrl', () => {
     vi.restoreAllMocks();
   });
 
-  it('passes through a full https URL unchanged when no token is set', () => {
+  it('passes through a full https URL unchanged when no token is set', async () => {
     const p = makeProvider();
     const url = 'https://gitlab.com/group/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('injects GITLAB_TOKEN as oauth2 credentials into a gitlab.com https URL', () => {
+  it('injects GITLAB_TOKEN as oauth2 credentials into a gitlab.com https URL', async () => {
     process.env.GITLAB_TOKEN = 'glpat-abc';
     const p = makeProvider();
-    const result = p.resolvePushUrl('https://gitlab.com/group/repo.git', FAKE_ROOT);
+    const result = await p.resolvePushUrl('https://gitlab.com/group/repo.git', FAKE_ROOT);
     expect(result).toContain('oauth2:glpat-abc@gitlab.com');
   });
 
-  it('injects token into a self-hosted GitLab HTTPS URL when GITLAB_URL matches', () => {
+  it('injects token into a self-hosted GitLab HTTPS URL when GITLAB_URL matches', async () => {
     process.env.GITLAB_TOKEN = 'glpat-xyz';
     process.env.GITLAB_URL = 'https://git.mycompany.com';
     const p = makeProvider();
-    const result = p.resolvePushUrl('https://git.mycompany.com/group/repo.git', FAKE_ROOT);
+    const result = await p.resolvePushUrl('https://git.mycompany.com/group/repo.git', FAKE_ROOT);
     expect(result).toContain('oauth2:glpat-xyz@git.mycompany.com');
   });
 
-  it('does NOT inject token into a self-hosted URL when GITLAB_URL is not set', () => {
+  it('does NOT inject token into a self-hosted URL when GITLAB_URL is not set', async () => {
     process.env.GITLAB_TOKEN = 'glpat-xyz';
     // GITLAB_URL defaults to gitlab.com — a different host must not receive the token
     const p = makeProvider();
     const url = 'https://git.mycompany.com/group/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('does not inject token into github.com URLs', () => {
+  it('does not inject token into github.com URLs', async () => {
     process.env.GITLAB_TOKEN = 'glpat-abc';
     const p = makeProvider();
     const url = 'https://github.com/owner/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('passes through git@ SSH URLs unchanged', () => {
+  it('passes through git@ SSH URLs unchanged', async () => {
     process.env.GITLAB_TOKEN = 'glpat-abc';
     const p = makeProvider();
     const url = 'git@gitlab.com:group/repo.git';
-    expect(p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
+    expect(await p.resolvePushUrl(url, FAKE_ROOT)).toBe(url);
   });
 
-  it('expands a group/project slug to a full gitlab.com URL', () => {
+  it('expands a group/project slug to a full gitlab.com URL', async () => {
     const p = makeProvider();
-    const result = p.resolvePushUrl('group/repo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('group/repo', FAKE_ROOT);
     expect(result).toBe('https://gitlab.com/group/repo.git');
   });
 
-  it('expands a group/project slug using GITLAB_URL when set', () => {
+  it('expands a group/project slug using GITLAB_URL when set', async () => {
     process.env.GITLAB_URL = 'https://git.mycompany.com';
     const p = makeProvider();
-    const result = p.resolvePushUrl('group/repo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('group/repo', FAKE_ROOT);
     expect(result).toBe('https://git.mycompany.com/group/repo.git');
   });
 
-  it('expands a multi-segment path to a full gitlab.com URL', () => {
+  it('expands a multi-segment path to a full gitlab.com URL', async () => {
     const p = makeProvider();
-    const result = p.resolvePushUrl('group/subgroup/repo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('group/subgroup/repo', FAKE_ROOT);
     expect(result).toBe('https://gitlab.com/group/subgroup/repo.git');
   });
 
-  it('strips an existing .git suffix from a slug before expanding', () => {
+  it('strips an existing .git suffix from a slug before expanding', async () => {
     const p = makeProvider();
-    const result = p.resolvePushUrl('group/repo.git', FAKE_ROOT);
+    const result = await p.resolvePushUrl('group/repo.git', FAKE_ROOT);
     expect(result).toBe('https://gitlab.com/group/repo.git');
   });
 
-  it('injects token when expanding a slug', () => {
+  it('injects token when expanding a slug', async () => {
     process.env.GITLAB_TOKEN = 'glpat-tok';
     const p = makeProvider();
-    const result = p.resolvePushUrl('group/repo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('group/repo', FAKE_ROOT);
     expect(result).toContain('oauth2:glpat-tok@gitlab.com');
   });
 
-  it('strips trailing slash from GITLAB_URL before expanding a slug', () => {
+  it('strips trailing slash from GITLAB_URL before expanding a slug', async () => {
     process.env.GITLAB_URL = 'https://git.mycompany.com/';
     const p = makeProvider();
-    const result = p.resolvePushUrl('group/repo', FAKE_ROOT);
+    const result = await p.resolvePushUrl('group/repo', FAKE_ROOT);
     expect(result).toBe('https://git.mycompany.com/group/repo.git');
   });
 
-  it('throws for an unknown remote name when git remote get-url fails', () => {
+  it('throws for an unknown remote name when git remote get-url fails', async () => {
     const p = makeProvider();
-    expect(() => p.resolvePushUrl('nonexistent-remote', '/tmp/not-a-real-git-repo')).toThrow(
-      /Cannot resolve push target "nonexistent-remote"/,
-    );
+    await expect(
+      p.resolvePushUrl('nonexistent-remote', '/tmp/not-a-real-git-repo'),
+    ).rejects.toThrow(/Cannot resolve push target "nonexistent-remote"/);
   });
 });
 
@@ -144,46 +144,54 @@ describe('GitLabProvider.resolvePushUrl', () => {
 // ---------------------------------------------------------------------------
 
 describe('GitLabProvider.extractRepoSlug', () => {
-  it('URL-encodes a group/project path from an HTTPS URL', () => {
+  it('URL-encodes a group/project path from an HTTPS URL', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('https://gitlab.com/group/repo.git', FAKE_ROOT)).toBe('group%2Frepo');
-    expect(p.extractRepoSlug('https://gitlab.com/group/repo', FAKE_ROOT)).toBe('group%2Frepo');
+    expect(await p.extractRepoSlug('https://gitlab.com/group/repo.git', FAKE_ROOT)).toBe(
+      'group%2Frepo',
+    );
+    expect(await p.extractRepoSlug('https://gitlab.com/group/repo', FAKE_ROOT)).toBe(
+      'group%2Frepo',
+    );
   });
 
-  it('URL-encodes a multi-segment path from an HTTPS URL', () => {
+  it('URL-encodes a multi-segment path from an HTTPS URL', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('https://gitlab.com/group/subgroup/repo.git', FAKE_ROOT)).toBe(
+    expect(await p.extractRepoSlug('https://gitlab.com/group/subgroup/repo.git', FAKE_ROOT)).toBe(
       'group%2Fsubgroup%2Frepo',
     );
   });
 
-  it('URL-encodes a path from a git@ SSH URL', () => {
+  it('URL-encodes a path from a git@ SSH URL', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('git@gitlab.com:group/repo.git', FAKE_ROOT)).toBe('group%2Frepo');
+    expect(await p.extractRepoSlug('git@gitlab.com:group/repo.git', FAKE_ROOT)).toBe(
+      'group%2Frepo',
+    );
   });
 
-  it('URL-encodes a multi-segment path from a git@ SSH URL', () => {
+  it('URL-encodes a multi-segment path from a git@ SSH URL', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('git@gitlab.com:group/subgroup/repo.git', FAKE_ROOT)).toBe(
+    expect(await p.extractRepoSlug('git@gitlab.com:group/subgroup/repo.git', FAKE_ROOT)).toBe(
       'group%2Fsubgroup%2Frepo',
     );
   });
 
-  it('URL-encodes a slug shorthand', () => {
+  it('URL-encodes a slug shorthand', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('group/repo', FAKE_ROOT)).toBe('group%2Frepo');
+    expect(await p.extractRepoSlug('group/repo', FAKE_ROOT)).toBe('group%2Frepo');
   });
 
-  it('URL-encodes a multi-segment slug shorthand', () => {
+  it('URL-encodes a multi-segment slug shorthand', async () => {
     const p = makeProvider();
-    expect(p.extractRepoSlug('group/subgroup/repo', FAKE_ROOT)).toBe('group%2Fsubgroup%2Frepo');
-  });
-
-  it('throws for an unresolvable remote name', () => {
-    const p = makeProvider();
-    expect(() => p.extractRepoSlug('nonexistent-remote', '/tmp/not-a-real-git-repo')).toThrow(
-      /Cannot resolve remote/,
+    expect(await p.extractRepoSlug('group/subgroup/repo', FAKE_ROOT)).toBe(
+      'group%2Fsubgroup%2Frepo',
     );
+  });
+
+  it('throws for an unresolvable remote name', async () => {
+    const p = makeProvider();
+    await expect(
+      p.extractRepoSlug('nonexistent-remote', '/tmp/not-a-real-git-repo'),
+    ).rejects.toThrow(/Cannot resolve remote/);
   });
 });
 

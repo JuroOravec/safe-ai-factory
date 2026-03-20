@@ -1,12 +1,11 @@
-import * as childProcess from 'node:child_process';
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { spawnCapture } from '../../utils/io.js';
 import { queryShotgunIndex, resolveShotgunPython } from './shotgun.js';
 
-vi.mock('node:child_process', () => ({
-  execSync: vi.fn(),
-  spawnSync: vi.fn(),
+vi.mock('../../utils/io.js', () => ({
+  spawnCapture: vi.fn(),
+  spawnAsync: vi.fn(),
 }));
 
 describe('resolveShotgunPython', () => {
@@ -36,54 +35,41 @@ describe('queryShotgunIndex', () => {
     vi.clearAllMocks();
   });
 
-  it('invokes python -m shotgun.main and returns raw output', () => {
-    vi.mocked(childProcess.spawnSync).mockReturnValueOnce({
-      status: 0,
-      stdout: 'Results: 3 rows\nname | path\n---\nfoo | src/foo.ts',
-      stderr: '',
-      error: undefined,
-    } as ReturnType<typeof childProcess.spawnSync>);
+  it('invokes python -m shotgun.main and returns raw output', async () => {
+    vi.mocked(spawnCapture).mockResolvedValueOnce(
+      'Results: 3 rows\nname | path\n---\nfoo | src/foo.ts',
+    );
 
-    const result = queryShotgunIndex({
+    const result = await queryShotgunIndex({
       graphId: 'abc123',
       question: 'where is foo?',
       projectDir: '/repo',
     });
     expect(result.raw).toContain('Results: 3 rows');
-    expect(childProcess.spawnSync).toHaveBeenCalledWith(
-      'python',
-      ['-m', 'shotgun.main', 'codebase', 'query', 'abc123', 'where is foo?'],
-      expect.objectContaining({ encoding: 'utf-8', cwd: '/repo' }),
-    );
+    expect(spawnCapture).toHaveBeenCalledWith({
+      command: 'python',
+      args: ['-m', 'shotgun.main', 'codebase', 'query', 'abc123', 'where is foo?'],
+      cwd: '/repo',
+    });
   });
 
-  it('uses SHOTGUN_PYTHON when set', () => {
+  it('uses SHOTGUN_PYTHON when set', async () => {
     process.env.SHOTGUN_PYTHON = '/path/to/.venv/bin/python';
-    vi.mocked(childProcess.spawnSync).mockReturnValueOnce({
-      status: 0,
-      stdout: 'ok',
-      stderr: '',
-      error: undefined,
-    } as ReturnType<typeof childProcess.spawnSync>);
+    vi.mocked(spawnCapture).mockResolvedValueOnce('ok');
 
-    queryShotgunIndex({ graphId: 'g1', question: 'q', projectDir: '/repo' });
-    expect(childProcess.spawnSync).toHaveBeenCalledWith(
-      '/path/to/.venv/bin/python',
-      ['-m', 'shotgun.main', 'codebase', 'query', 'g1', 'q'],
-      expect.objectContaining({ encoding: 'utf-8', cwd: '/repo' }),
-    );
+    await queryShotgunIndex({ graphId: 'g1', question: 'q', projectDir: '/repo' });
+    expect(spawnCapture).toHaveBeenCalledWith({
+      command: '/path/to/.venv/bin/python',
+      args: ['-m', 'shotgun.main', 'codebase', 'query', 'g1', 'q'],
+      cwd: '/repo',
+    });
   });
 
-  it('throws on non-zero exit status', () => {
-    vi.mocked(childProcess.spawnSync).mockReturnValueOnce({
-      status: 1,
-      stdout: '',
-      stderr: 'No graph found',
-      error: undefined,
-    } as ReturnType<typeof childProcess.spawnSync>);
+  it('throws on non-zero exit status', async () => {
+    vi.mocked(spawnCapture).mockRejectedValueOnce(new Error('exited with code 1: No graph found'));
 
-    expect(() => queryShotgunIndex({ graphId: 'bad', question: 'q', projectDir: '/repo' })).toThrow(
-      /shotgun\.main exited with code 1/,
-    );
+    await expect(
+      queryShotgunIndex({ graphId: 'bad', question: 'q', projectDir: '/repo' }),
+    ).rejects.toThrow(/shotgun-sh codebase query failed/);
   });
 });

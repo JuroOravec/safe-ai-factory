@@ -1,11 +1,15 @@
-import { execSync } from 'node:child_process';
+import { spawnCapture } from '../../utils/io.js';
 
 /**
  * Validates that all test files containing "e2e" in their name use the suffix
  * convention (xxx-e2e.test.ts or xxx.e2e.test.ts), not the prefix (e2e-xxx.test.ts).
  */
 export default async function validateE2eTestNaming() {
-  const output = execSync('git ls-files "**/*.test.ts" "**/*.test.js"', { encoding: 'utf-8' });
+  const output = await spawnCapture({
+    command: 'git',
+    args: ['ls-files', '**/*.test.ts', '**/*.test.js'],
+    cwd: process.cwd(),
+  });
   const files = output.split('\n').filter((f) => f.trim() !== '');
 
   const violations: string[] = [];

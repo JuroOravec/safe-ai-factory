@@ -312,7 +312,7 @@ async function runFail2PassCore(
   } finally {
     registry.deregisterProvisioner(provisioner);
     await provisioner.teardown({ runId: sandbox.runId });
-    destroySandbox(sandbox.sandboxBasePath);
+    await destroySandbox(sandbox.sandboxBasePath);
   }
 }
 
@@ -723,7 +723,7 @@ async function runTestsCore(
       message: `Tests failed after ${testRetries} attempt(s). Last stderr:\n${lastStderr}`,
     };
   } finally {
-    destroySandbox(sandbox.sandboxBasePath);
+    await destroySandbox(sandbox.sandboxBasePath);
   }
 }
 
@@ -820,7 +820,7 @@ export async function runDebug(
     });
   } finally {
     await provisioner.teardown({ runId });
-    destroySandbox(sandbox.sandboxBasePath);
+    await destroySandbox(sandbox.sandboxBasePath);
     process.removeListener('SIGINT', ignoreSignal);
     process.removeListener('SIGTERM', ignoreSignal);
     console.log('[debug] Cleanup complete.');

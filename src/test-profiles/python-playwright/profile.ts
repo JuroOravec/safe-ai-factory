@@ -1,5 +1,4 @@
-import { spawnSync } from 'node:child_process';
-
+import { spawnWait } from '../../utils/io.js';
 import type { TestProfile, ValidateFilesOpts } from '../types.js';
 
 /**
@@ -7,7 +6,7 @@ import type { TestProfile, ValidateFilesOpts } from '../types.js';
  * Identical to the python-pytest hook — ruff works on any Python file regardless
  * of whether it imports playwright. Skips silently if ruff is not on PATH.
  */
-function pythonPlaywrightValidateFiles(opts: ValidateFilesOpts): void {
+async function pythonPlaywrightValidateFiles(opts: ValidateFilesOpts): Promise<void> {
   const { testsDir, generatedFiles } = opts;
   if (generatedFiles.length === 0) return;
   const pyFiles = generatedFiles.filter((f) => f.endsWith('.py'));
@@ -15,16 +14,16 @@ function pythonPlaywrightValidateFiles(opts: ValidateFilesOpts): void {
 
   console.log(`\nValidating generated spec files (ruff)...`);
   try {
-    const result = spawnSync('ruff', ['check', '--select', 'E,F', ...pyFiles], {
+    const result = await spawnWait({
+      command: 'ruff',
+      args: ['check', '--select', 'E,F', ...pyFiles],
       cwd: testsDir,
-      encoding: 'utf8',
-      timeout: 30_000,
+      timeoutMs: 30_000,
     });
-    if (result.error) throw result.error; // binary not found → ENOENT
-    if (result.status === 0) {
+    if (result.code === 0) {
       console.log(`  Python validation passed.`);
     } else {
-      const output = (result.stdout ?? '') + (result.stderr ?? '');
+      const output = result.stdout + result.stderr;
       console.error(`  ${opts.errMessage}`);
       for (const line of output.split('\n').filter(Boolean).slice(0, 20)) {
         console.error(`    ${line}`);

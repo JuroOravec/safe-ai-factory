@@ -28,7 +28,7 @@ export const shotgunDesignerProfile: DesignerProfile = {
     return REQUIRED_FILES.every((f) => existsSync(join(feature.absolutePath, f)));
   },
 
-  run({ cwd, feature, model, prompt }: DesignerRunOpts): void {
+  async run({ cwd, feature, model, prompt }: DesignerRunOpts): Promise<void> {
     const proposalPath = join(feature.absolutePath, 'proposal.md');
 
     const proposalPrompt =
@@ -41,7 +41,7 @@ export const shotgunDesignerProfile: DesignerProfile = {
     if (model?.trim()) runArgs.splice(0, 0, '--model', model.trim());
 
     // Run `shotgun-sh --spec-dir <featureDir> run -n <proposalPrompt>`
-    runShotgunCli(['--spec-dir', feature.relativePath, 'run', ...runArgs], {
+    await runShotgunCli(['--spec-dir', feature.relativePath, 'run', ...runArgs], {
       projectDir: cwd,
       // Shotgun needs these environment variables to stream the output to the console.
       env: { PYTHONUNBUFFERED: '1', SHOTGUN_LOGGING_TO_CONSOLE: '1' },

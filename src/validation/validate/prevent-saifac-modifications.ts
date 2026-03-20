@@ -1,9 +1,15 @@
-import { execSync } from 'node:child_process';
+import { spawnCapture } from '../../utils/io.js';
 
 export default async function preventSpecModifications() {
   let branchName = '';
   try {
-    branchName = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
+    branchName = (
+      await spawnCapture({
+        command: 'git',
+        args: ['rev-parse', '--abbrev-ref', 'HEAD'],
+        cwd: process.cwd(),
+      })
+    ).trim();
   } catch {
     return; // Not a git repo
   }
@@ -17,7 +23,11 @@ export default async function preventSpecModifications() {
   try {
     // The agent works in a fresh git worktree and its changes are uncommitted.
     // Any modified, added, or deleted files will appear in porcelain status.
-    statusOutput = execSync('git status --porcelain', { encoding: 'utf-8' });
+    statusOutput = await spawnCapture({
+      command: 'git',
+      args: ['status', '--porcelain'],
+      cwd: process.cwd(),
+    });
   } catch {
     return;
   }

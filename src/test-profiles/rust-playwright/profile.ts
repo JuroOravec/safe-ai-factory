@@ -1,7 +1,7 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { spawnWait } from '../../utils/io.js';
 import type { OnDoneOpts, TestProfile, ValidateFilesOpts } from '../types.js';
 
 /**
@@ -28,23 +28,23 @@ test-output = "immediate-final"
  * Identical to the rust-rusttest hook — cargo check works on any Rust crate regardless of
  * whether it imports the playwright crate. Skips silently if `cargo` is not on PATH.
  */
-function rustPlaywrightValidateFiles(opts: ValidateFilesOpts): void {
+async function rustPlaywrightValidateFiles(opts: ValidateFilesOpts): Promise<void> {
   const { testsDir, generatedFiles } = opts;
   if (generatedFiles.length === 0) return;
   if (!generatedFiles.some((f) => f.endsWith('.rs'))) return;
 
   console.log(`\nValidating generated spec files (cargo check --tests)...`);
   try {
-    const result = spawnSync('cargo', ['check', '--tests'], {
+    const result = await spawnWait({
+      command: 'cargo',
+      args: ['check', '--tests'],
       cwd: testsDir,
-      encoding: 'utf8',
-      timeout: 60_000,
+      timeoutMs: 60_000,
     });
-    if (result.error) throw result.error; // binary not found → ENOENT
-    if (result.status === 0) {
+    if (result.code === 0) {
       console.log(`  Rust validation passed.`);
     } else {
-      const output = (result.stdout ?? '') + (result.stderr ?? '');
+      const output = result.stdout + result.stderr;
       console.error(`  ${opts.errMessage}`);
       for (const line of output.split('\n').filter(Boolean).slice(0, 20)) {
         console.error(`    ${line}`);

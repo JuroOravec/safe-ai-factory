@@ -1,9 +1,12 @@
-import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+import { spawnCapture } from '../../utils/io.js';
+
 export default async function validateDescriptiveTests() {
-  const output = execSync('git ls-files "src/**/*.test.ts" "saifac/**/*.test.ts"', {
-    encoding: 'utf-8',
+  const output = await spawnCapture({
+    command: 'git',
+    args: ['ls-files', 'src/**/*.test.ts', 'saifac/**/*.test.ts'],
+    cwd: process.cwd(),
   });
   const files = output.split('\n').filter((f) => f.trim() !== '');
 

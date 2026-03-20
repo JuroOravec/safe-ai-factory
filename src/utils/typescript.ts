@@ -1,7 +1,7 @@
-import { spawnSync } from 'node:child_process';
+import { spawnWait } from './io.js';
 
 // TypeScript validation: ensure generated spec files have no syntax/type errors.
-// - catch: spawnSync threw (e.g. npx/tsc not on PATH). Non-fatal — validation skipped.
+// - catch: spawn threw (e.g. npx/tsc not on PATH). Non-fatal — validation skipped.
 // - status === 0: tsc found no errors. Validation passed.
 // - status !== 0: tsc ran and reported real errors (bad imports, broken syntax).
 export async function validateTypescript(opts: {
@@ -11,9 +11,9 @@ export async function validateTypescript(opts: {
 }) {
   const { files, cwd, errMessage } = opts;
   try {
-    const tscResult = spawnSync(
-      'npx',
-      [
+    const tscResult = await spawnWait({
+      command: 'npx',
+      args: [
         'tsc',
         '--noEmit',
         '--allowJs',
@@ -31,12 +31,13 @@ export async function validateTypescript(opts: {
         'true',
         ...files,
       ],
-      { cwd, encoding: 'utf8', timeout: 30_000 },
-    );
-    if (tscResult.status === 0) {
+      cwd,
+      timeoutMs: 30_000,
+    });
+    if (tscResult.code === 0) {
       console.log(`  TypeScript validation passed.`);
     } else {
-      const output = (tscResult.stdout ?? '') + (tscResult.stderr ?? '');
+      const output = tscResult.stdout + tscResult.stderr;
       console.error(`  ${errMessage}`);
       for (const line of output.split('\n').filter(Boolean).slice(0, 20)) {
         console.error(`    ${line}`);

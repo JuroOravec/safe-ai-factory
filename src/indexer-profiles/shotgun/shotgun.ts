@@ -12,7 +12,7 @@
  * @see {@link file://.cursor/skills/project/setup-swe-factory/SKILL.md Phase 2}
  */
 
-import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
+import { spawnAsync, spawnCapture } from '../../utils/io.js';
 
 export interface ShotgunQueryResult {
   /** Raw stdout from shotgun-sh codebase query. */
@@ -53,10 +53,7 @@ function formatArgForDisplay(arg: string): string {
  * Runs `<python> -m shotgun.main <args>` with stdio inherited.
  * Use for interactive or long-running commands (e.g. spec generation).
  */
-export function runShotgunCli(
-  args: string[],
-  opts: RunShotgunCliOptions,
-): SpawnSyncReturns<string> {
+export async function runShotgunCli(args: string[], opts: RunShotgunCliOptions): Promise<void> {
   const python = resolveShotgunPython();
   const allArgs = ['-m', 'shotgun.main', ...args];
   if (opts?.printCmd) {
@@ -65,31 +62,66 @@ export function runShotgunCli(
       .join(' ');
     console.log(`  $ ${display}`);
   }
-  const result = spawnSync(python, allArgs, {
-    stdio: 'inherit',
+  await spawnAsync({
+    command: python,
+    args: allArgs,
     cwd: opts.projectDir,
     env: opts?.env ? { ...process.env, ...opts.env } : process.env,
-    encoding: 'utf-8',
+    stdio: 'inherit',
   });
-  if (result.status !== 0) {
-    throw new Error(`shotgun.main exited with code ${result.status ?? 'unknown'}`);
-  }
-  return result;
 }
 
 /**
  * Runs `<python> -m shotgun.main codebase query <graphId> "<question>"` and returns the raw output.
  */
-export function queryShotgunIndex(opts: QueryShotgunIndexOptions): ShotgunQueryResult {
+export async function queryShotgunIndex(
+  opts: QueryShotgunIndexOptions,
+): Promise<ShotgunQueryResult> {
+  const python = resolveShotgunPython();
   const { graphId, question, projectDir } = opts;
-  const result = runShotgunCli(['codebase', 'query', graphId, question], {
-    projectDir,
-    printCmd: true,
-  });
-  if (result.status !== 0) {
-    throw new Error(
-      `shotgun-sh codebase query failed: ${result.stderr?.trim() ?? result.error?.message ?? 'unknown'}`,
-    );
+  const display = [
+    python,
+    '-m',
+    'shotgun.main',
+    'codebase',
+    'query',
+    graphId,
+    formatArgForDisplay(question),
+  ].join(' ');
+  console.log(`  $ ${display}`);
+
+  try {
+    const raw = await spawnCapture({
+      command: python,
+      args: ['-m', 'shotgun.main', 'codebase', 'query', graphId, question],
+      cwd: projectDir,
+    });
+    return { raw: raw.trim() };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`shotgun-sh codebase query failed: ${msg}`);
   }
-  return { raw: (result.stdout ?? '').trim() };
+}
+
+/**
+ * Capture stdout from `<python> -m shotgun.main <args>` (pipe mode).
+ */
+export async function runShotgunCapture(
+  args: string[],
+  opts: RunShotgunCliOptions,
+): Promise<string> {
+  const python = resolveShotgunPython();
+  if (opts?.printCmd) {
+    const allArgs = ['-m', 'shotgun.main', ...args];
+    const display = [python, ...allArgs]
+      .map((a, i) => (i === 0 ? a : formatArgForDisplay(a)))
+      .join(' ');
+    console.log(`  $ ${display}`);
+  }
+  return spawnCapture({
+    command: python,
+    args: ['-m', 'shotgun.main', ...args],
+    cwd: opts.projectDir,
+    env: opts?.env ? { ...process.env, ...opts.env } : process.env,
+  });
 }

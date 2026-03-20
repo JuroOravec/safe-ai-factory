@@ -10,9 +10,9 @@
  *      gRPC connectivity to HATCHET_SERVER_URL.
  */
 
-import { execSync } from 'node:child_process';
-
 import { defineCommand, runMain } from 'citty';
+
+import { spawnCapture } from '../../utils/io.js';
 
 const RESET = '\x1b[0m';
 const GREEN = '\x1b[32m';
@@ -30,9 +30,9 @@ function fail(msg: string) {
   process.stdout.write(`  ${RED}✘${RESET}  ${msg}\n`);
 }
 
-function checkDocker(): boolean {
+async function checkDocker(): Promise<boolean> {
   try {
-    execSync('docker info', { stdio: 'pipe' });
+    await spawnCapture({ command: 'docker', args: ['info'], cwd: process.cwd() });
     ok('Docker is running');
     return true;
   } catch {
@@ -87,7 +87,7 @@ const doctorCommand = defineCommand({
 
     const results: boolean[] = [];
 
-    results.push(checkDocker());
+    results.push(await checkDocker());
     results.push(await checkHatchet());
 
     const allPassed = results.every(Boolean);

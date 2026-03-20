@@ -10,7 +10,6 @@
  *   clear            Remove factory containers/images (scoped to project; --all: everything)
  */
 
-import { execSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -32,6 +31,7 @@ import {
   SUPPORTED_PROFILES,
   type TestProfile,
 } from '../src/test-profiles/index.js';
+import { spawnAsync, spawnCapture } from '../src/utils/io.js';
 
 function parseProjectName(opts: { project?: string }): string {
   const fromOpt =
@@ -104,14 +104,16 @@ const testBuildCommand = defineCommand({
       console.log(`Building: ${tag}`);
       console.log(`  Dockerfile: ${dockerfilePath}`);
 
-      const result = spawnSync('docker', ['build', '-f', dockerfilePath, '-t', tag, '.'], {
-        stdio: 'inherit',
-        cwd: repoRoot,
-      });
-
-      if (result.status !== 0) {
-        console.error(`\ndocker build failed for ${profile.id} (exit ${result.status ?? 1})`);
-        process.exit(result.status ?? 1);
+      try {
+        await spawnAsync({
+          command: 'docker',
+          args: ['build', '-f', dockerfilePath, '-t', tag, '.'],
+          cwd: repoRoot,
+          stdio: 'inherit',
+        });
+      } catch {
+        console.error(`\ndocker build failed for ${profile.id}`);
+        process.exit(1);
       }
       console.log(`  => ${tag}\n`);
     }
@@ -149,14 +151,16 @@ const coderBaseBuildCommand = defineCommand({
     console.log(`  Dockerfile: ${dockerfilePath}`);
     console.log('  (extend this image to bring your own coder agent)\n');
 
-    const result = spawnSync('docker', ['build', '-f', dockerfilePath, '-t', tag, '.'], {
-      stdio: 'inherit',
-      cwd: repoRoot,
-    });
-
-    if (result.status !== 0) {
-      console.error(`\ndocker build failed (exit ${result.status ?? 1})`);
-      process.exit(result.status ?? 1);
+    try {
+      await spawnAsync({
+        command: 'docker',
+        args: ['build', '-f', dockerfilePath, '-t', tag, '.'],
+        cwd: repoRoot,
+        stdio: 'inherit',
+      });
+    } catch {
+      console.error(`\ndocker build failed`);
+      process.exit(1);
     }
 
     console.log(`\nCoder base image built: ${tag}`);
@@ -211,14 +215,16 @@ const coderBuildCommand = defineCommand({
       console.log(`  Profile:    ${profile.id} (${profile.displayName})`);
       console.log(`  Dockerfile: ${dockerfilePath}`);
 
-      const result = spawnSync('docker', ['build', '-f', dockerfilePath, '-t', tag, '.'], {
-        stdio: 'inherit',
-        cwd: repoRoot,
-      });
-
-      if (result.status !== 0) {
-        console.error(`\ndocker build failed for ${profile.id} (exit ${result.status ?? 1})`);
-        process.exit(result.status ?? 1);
+      try {
+        await spawnAsync({
+          command: 'docker',
+          args: ['build', '-f', dockerfilePath, '-t', tag, '.'],
+          cwd: repoRoot,
+          stdio: 'inherit',
+        });
+      } catch {
+        console.error(`\ndocker build failed for ${profile.id}`);
+        process.exit(1);
       }
       console.log(`  => ${tag}\n`);
     }
@@ -277,14 +283,16 @@ const stageBuildCommand = defineCommand({
       console.log(`  Profile:    ${profile.id} (${profile.displayName})`);
       console.log(`  Dockerfile: ${dockerfilePath}`);
 
-      const result = spawnSync('docker', ['build', '-f', dockerfilePath, '-t', tag, '.'], {
-        stdio: 'inherit',
-        cwd: repoRoot,
-      });
-
-      if (result.status !== 0) {
-        console.error(`\ndocker build failed for ${profile.id} (exit ${result.status ?? 1})`);
-        process.exit(result.status ?? 1);
+      try {
+        await spawnAsync({
+          command: 'docker',
+          args: ['build', '-f', dockerfilePath, '-t', tag, '.'],
+          cwd: repoRoot,
+          stdio: 'inherit',
+        });
+      } catch {
+        console.error(`\ndocker build failed for ${profile.id}`);
+        process.exit(1);
       }
       console.log(`  => ${tag}\n`);
     }
@@ -321,12 +329,16 @@ const clearCommand = defineCommand({
     let removedImages = 0;
     let removedNetworks = 0;
 
-    const removeContainersByPrefix = (prefix: string): number => {
+    const removeContainersByPrefix = async (prefix: string): Promise<number> => {
       let lines: string;
       try {
-        lines = execSync(`docker ps -a --format '{{.Names}}' --filter 'name=${prefix}'`, {
-          encoding: 'utf8',
-        }).trim();
+        lines = (
+          await spawnCapture({
+            command: 'docker',
+            args: ['ps', '-a', '--format', '{{.Names}}', '--filter', `name=${prefix}`],
+            cwd: process.cwd(),
+          })
+        ).trim();
       } catch {
         console.error('Failed to list Docker containers. Is Docker running?');
         process.exit(1);
@@ -336,7 +348,12 @@ const clearCommand = defineCommand({
       let removed = 0;
       for (const name of matching) {
         try {
-          execSync(`docker rm -f "${name}"`, { stdio: 'pipe' });
+          await spawnAsync({
+            command: 'docker',
+            args: ['rm', '-f', name],
+            cwd: process.cwd(),
+            stdio: 'pipe',
+          });
           console.log(`  removed container: ${name}`);
           removed++;
         } catch (err) {
@@ -347,17 +364,26 @@ const clearCommand = defineCommand({
     };
 
     console.log(`\nListing staging containers (prefix: ${stagingPrefix}*)...`);
-    removedContainers += removeContainersByPrefix(stagingPrefix);
+    removedContainers += await removeContainersByPrefix(stagingPrefix);
 
     console.log(`\nListing test runner containers (prefix: ${testRunnerPrefix}*)...`);
-    removedContainers += removeContainersByPrefix(testRunnerPrefix);
+    removedContainers += await removeContainersByPrefix(testRunnerPrefix);
 
     console.log(`\nListing Docker images (prefix: ${stagingPrefix}*)...`);
     let imageLines: string;
     try {
-      imageLines = execSync(
-        `docker images --format '{{.Repository}}:{{.Tag}}' --filter 'reference=${stagingPrefix}*'`,
-        { encoding: 'utf8' },
+      imageLines = (
+        await spawnCapture({
+          command: 'docker',
+          args: [
+            'images',
+            '--format',
+            '{{.Repository}}:{{.Tag}}',
+            '--filter',
+            `reference=${stagingPrefix}*`,
+          ],
+          cwd: process.cwd(),
+        })
       ).trim();
     } catch {
       console.error('Failed to list Docker images. Is Docker running?');
@@ -370,7 +396,12 @@ const clearCommand = defineCommand({
     });
     for (const tag of matchingImages) {
       try {
-        execSync(`docker rmi -f "${tag}"`, { stdio: 'pipe' });
+        await spawnAsync({
+          command: 'docker',
+          args: ['rmi', '-f', tag],
+          cwd: process.cwd(),
+          stdio: 'pipe',
+        });
         console.log(`  removed image: ${tag}`);
         removedImages++;
       } catch (err) {
@@ -381,9 +412,12 @@ const clearCommand = defineCommand({
     console.log(`\nListing factory networks (prefix: ${networkPrefix}*)...`);
     let networkLines: string;
     try {
-      networkLines = execSync(
-        `docker network ls --format '{{.Name}}' --filter 'name=${networkPrefix}'`,
-        { encoding: 'utf8' },
+      networkLines = (
+        await spawnCapture({
+          command: 'docker',
+          args: ['network', 'ls', '--format', '{{.Name}}', '--filter', `name=${networkPrefix}`],
+          cwd: process.cwd(),
+        })
       ).trim();
     } catch {
       console.error('Failed to list Docker networks. Is Docker running?');
@@ -393,7 +427,12 @@ const clearCommand = defineCommand({
     const matchingNetworks = networkNames.filter((n) => n.startsWith(networkPrefix));
     for (const name of matchingNetworks) {
       try {
-        execSync(`docker network rm "${name}"`, { stdio: 'pipe' });
+        await spawnAsync({
+          command: 'docker',
+          args: ['network', 'rm', name],
+          cwd: process.cwd(),
+          stdio: 'pipe',
+        });
         console.log(`  removed network: ${name}`);
         removedNetworks++;
       } catch (err) {
