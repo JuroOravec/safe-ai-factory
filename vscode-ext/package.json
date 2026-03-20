@@ -194,6 +194,16 @@
         "icon": "$(output)"
       }
     ],
+    "configuration": {
+      "title": "Safe AI Factory",
+      "properties": {
+        "saifac.verbose": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose logging for the Safe AI Factory extension. When enabled, debug-level messages appear in the SAIFAC output panel."
+        }
+      }
+    },
     "menus": {
       "view/title": [
         {

@@ -9,9 +9,8 @@ import { chmod, mkdir, readdir, rm } from 'node:fs/promises';
 import { arch } from 'node:os';
 import { join } from 'node:path';
 
-import { consola } from 'consola';
-
 import { getSaifRoot } from '../../../constants.js';
+import { consola } from '../../../logger.js';
 import { pathExists, spawnAsync } from '../../../utils/io.js';
 
 const ARGUS_VERSION = '0.5.2';

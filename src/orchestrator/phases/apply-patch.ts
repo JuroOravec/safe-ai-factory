@@ -4,11 +4,10 @@
 
 import { join } from 'node:path';
 
-import { consola } from 'consola';
-
 import { generatePRSummary } from '../../git/agents/pr-summarizer.js';
 import type { GitProvider } from '../../git/types.js';
 import type { ModelOverrides } from '../../llm-config.js';
+import { consola } from '../../logger.js';
 import type { Feature } from '../../specs/discover.js';
 import {
   gitAdd,

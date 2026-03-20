@@ -5,8 +5,8 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import { consola } from 'consola';
 
+import { consola } from '../../logger.js';
 import { readUtf8 } from '../../utils/io.js';
 import type { AssertionResult, AssertionSuiteResult } from '../types.js';
 

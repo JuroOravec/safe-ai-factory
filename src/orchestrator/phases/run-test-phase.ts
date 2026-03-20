@@ -7,8 +7,7 @@
 
 import { join } from 'node:path';
 
-import { consola } from 'consola';
-
+import { consola } from '../../logger.js';
 import { createProvisioner } from '../../provisioners/index.js';
 import type { TestsResult } from '../../provisioners/types.js';
 import type { CleanupRegistry } from '../../utils/cleanup.js';

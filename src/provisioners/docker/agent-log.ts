@@ -6,7 +6,7 @@
  * them without circular dependencies.
  */
 
-import { consola } from 'consola';
+import { consola } from '../../logger.js';
 
 /**
  * Reserved env var prefixes and keys that must not be overridden by agentEnv.

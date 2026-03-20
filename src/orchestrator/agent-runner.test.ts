@@ -5,9 +5,9 @@
  * or the filesystem.
  */
 
-import { consola } from 'consola';
 import { describe, expect, it, vi } from 'vitest';
 
+import { consola } from '../logger.js';
 import { filterAgentEnv } from '../provisioners/docker/agent-log.js';
 
 describe('filterAgentEnv', () => {

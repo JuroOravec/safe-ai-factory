@@ -1,7 +1,6 @@
 import { join } from 'node:path';
 
-import { consola } from 'consola';
-
+import { consola } from '../../logger.js';
 import { writeUtf8 } from '../../utils/io.js';
 import { validateTypescript } from '../../utils/typescript.js';
 import type { OnDoneOpts, TestProfile, ValidateFilesOpts } from '../types.js';

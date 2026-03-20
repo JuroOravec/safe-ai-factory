@@ -10,7 +10,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { consola } from 'consola';
+import { consola } from '../../logger.js';
 
 const SKILLS_DIR = '.cursor/skills';
 

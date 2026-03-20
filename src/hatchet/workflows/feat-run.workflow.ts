@@ -38,9 +38,9 @@
 import { join } from 'node:path';
 
 import type { JsonValue } from '@hatchet-dev/typescript-sdk/v1/types.js';
-import { consola } from 'consola';
 import { z } from 'zod';
 
+import { consola } from '../../logger.js';
 import { buildInitialTask, runVagueSpecsCheckerForFailure } from '../../orchestrator/loop.js';
 import { getSandboxSourceDir } from '../../orchestrator/modes.js';
 import { applyPatchToHost } from '../../orchestrator/phases/apply-patch.js';

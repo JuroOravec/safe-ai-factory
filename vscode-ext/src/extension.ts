@@ -7,15 +7,29 @@
 
 import * as path from 'node:path';
 
-import { consola } from 'consola';
 import * as vscode from 'vscode';
 
 import { SaifCliService } from './cliService';
 import { FeatureItem, FeaturesTreeProvider } from './FeaturesTreeProvider';
 import { saifLogger } from './logger';
 import { RunItem, RunProjectItem, RunsTreeProvider } from './RunsTreeProvider';
+import { consola, setVerboseLogging } from './saifac-logger.js';
+
+function applyVerboseSetting(): void {
+  const verbose = vscode.workspace.getConfiguration('saifac').get<boolean>('verbose', false);
+  setVerboseLogging(verbose);
+}
 
 export async function activate(context: vscode.ExtensionContext) {
+  applyVerboseSetting();
+
+  const configChangeListener = vscode.workspace.onDidChangeConfiguration((e) => {
+    if (e.affectsConfiguration('saifac.verbose')) {
+      applyVerboseSetting();
+    }
+  });
+  context.subscriptions.push(configChangeListener);
+
   consola.log('Safe AI Factory extension is now active!');
 
   const cliService = new SaifCliService();

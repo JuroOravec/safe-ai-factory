@@ -5,7 +5,6 @@
 import { join, resolve } from 'node:path';
 
 import { cancel, intro, isCancel, outro, select } from '@clack/prompts';
-import { consola } from 'consola';
 
 import {
   type AgentProfile,
@@ -34,6 +33,7 @@ import {
   resolveIndexerProfile,
 } from '../indexer-profiles/index.js';
 import { isSupportedAgentName, type ModelOverrides, SUPPORTED_AGENT_NAMES } from '../llm-config.js';
+import { consola } from '../logger.js';
 import { DEFAULT_SANDBOX_BASE_DIR } from '../orchestrator/sandbox.js';
 import { createRunStorage } from '../run-storage/index.js';
 import {

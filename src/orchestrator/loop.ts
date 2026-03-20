@@ -6,7 +6,6 @@
 import { join } from 'node:path';
 
 import { isCancel, text } from '@clack/prompts';
-import { consola } from 'consola';
 
 import type {
   NormalizedCodingEnvironment,
@@ -18,6 +17,7 @@ import { TestCatalogSchema } from '../design-tests/schema.js';
 import { generateTests } from '../design-tests/write.js';
 import type { GitProvider } from '../git/types.js';
 import { type ModelOverrides, resolveAgentLlmConfig } from '../llm-config.js';
+import { consola } from '../logger.js';
 import { createProvisioner } from '../provisioners/index.js';
 import {
   type AssertionSuiteResult,

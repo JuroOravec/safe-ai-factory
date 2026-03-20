@@ -14,10 +14,9 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { consola } from 'consola';
-
 import { getSaifRoot } from '../constants.js';
 import { type ModelOverrides } from '../llm-config.js';
+import { consola } from '../logger.js';
 import type { Feature } from '../specs/discover.js';
 import { type TestProfile } from '../test-profiles/index.js';
 import type { DrainableChunk } from '../utils/drain-stream.js';

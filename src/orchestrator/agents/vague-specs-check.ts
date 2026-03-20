@@ -19,10 +19,10 @@
  */
 
 import { Agent } from '@mastra/core/agent';
-import { consola } from 'consola';
 import { z } from 'zod';
 
 import { type ModelOverrides, resolveAgentModel } from '../../llm-config.js';
+import { consola } from '../../logger.js';
 import type { AssertionResult, AssertionSuiteResult } from '../../provisioners/types.js';
 import { type DrainableChunk, drainFullStream } from '../../utils/drain-stream.js';
 

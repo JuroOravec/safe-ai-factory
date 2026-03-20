@@ -1,5 +1,4 @@
-import { consola } from 'consola';
-
+import { consola } from '../../logger.js';
 import { readUtf8, spawnCapture } from '../../utils/io.js';
 
 export default async function validateDocstrings() {

@@ -7,9 +7,9 @@
 
 import { resolve } from 'node:path';
 
-import { consola } from 'consola';
 import { cosmiconfig } from 'cosmiconfig';
 
+import { consola } from '../logger.js';
 import { pathExists } from '../utils/io.js';
 import { type SaifConfig, saifConfigSchema } from './schema.js';
 

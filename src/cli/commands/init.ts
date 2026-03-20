@@ -8,10 +8,10 @@
  */
 
 import { defineCommand, runMain } from 'citty';
-import { consola } from 'consola';
 
 import { scaffoldSaifConfig } from '../../config/scaffold.js';
 import { resolveIndexerProfile } from '../../indexer-profiles/index.js';
+import { consola } from '../../logger.js';
 import { indexerArg, projectDirArg, saifDirArg } from '../args.js';
 import { parseProjectDir, parseSaifDir, resolveProjectName } from '../utils.js';
 

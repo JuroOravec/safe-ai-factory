@@ -10,8 +10,8 @@
 import { readdir, rm as rmAsync } from 'node:fs/promises';
 
 import { defineCommand, runMain } from 'citty';
-import { consola } from 'consola';
 
+import { consola } from '../../logger.js';
 import { DEFAULT_SANDBOX_BASE_DIR } from '../../orchestrator/sandbox.js';
 import { pathExists } from '../../utils/io.js';
 import { projectDirArg, sandboxBaseDirArg } from '../args.js';

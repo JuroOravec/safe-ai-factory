@@ -19,7 +19,6 @@ import { join, resolve } from 'node:path';
 
 import { cancel, confirm, intro, isCancel, outro, text } from '@clack/prompts';
 import { defineCommand, runMain } from 'citty';
-import { consola } from 'consola';
 
 import {
   DEFAULT_AGENT_PROFILE,
@@ -33,6 +32,7 @@ import { runDesignTests } from '../../design-tests/design.js';
 import { generateTests } from '../../design-tests/write.js';
 import { DEFAULT_DESIGNER_PROFILE } from '../../designer-profiles/index.js';
 import type { ModelOverrides } from '../../llm-config.js';
+import { consola, setVerboseLogging } from '../../logger.js';
 import { runDebug, runFail2Pass, runStart } from '../../orchestrator/modes.js';
 import { readSandboxGateScript } from '../../sandbox-profiles/index.js';
 import type { Feature } from '../../specs/discover.js';
@@ -709,6 +709,7 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
 
   const feature = await getFeatOrPrompt(args, projectDir);
   const runArgs = args as FeatRunArgs;
+  setVerboseLogging(runArgs.verbose === true);
 
   const maxRuns = parseMaxRuns(runArgs, config);
   const overrides = parseModelOverrides(args, config);

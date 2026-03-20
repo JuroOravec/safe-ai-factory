@@ -1,5 +1,4 @@
-import { consola } from 'consola';
-
+import { consola } from '../logger.js';
 import { spawnWait } from './io.js';
 
 // TypeScript validation: ensure generated spec files have no syntax/type errors.

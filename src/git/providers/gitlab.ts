@@ -1,5 +1,5 @@
-import type { GitProvider, PullRequestOpts } from '../types.js';
 import { gitRemoteGetUrl } from '../../utils/git.js';
+import type { GitProvider, PullRequestOpts } from '../types.js';
 
 const DEFAULT_GITLAB_HOST = 'gitlab.com';
 

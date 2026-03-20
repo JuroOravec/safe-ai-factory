@@ -5,8 +5,7 @@
  * Exported as runCheck() for use by the commands CLI.
  */
 
-import { consola } from 'consola';
-
+import { consola } from '../logger.js';
 import { spawnUserCmd, spawnUserCmdCapture } from '../utils/io.js';
 
 const phases = [

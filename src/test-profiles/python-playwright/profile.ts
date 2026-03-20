@@ -1,5 +1,4 @@
-import { consola } from 'consola';
-
+import { consola } from '../../logger.js';
 import { spawnWait } from '../../utils/io.js';
 import type { TestProfile, ValidateFilesOpts } from '../types.js';
 

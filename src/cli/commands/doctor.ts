@@ -11,23 +11,19 @@
  */
 
 import { defineCommand, runMain } from 'citty';
+import { colors } from 'consola/utils';
 
+import { consola } from '../../logger.js';
 import { spawnCapture } from '../../utils/io.js';
 
-const RESET = '\x1b[0m';
-const GREEN = '\x1b[32m';
-const YELLOW = '\x1b[33m';
-const RED = '\x1b[31m';
-const BOLD = '\x1b[1m';
-
 function ok(msg: string) {
-  process.stdout.write(`  ${GREEN}✔${RESET}  ${msg}\n`);
+  consola.success(msg);
 }
 function warn(msg: string) {
-  process.stdout.write(`  ${YELLOW}⚠${RESET}  ${msg}\n`);
+  consola.warn(msg);
 }
 function fail(msg: string) {
-  process.stdout.write(`  ${RED}✘${RESET}  ${msg}\n`);
+  consola.error(msg);
 }
 
 async function checkDocker(): Promise<boolean> {
@@ -47,7 +43,7 @@ async function checkHatchet(): Promise<boolean> {
   if (!token) {
     warn(
       'HATCHET_CLIENT_TOKEN is not set — saifac will run in local (in-process) mode.\n' +
-        '         To enable Hatchet durability + dashboard, see: docs/hatchet.md',
+        'To enable Hatchet durability + dashboard, see: docs/hatchet.md',
     );
     return true; // Not an error — local mode is a valid configuration.
   }
@@ -71,7 +67,7 @@ async function checkHatchet(): Promise<boolean> {
     fail(`Hatchet SDK error: ${message}`);
     fail(
       'Make sure HATCHET_SERVER_URL is correct and the Hatchet server is reachable.\n' +
-        '         See: docs/hatchet.md',
+        'See: docs/hatchet.md',
     );
     return false;
   }
@@ -83,7 +79,9 @@ const doctorCommand = defineCommand({
     description: 'Check environment health (Docker, Hatchet connectivity)',
   },
   async run() {
-    process.stdout.write(`\n${BOLD}saifac doctor${RESET}\n\n`);
+    consola.log('');
+    consola.log(colors.bold('saifac doctor'));
+    consola.log('');
 
     const results: boolean[] = [];
 
@@ -92,11 +90,13 @@ const doctorCommand = defineCommand({
 
     const allPassed = results.every(Boolean);
 
-    process.stdout.write('\n');
+    consola.log('');
     if (allPassed) {
-      process.stdout.write(`${GREEN}All checks passed.${RESET}\n\n`);
+      consola.success('All checks passed.');
+      consola.log('');
     } else {
-      process.stdout.write(`${RED}One or more checks failed. See messages above.${RESET}\n\n`);
+      consola.error('One or more checks failed. See messages above.');
+      consola.log('');
       process.exit(1);
     }
   },

@@ -19,11 +19,11 @@ import { arch } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
 
-import { consola } from 'consola';
 import Docker from 'dockerode';
 
 import type { DockerEnvironment } from '../../config/schema.js';
 import { getSaifRoot } from '../../constants.js';
+import { consola } from '../../logger.js';
 import {
   resolveSandboxStageDockerfilePath,
   type SupportedSandboxProfileId,

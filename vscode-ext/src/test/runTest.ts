@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 
 import { runTests } from '@vscode/test-electron';
-import { consola } from 'consola';
+
+import { consola } from '../saifac-logger.js';
 
 /**
  * Entry point for VS Code extension tests. Runs outside VS Code in Node.

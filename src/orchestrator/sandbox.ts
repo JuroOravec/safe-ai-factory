@@ -24,10 +24,10 @@
 import { chmod, mkdir, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { consola } from 'consola';
 import { minimatch } from 'minimatch';
 
 import type { TestCatalog } from '../design-tests/schema.js';
+import { consola } from '../logger.js';
 import type { Feature } from '../specs/discover.js';
 import {
   gitAdd,

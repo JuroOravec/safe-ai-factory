@@ -9,14 +9,13 @@
 
 import { join } from 'node:path';
 
-import { consola } from 'consola';
-
 import { getHatchetClient } from '../hatchet/client.js';
 import { serializeOrchestratorOpts } from '../hatchet/utils/serialize-opts.js';
 import {
   createFeatRunWorkflow,
   type FeatRunSerializedInput,
 } from '../hatchet/workflows/feat-run.workflow.js';
+import { consola } from '../logger.js';
 import { hasFeatureSuccessfullyFailed } from '../provisioners/docker/index.js';
 import { createProvisioner } from '../provisioners/index.js';
 import { type TestsResult } from '../provisioners/types.js';

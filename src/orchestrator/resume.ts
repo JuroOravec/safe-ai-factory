@@ -8,8 +8,7 @@
 import { mkdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { consola } from 'consola';
-
+import { consola } from '../logger.js';
 import {
   buildRunArtifact,
   deserializeArtifactConfig,

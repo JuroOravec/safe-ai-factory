@@ -11,10 +11,10 @@ import { mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { Tool } from '@mastra/core/tools';
-import { consola } from 'consola';
 
 import type { IndexerProfile } from '../indexer-profiles/index.js';
 import { type ModelOverrides } from '../llm-config.js';
+import { consola } from '../logger.js';
 import type { Feature } from '../specs/discover.js';
 import { type TestProfile } from '../test-profiles/index.js';
 import { type DrainableChunk, drainFullStream } from '../utils/drain-stream.js';

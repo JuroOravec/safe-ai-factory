@@ -19,9 +19,9 @@
  */
 
 import { createTool, type Tool } from '@mastra/core/tools';
-import { consola } from 'consola';
 import { z } from 'zod';
 
+import { consola } from '../../logger.js';
 import type { IndexerGetToolOpts, IndexerInitOpts, IndexerProfile } from '../types.js';
 import { queryShotgunIndex, runShotgunCapture, runShotgunCli } from './shotgun.js';
 

@@ -13,9 +13,9 @@
 import { resolve } from 'node:path';
 
 import { defineCommand, runMain } from 'citty';
-import { consola } from 'consola';
 
 import { getSaifRoot } from '../src/constants.js';
+import { consola } from '../src/logger.js';
 import {
   DEFAULT_SANDBOX_PROFILE,
   resolveSandboxCoderDockerfilePath,

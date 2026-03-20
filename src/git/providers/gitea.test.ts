@@ -147,7 +147,9 @@ describe('GiteaProvider.resolvePushUrl', () => {
 
   it('throws for an unknown remote name when git remote get-url fails', async () => {
     const p = makeProvider();
-    await expect(p.resolvePushUrl('nonexistent-remote', '/tmp/not-a-real-git-repo')).rejects.toThrow(/Cannot resolve push target "nonexistent-remote"/);
+    await expect(
+      p.resolvePushUrl('nonexistent-remote', '/tmp/not-a-real-git-repo'),
+    ).rejects.toThrow(/Cannot resolve push target "nonexistent-remote"/);
   });
 });
 
@@ -205,19 +207,23 @@ describe('GiteaProvider.extractRepoSlug', () => {
   it('strips embedded userinfo from an HTTPS URL when extracting slug', async () => {
     const p = makeProvider();
     // userinfo should not leak into the host stored in the opaque slug
-    expect(await p.extractRepoSlug('https://myuser:mytoken@gitea.com/owner/repo.git', FAKE_ROOT)).toBe(
-      'https://gitea.com|owner/repo',
-    );
+    expect(
+      await p.extractRepoSlug('https://myuser:mytoken@gitea.com/owner/repo.git', FAKE_ROOT),
+    ).toBe('https://gitea.com|owner/repo');
   });
 
   it('extracts slug correctly for a dotted repo name (owner/my.repo)', async () => {
     const p = makeProvider();
-    expect(await p.extractRepoSlug('owner/my.repo', FAKE_ROOT)).toBe('https://gitea.com|owner/my.repo');
+    expect(await p.extractRepoSlug('owner/my.repo', FAKE_ROOT)).toBe(
+      'https://gitea.com|owner/my.repo',
+    );
   });
 
   it('extracts slug from an owner/repo.git slug shorthand', async () => {
     const p = makeProvider();
-    expect(await p.extractRepoSlug('owner/repo.git', FAKE_ROOT)).toBe('https://gitea.com|owner/repo');
+    expect(await p.extractRepoSlug('owner/repo.git', FAKE_ROOT)).toBe(
+      'https://gitea.com|owner/repo',
+    );
   });
 
   it('expands an owner/repo slug using gitea.com when GITEA_URL is not set', async () => {
@@ -235,23 +241,25 @@ describe('GiteaProvider.extractRepoSlug', () => {
 
   it('throws for an unresolvable remote name', async () => {
     const p = makeProvider();
-    await expect(p.extractRepoSlug('nonexistent-remote', '/tmp/not-a-real-git-repo')).rejects.toThrow(
-      /Cannot resolve remote/,
-    );
+    await expect(
+      p.extractRepoSlug('nonexistent-remote', '/tmp/not-a-real-git-repo'),
+    ).rejects.toThrow(/Cannot resolve remote/);
   });
 
   it('throws when GITEA_URL contains a pipe character', async () => {
     process.env.GITEA_URL = 'https://gitea|bad.com';
     const p = makeProvider();
-    await expect(p.extractRepoSlug('owner/repo', FAKE_ROOT)).rejects.toThrow(/GITEA_URL must not contain/);
+    await expect(p.extractRepoSlug('owner/repo', FAKE_ROOT)).rejects.toThrow(
+      /GITEA_URL must not contain/,
+    );
   });
 
   it('throws when the URL cannot be parsed as a Gitea URL', async () => {
     const p = makeProvider();
     // An HTTPS URL that cannot be reduced to owner/repo (extra path segment)
-    await expect(p.extractRepoSlug('https://gitea.com/group/subgroup/repo.git', FAKE_ROOT)).rejects.toThrow(
-      /Cannot extract Gitea owner\/repo/,
-    );
+    await expect(
+      p.extractRepoSlug('https://gitea.com/group/subgroup/repo.git', FAKE_ROOT),
+    ).rejects.toThrow(/Cannot extract Gitea owner\/repo/);
   });
 });
 

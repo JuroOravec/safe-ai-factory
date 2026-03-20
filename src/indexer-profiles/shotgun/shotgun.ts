@@ -12,8 +12,7 @@
  * @see {@link file://.cursor/skills/project/setup-swe-factory/SKILL.md Phase 2}
  */
 
-import { consola } from 'consola';
-
+import { consola } from '../../logger.js';
 import { spawnAsync, spawnCapture } from '../../utils/io.js';
 
 export interface ShotgunQueryResult {

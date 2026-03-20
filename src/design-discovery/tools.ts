@@ -11,12 +11,12 @@ import { resolve } from 'node:path';
 import { createTool, type Tool } from '@mastra/core/tools';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { consola } from 'consola';
 import { createJiti } from 'jiti';
 import { z } from 'zod';
 
 import type { DiscoveryOptions } from '../cli/utils.js';
 import { getSaifRoot } from '../constants.js';
+import { consola } from '../logger.js';
 import { pathExists } from '../utils/io.js';
 
 const jitiInstance = createJiti(resolve(getSaifRoot(), 'src', 'design-discovery', 'tools.ts'), {

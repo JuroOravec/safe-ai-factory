@@ -73,6 +73,25 @@ for Claude Code).
 These are the **private** contract between the orchestrator and the
 container — you should never need to set them directly.
 
+## Logging
+
+These variables tune what saifac prints to the terminal. They are read by the
+[consola](https://github.com/unjs/consola) logger on startup and require no
+code changes to take effect.
+
+| Variable        | Description                                                                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CONSOLA_LEVEL` | Numeric minimum log level. Lower = quieter. Common values: `0` (fatal only), `3` (info, the default), `4` (verbose), `5` (debug), `999` (trace — everything).                  |
+| `DEBUG`         | When set to any non-empty value and `CONSOLA_LEVEL` is **not** set, consola raises its level to `4` (verbose) automatically. Mirrors the Node.js ecosystem `DEBUG` convention. |
+
+Both variables are overridden at runtime by the `--verbose` CLI flag
+(`saifac feat run --verbose`), which sets the level to `debug` (5) for that
+invocation. Prefer the flag for one-off debugging; prefer the env vars for
+persistent configuration or CI.
+
+For full logging architecture details see
+[docs/development/logging.md](development/logging.md).
+
 ## Hatchet (optional)
 
 Setting these options enables the Hatchet-backed orchestrator, which adds
@@ -81,5 +100,5 @@ in-process mode. See [Hatchet integration](hatchet.md) for setup instructions.
 
 | Variable               | Description                                                       |
 | ---------------------- | ----------------------------------------------------------------- |
-| `HATCHET_CLIENT_TOKEN` | API token from the Hatchet dashboard. Enables Hatchet.   |
+| `HATCHET_CLIENT_TOKEN` | API token from the Hatchet dashboard. Enables Hatchet.            |
 | `HATCHET_SERVER_URL`   | gRPC address of the Hatchet server. Defaults to `localhost:7077`. |

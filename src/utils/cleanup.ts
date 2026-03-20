@@ -2,7 +2,7 @@
 // Cleanup registry — tracks live provisioners for graceful shutdown
 // ---------------------------------------------------------------------------
 
-import { consola } from 'consola';
+import { consola } from '../logger.js';
 
 /** Minimal provisioner interface used by CleanupRegistry (avoids circular deps). */
 export interface ProvisionerRef {

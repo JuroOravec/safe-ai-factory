@@ -1,8 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { consola } from 'consola';
-
+import { consola } from '../../logger.js';
 import { pathExists, spawnWait, writeUtf8 } from '../../utils/io.js';
 import type { OnDoneOpts, TestProfile, ValidateFilesOpts } from '../types.js';
 

@@ -10,8 +10,8 @@ import type { DiscoveryOptions } from '../cli/utils.js';
 import type { ModelOverrides } from '../llm-config.js';
 import type { Feature } from '../specs/discover.js';
 import { type DrainableChunk, drainFullStream } from '../utils/drain-stream.js';
-import { createDiscoveryAgent } from './agent.js';
 import { pathExists, readUtf8, writeUtf8 } from '../utils/io.js';
+import { createDiscoveryAgent } from './agent.js';
 import { loadDiscoveryTools } from './tools.js';
 
 export interface RunDiscoveryOpts {
