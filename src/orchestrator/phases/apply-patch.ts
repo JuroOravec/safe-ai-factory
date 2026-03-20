@@ -32,6 +32,8 @@ export interface ApplyPatchOpts {
   gitProvider: GitProvider;
   /** CLI-level model overrides forwarded to the PR summarizer agent. */
   overrides: ModelOverrides;
+  /** When true, verbose logs are enabled. */
+  verbose?: boolean;
 }
 
 /**
@@ -50,7 +52,7 @@ export interface ApplyPatchOpts {
  * is deleted, otherwise git's internal worktree registry gets stale entries.
  */
 export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
-  const { codePath, projectDir, feature, runId, push, pr, gitProvider, overrides } = opts;
+  const { codePath, projectDir, feature, runId, push, pr, gitProvider, overrides, verbose } = opts;
 
   // patch.diff is written to sandboxBasePath (parent of codePath) by extractPatch,
   // deliberately outside the git working tree so `git clean -fd` cannot delete it.
@@ -101,10 +103,14 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
     // 2. Apply patch inside the worktree
     execSync(`git apply "${patchFile}"`, { cwd: wtPath, env: gitEnv });
     execSync('git add .', { cwd: wtPath, env: gitEnv });
-    execSync(`git commit -m "feat(${feature.name}): auto-generated implementation"`, {
-      cwd: wtPath,
-      env: gitEnv,
-    });
+    const implCommitQuiet = verbose === true ? '' : '-q ';
+    execSync(
+      `git commit ${implCommitQuiet}-m "feat(${feature.name}): auto-generated implementation"`,
+      {
+        cwd: wtPath,
+        env: gitEnv,
+      },
+    );
     console.log(`[orchestrator] Committed patch on branch ${branchName}`);
 
     // 4. Push

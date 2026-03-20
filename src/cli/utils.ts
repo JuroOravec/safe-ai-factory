@@ -638,6 +638,7 @@ export interface FeatRunArgs extends OrchestratorArgs {
   push?: string;
   pr?: boolean;
   'git-provider'?: string;
+  verbose?: boolean;
 }
 
 export function parseMaxRuns(args: FeatRunArgs, config?: SaifConfig): number {

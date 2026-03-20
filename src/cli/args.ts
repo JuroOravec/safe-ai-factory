@@ -197,4 +197,9 @@ export const featRunArgs = {
     description:
       'Git hosting provider for push/PR. github | gitlab | bitbucket | azure | gitea (default: github).',
   },
+  verbose: {
+    type: 'boolean' as const,
+    alias: 'v' as const,
+    description: 'Show verbose logs. Default: quiet logs.',
+  },
 };

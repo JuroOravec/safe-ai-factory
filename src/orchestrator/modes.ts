@@ -203,6 +203,7 @@ type Fail2PassOpts = Pick<
   | 'agentScript'
   | 'stageScript'
   | 'testScript'
+  | 'verbose'
 >;
 
 async function runFail2PassCore(
@@ -239,6 +240,7 @@ async function runFail2PassCore(
     agentStartScript,
     agentScript,
     stageScript,
+    verbose: opts.verbose,
   });
   const testRunnerOpts = prepareTestRunnerOpts({
     feature,
@@ -373,6 +375,7 @@ async function runStartCore(
     agentStartScript,
     agentScript,
     stageScript,
+    verbose: opts.verbose,
   });
 
   // ─── Save run artifact (on Ctrl+C / failure) ───────────────────────────────
@@ -534,6 +537,7 @@ type TestOpts = Pick<
   | 'gitProvider'
   | 'overrides'
   | 'reviewerEnabled'
+  | 'verbose'
 > & {
   /**
    * Required for mode='test': path to a patch file to apply before tests.
@@ -574,6 +578,7 @@ async function runTestsCore(
     pr,
     gitProvider,
     overrides,
+    verbose,
   } = opts;
 
   if (!patchPath) {
@@ -597,6 +602,7 @@ async function runTestsCore(
     agentStartScript,
     agentScript,
     stageScript,
+    verbose,
   });
   const testRunnerOpts = prepareTestRunnerOpts({
     feature,
@@ -670,6 +676,7 @@ async function runTestsCore(
           pr,
           gitProvider,
           overrides,
+          verbose,
         });
         return {
           success: true,

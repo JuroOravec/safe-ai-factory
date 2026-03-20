@@ -196,6 +196,10 @@ export interface IterativeLoopOpts {
    * The stack is torn down cleanly after each agent run regardless of outcome.
    */
   codingEnvironment: NormalizedCodingEnvironment;
+  /**
+   * When true, verbose logs are enabled.
+   */
+  verbose?: boolean;
 }
 
 export interface OrchestratorResult {
@@ -455,6 +459,7 @@ export async function runIterativeLoop(
             pr,
             gitProvider,
             overrides,
+            verbose: opts.verbose,
           });
           destroySandbox(sandbox.sandboxBasePath);
           sandboxDestroyed = true;

@@ -63,6 +63,8 @@ export interface SerializedOrchestratorOpts extends Record<string, unknown> {
   } | null;
   /** URI passed to createRunStorage, or null when storage is disabled. */
   runStorageUri: string | null;
+  /** When true, verbose logs are enabled. */
+  verbose?: boolean;
 }
 
 export function serializeOrchestratorOpts(opts: OrchestratorOpts): SerializedOrchestratorOpts {
@@ -159,5 +161,6 @@ export function deserializeOrchestratorOpts(serialized: Record<string, unknown>)
         }
       : null,
     runStorage: s.runStorageUri ? createRunStorage(s.runStorageUri, s.projectDir) : null,
+    verbose: !!s.verbose,
   };
 }

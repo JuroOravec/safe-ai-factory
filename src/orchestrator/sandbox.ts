@@ -170,6 +170,11 @@ export interface CreateSandboxOpts {
    * Defaults to the profile's stage.sh when not provided.
    */
   stageScript: string;
+  /**
+   * When true, `git commit` omits `-q` so per-file summaries are printed.
+   * When false/omitted, commits use `-q` for quieter output.
+   */
+  verbose?: boolean;
 }
 
 /**
@@ -197,6 +202,7 @@ export function createSandbox(opts: CreateSandboxOpts): Sandbox {
     agentStartScript,
     agentScript,
     stageScript,
+    verbose,
   } = opts;
   const runId = opts.runId ?? Math.random().toString(36).substring(2, 9);
 
@@ -252,7 +258,8 @@ export function createSandbox(opts: CreateSandboxOpts): Sandbox {
   // Initialize a fresh git repo inside code/ for patch extraction
   execSync('git init', { cwd: codePath, stdio: 'inherit' });
   execSync('git add .', { cwd: codePath, stdio: 'inherit' });
-  execSync('git commit -m "Base state"', {
+  const baseCommitQuiet = verbose === true ? '' : '-q ';
+  execSync(`git commit ${baseCommitQuiet}-m "Base state"`, {
     cwd: codePath,
     stdio: 'inherit',
     env: {

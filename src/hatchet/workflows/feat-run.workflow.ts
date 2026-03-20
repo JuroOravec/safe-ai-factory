@@ -305,6 +305,7 @@ export function createFeatRunWorkflow() {
         agentStartScript: opts.agentStartScript,
         agentScript: opts.agentScript,
         stageScript: opts.stageScript,
+        verbose: !!opts.verbose,
       }) as Sandbox & { [x: string]: JsonValue };
     },
   });
@@ -436,6 +437,7 @@ export function createFeatRunWorkflow() {
         pr: opts.pr,
         gitProvider: opts.gitProvider,
         overrides: opts.overrides,
+        verbose: !!opts.verbose,
       });
 
       return { applied: true };

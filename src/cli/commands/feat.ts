@@ -765,6 +765,7 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
   console.log(`  Agent env vars: ${Object.keys(agentEnv).join(', ') || 'none'}`);
   console.log(`  Gate retries: ${gateRetries}`);
   if (push) console.log(`  Push: ${push}${pr ? ` (+ PR via ${gitProvider.id})` : ''}`);
+  if (runArgs.verbose === true) console.log('  Verbose: enabled');
 
   return {
     sandboxProfileId: sandboxProfile.id,
@@ -799,6 +800,7 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
     stagingEnvironment,
     codingEnvironment,
     resume: null,
+    verbose: !!runArgs.verbose,
   };
 };
 
