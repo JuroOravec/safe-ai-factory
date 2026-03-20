@@ -7,7 +7,7 @@
  * Outputs are written to saifac/features/<featureName>/tests/
  */
 
-import { mkdirSync, readdirSync } from 'node:fs';
+import { mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { Tool } from '@mastra/core/tools';
@@ -66,7 +66,7 @@ async function readFeatureFiles(featureDir: string): Promise<Record<string, stri
 
   async function walk(dir: string, prefix: string): Promise<void> {
     if (!(await pathExists(dir))) return;
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
       const fullPath = join(dir, entry.name);
       const relPath = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
@@ -198,7 +198,7 @@ export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTests
   }
 
   // Write tests.md
-  mkdirSync(testsDir, { recursive: true });
+  await mkdir(testsDir, { recursive: true });
   const testPlanPath = join(testsDir, 'tests.md');
   await writeUtf8(testPlanPath, testPlan);
   console.log(`[design-tests:plan] Step 1a complete → ${testPlanPath}`);

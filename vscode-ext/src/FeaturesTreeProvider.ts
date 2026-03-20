@@ -142,7 +142,7 @@ export class FeaturesTreeProvider implements vscode.TreeDataProvider<SaifTreeIte
       return [];
     }
 
-    const features = this.discoverFeaturesRecursive(featuresDirPath, projectPath);
+    const features = await this.discoverFeaturesRecursive(featuresDirPath, projectPath);
     return features;
   }
 
@@ -155,18 +155,21 @@ export class FeaturesTreeProvider implements vscode.TreeDataProvider<SaifTreeIte
    * Recursively discovers feature dirs. Feature ID = full relative path
    * (e.g. "(auth)/login", "my-feat").
    */
-  private discoverFeaturesRecursive(baseDir: string, projectPath: string): FeatureItem[] {
+  private async discoverFeaturesRecursive(
+    baseDir: string,
+    projectPath: string,
+  ): Promise<FeatureItem[]> {
     const features: FeatureItem[] = [];
 
-    const scan = (currentPath: string, relativePrefix: string) => {
-      const entries = fs.readdirSync(currentPath, { withFileTypes: true });
+    const scan = async (currentPath: string, relativePrefix: string): Promise<void> => {
+      const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
         const fullPath = path.join(currentPath, entry.name);
         const relativePath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
 
         if (this.isGroupDir(entry.name)) {
-          scan(fullPath, relativePath);
+          await scan(fullPath, relativePath);
         } else {
           features.push(
             new FeatureItem({
@@ -179,7 +182,7 @@ export class FeaturesTreeProvider implements vscode.TreeDataProvider<SaifTreeIte
       }
     };
 
-    scan(baseDir, '');
+    await scan(baseDir, '');
     return features;
   }
 }

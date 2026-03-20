@@ -21,7 +21,8 @@
  *       ...rest of repo...
  */
 
-import { chmodSync, mkdirSync, readdirSync } from 'node:fs';
+import { chmodSync } from 'node:fs';
+import { mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { minimatch } from 'minimatch';
@@ -44,7 +45,7 @@ export async function removeAllHiddenDirs(baseDir: string): Promise<number> {
   let removed = 0;
   if (!(await pathExists(baseDir))) return removed;
 
-  const entries = readdirSync(baseDir, { withFileTypes: true });
+  const entries = await readdir(baseDir, { withFileTypes: true });
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const fullPath = join(baseDir, entry.name);
@@ -218,7 +219,7 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   const stagePath = join(sandboxBasePath, 'stage.sh');
 
   console.log(`[sandbox] Creating isolated sandbox at ${sandboxBasePath}`);
-  mkdirSync(codePath, { recursive: true });
+  await mkdir(codePath, { recursive: true });
 
   // rsync the repo into code/, respecting .gitignore to skip node_modules etc.
   await spawnAsync({
@@ -253,7 +254,7 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
     ...catalog,
     testCases: catalog.testCases.filter((tc) => tc.visibility === 'public'),
   };
-  mkdirSync(inCodeTestsDir, { recursive: true });
+  await mkdir(inCodeTestsDir, { recursive: true });
   await writeUtf8(join(inCodeTestsDir, 'tests.json'), JSON.stringify(publicCatalog, null, 2));
 
   const hiddenCount = catalog.testCases.filter((tc) => tc.visibility === 'hidden').length;

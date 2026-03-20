@@ -5,7 +5,7 @@
  * to return a deterministic TypeScript stub. Real filesystem is used via temp dirs.
  */
 
-import { mkdirSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,9 +31,9 @@ vi.mock('../design-tests/agents/tests-writer.js', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeTempDir(): string {
+async function makeTempDir(): Promise<string> {
   const dir = join(tmpdir(), `blackbox-test-${Math.random().toString(36).slice(2)}`);
-  mkdirSync(dir, { recursive: true });
+  await mkdir(dir, { recursive: true });
   return dir;
 }
 
@@ -78,11 +78,11 @@ describe('generateTests', () => {
   const featureName = 'test-feature';
 
   beforeEach(async () => {
-    projectDir = makeTempDir();
+    projectDir = await makeTempDir();
     const featureDir = join(projectDir, saifDir, 'features', featureName);
-    mkdirSync(featureDir, { recursive: true });
+    await mkdir(featureDir, { recursive: true });
     const testsDir = join(featureDir, 'tests');
-    mkdirSync(testsDir, { recursive: true });
+    await mkdir(testsDir, { recursive: true });
     await writeUtf8(join(testsDir, 'tests.json'), imperativeCatalog());
     feature = await resolveFeature({ input: featureName, projectDir, saifDir });
   });
@@ -136,7 +136,7 @@ describe('generateTests', () => {
   it('does not overwrite an existing spec file', async () => {
     const testsDir = join(feature.absolutePath, 'tests');
     const existingPath = join(testsDir, 'public', 'happy.spec.ts');
-    mkdirSync(join(testsDir, 'public'), { recursive: true });
+    await mkdir(join(testsDir, 'public'), { recursive: true });
     await writeUtf8(existingPath, '// custom content');
 
     const result = await generateTests({
@@ -204,9 +204,9 @@ describe('generateTests', () => {
 
 describe('generateTests (error cases)', () => {
   it('throws when tests.json does not exist', async () => {
-    const projectDir = makeTempDir();
+    const projectDir = await makeTempDir();
     const featureDir = join(projectDir, 'saifac', 'features', 'missing');
-    mkdirSync(featureDir, { recursive: true });
+    await mkdir(featureDir, { recursive: true });
     const feature = await resolveFeature({ input: 'missing', projectDir, saifDir: 'saifac' });
     await expect(
       generateTests({
@@ -217,11 +217,11 @@ describe('generateTests (error cases)', () => {
   });
 
   it('throws when tests.json fails schema validation', async () => {
-    const projectDir = makeTempDir();
+    const projectDir = await makeTempDir();
     const featureDir = join(projectDir, 'saifac', 'features', 'bad-feature');
-    mkdirSync(featureDir, { recursive: true });
+    await mkdir(featureDir, { recursive: true });
     const testsDir = join(featureDir, 'tests');
-    mkdirSync(testsDir, { recursive: true });
+    await mkdir(testsDir, { recursive: true });
     await writeUtf8(join(testsDir, 'tests.json'), '{"invalid": true}');
     const feature = await resolveFeature({ input: 'bad-feature', projectDir, saifDir: 'saifac' });
     await expect(

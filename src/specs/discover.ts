@@ -11,7 +11,7 @@
  *   saifac/features/(user)/router/       -> feature: (user)/router  (distinct from above)
  */
 
-import { readdirSync } from 'node:fs';
+import { readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 import { pathExists } from '../utils/io.js';
@@ -65,7 +65,7 @@ export async function discoverFeatures(
   async function scan(currentPath: string, relativePrefix: string): Promise<void> {
     if (!(await pathExists(currentPath))) return;
 
-    const entries = readdirSync(currentPath, { withFileTypes: true });
+    const entries = await readdir(currentPath, { withFileTypes: true });
 
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;

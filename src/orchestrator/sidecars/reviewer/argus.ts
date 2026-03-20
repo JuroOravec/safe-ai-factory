@@ -5,7 +5,7 @@
  * Binaries are stored at src/orchestrator/argus/out/argus-linux-{arch}.
  */
 
-import { mkdirSync, readdirSync } from 'node:fs';
+import { mkdir, readdir } from 'node:fs/promises';
 import { arch } from 'node:os';
 import { join } from 'node:path';
 
@@ -50,7 +50,7 @@ export async function ensureArgusBinary(hostArch: 'arm64' | 'x64'): Promise<stri
   }
 
   const outDir = getOutDir();
-  mkdirSync(outDir, { recursive: true });
+  await mkdir(outDir, { recursive: true });
 
   const url = `https://github.com/${REPO}/releases/download/${RELEASE_TAG}/${asset}`;
   const tmpTar = join(outDir, `tmp-argus-${hostArch}.tar.gz`);
@@ -73,7 +73,7 @@ export async function ensureArgusBinary(hostArch: 'arm64' | 'x64'): Promise<stri
 
   // Extract the 'argus' binary from the tarball. The archive contains a single file named 'argus'.
   const tmpExtract = join(outDir, `tmp-extract-${hostArch}`);
-  mkdirSync(tmpExtract, { recursive: true });
+  await mkdir(tmpExtract, { recursive: true });
   await spawnAsync({
     command: 'tar',
     args: ['-xzf', tmpTar, '-C', tmpExtract],
@@ -82,7 +82,7 @@ export async function ensureArgusBinary(hostArch: 'arm64' | 'x64'): Promise<stri
   });
 
   // Find the binary (could be at root or in a subdir)
-  const extracted = findArgusBinary(tmpExtract);
+  const extracted = await findArgusBinary(tmpExtract);
   if (!extracted) {
     await spawnAsync({ command: 'rm', args: ['-rf', tmpExtract, tmpTar], cwd: process.cwd() });
     throw new Error(`Could not find argus binary in archive from ${url}`);
@@ -96,11 +96,11 @@ export async function ensureArgusBinary(hostArch: 'arm64' | 'x64'): Promise<stri
   return binaryPath;
 }
 
-function findArgusBinary(dir: string): string | null {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+async function findArgusBinary(dir: string): Promise<string | null> {
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      const found = findArgusBinary(full);
+      const found = await findArgusBinary(full);
       if (found) return found;
     } else if (entry.name === 'argus') {
       return full;

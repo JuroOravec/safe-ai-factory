@@ -14,7 +14,7 @@
  *   Alias: saifac feature
  */
 
-import { mkdirSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 import { cancel, confirm, intro, isCancel, outro, text } from '@clack/prompts';
@@ -195,7 +195,7 @@ const newCommand = defineCommand({
     if (!nonInteractive) outro('Creating feature…');
 
     const featureDir = join(projectDir, saifDir, 'features', featName);
-    mkdirSync(featureDir, { recursive: true });
+    await mkdir(featureDir, { recursive: true });
 
     // Write proposal.md if description is provided
     if (description) {

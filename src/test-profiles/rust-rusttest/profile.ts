@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { pathExists, spawnWait, writeUtf8 } from '../../utils/io.js';
@@ -18,7 +18,7 @@ async function writeNextestConfig(testsDir: string, force: boolean): Promise<voi
 [profile.ci]
 test-output = "immediate-final"
 `;
-  mkdirSync(configDir, { recursive: true });
+  await mkdir(configDir, { recursive: true });
   await writeUtf8(configPath, content);
   console.log(`[design-tests:rust-rusttest] Written ${configPath}`);
 }

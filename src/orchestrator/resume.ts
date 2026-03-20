@@ -5,7 +5,8 @@
  * save-on-Ctrl+C artifact persistence, and merging restored config with CLI overrides.
  */
 
-import { mkdirSync, unlinkSync } from 'node:fs';
+import { unlinkSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
@@ -105,7 +106,7 @@ export async function createResumeWorktree(
   };
 
   const worktreeDir = join(projectDir, '.saifac', 'worktrees');
-  mkdirSync(worktreeDir, { recursive: true });
+  await mkdir(worktreeDir, { recursive: true });
   const worktreePath = join(worktreeDir, `resume-${runId}`);
   const branchName = `factory-resume-${runId}`;
 

@@ -3,7 +3,8 @@
  * that loadSaifConfig + parse* functions use the config values correctly.
  */
 
-import { mkdirSync, rmSync } from 'node:fs';
+import { rmSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -18,17 +19,17 @@ import {
 import { writeUtf8 } from '../utils/io.js';
 import { loadSaifConfig } from './load.js';
 
-function makeTempDir(): string {
+async function makeTempDir(): Promise<string> {
   const dir = join(tmpdir(), `saifac-config-int-${Math.random().toString(36).slice(2)}`);
-  mkdirSync(dir, { recursive: true });
+  await mkdir(dir, { recursive: true });
   return dir;
 }
 
 describe('config integration', () => {
   let projectDir: string;
 
-  beforeEach(() => {
-    projectDir = makeTempDir();
+  beforeEach(async () => {
+    projectDir = await makeTempDir();
   });
 
   afterEach(() => {
@@ -38,7 +39,7 @@ describe('config integration', () => {
   describe('config.json', () => {
     it('parseStorageOverrides uses globalStorage and storages from config', async () => {
       const saifDir = join(projectDir, 'saifac');
-      mkdirSync(saifDir, { recursive: true });
+      await mkdir(saifDir, { recursive: true });
       await writeUtf8(
         join(saifDir, 'config.json'),
         JSON.stringify({
@@ -58,7 +59,7 @@ describe('config integration', () => {
 
     it('parseStorageOverrides: CLI overrides config', async () => {
       const saifDir = join(projectDir, 'saifac');
-      mkdirSync(saifDir, { recursive: true });
+      await mkdir(saifDir, { recursive: true });
       await writeUtf8(
         join(saifDir, 'config.json'),
         JSON.stringify({
@@ -78,7 +79,7 @@ describe('config integration', () => {
 
     it('parseMaxRuns uses config when CLI has no value', async () => {
       const saifDir = join(projectDir, 'saifac');
-      mkdirSync(saifDir, { recursive: true });
+      await mkdir(saifDir, { recursive: true });
       await writeUtf8(join(saifDir, 'config.json'), JSON.stringify({ defaults: { maxRuns: 12 } }));
 
       const config = await loadSaifConfig('saifac', projectDir);
@@ -89,7 +90,7 @@ describe('config integration', () => {
 
     it('parseMaxRuns: CLI overrides config', async () => {
       const saifDir = join(projectDir, 'saifac');
-      mkdirSync(saifDir, { recursive: true });
+      await mkdir(saifDir, { recursive: true });
       await writeUtf8(join(saifDir, 'config.json'), JSON.stringify({ defaults: { maxRuns: 12 } }));
 
       const config = await loadSaifConfig('saifac', projectDir);
@@ -100,7 +101,7 @@ describe('config integration', () => {
 
     it('parseResolveAmbiguity uses config when CLI has no value', async () => {
       const saifDir = join(projectDir, 'saifac');
-      mkdirSync(saifDir, { recursive: true });
+      await mkdir(saifDir, { recursive: true });
       await writeUtf8(
         join(saifDir, 'config.json'),
         JSON.stringify({ defaults: { resolveAmbiguity: 'off' } }),
@@ -114,7 +115,7 @@ describe('config integration', () => {
 
     it('parseModelOverrides uses globalModel and agentModels from config', async () => {
       const saifDir = join(projectDir, 'saifac');
-      mkdirSync(saifDir, { recursive: true });
+      await mkdir(saifDir, { recursive: true });
       await writeUtf8(
         join(saifDir, 'config.json'),
         JSON.stringify({
@@ -139,7 +140,7 @@ describe('config integration', () => {
   describe('config.js', () => {
     it('loads config.js and parseStorageOverrides uses values', async () => {
       const saifDir = join(projectDir, 'saifac');
-      mkdirSync(saifDir, { recursive: true });
+      await mkdir(saifDir, { recursive: true });
       // Use config.js (no config.json) so cosmiconfig picks .js
       await writeUtf8(
         join(saifDir, 'config.js'),
@@ -156,7 +157,7 @@ describe('config integration', () => {
 
     it('loads config.js and parseMaxRuns uses value', async () => {
       const saifDir = join(projectDir, 'saifac');
-      mkdirSync(saifDir, { recursive: true });
+      await mkdir(saifDir, { recursive: true });
       await writeUtf8(
         join(saifDir, 'config.js'),
         "module.exports = { defaults: { maxRuns: 8, resolveAmbiguity: 'prompt' } };",

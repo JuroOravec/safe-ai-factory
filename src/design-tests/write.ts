@@ -11,7 +11,7 @@
  * By default existing files are never overwritten. Pass force: true to overwrite.
  */
 
-import { mkdirSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { getSaifRoot } from '../constants.js';
@@ -182,7 +182,7 @@ export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTe
           abortSignal,
         });
 
-        mkdirSync(dirname(specPath), { recursive: true });
+        await mkdir(dirname(specPath), { recursive: true });
         await writeUtf8(specPath, source);
         console.log(`[design-tests:write] Generated ${specPath}`);
         generatedFiles.push(entrypoint);

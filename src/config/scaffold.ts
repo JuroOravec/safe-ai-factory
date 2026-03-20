@@ -2,7 +2,7 @@
  * Scaffold config.ts when no config file exists.
  */
 
-import { mkdirSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { pathExists, writeUtf8 } from '../utils/io.js';
@@ -75,7 +75,7 @@ export async function scaffoldSaifConfig(saifDir: string, projectDir: string): P
   }
 
   if (!(await pathExists(configDir))) {
-    mkdirSync(configDir, { recursive: true });
+    await mkdir(configDir, { recursive: true });
   }
 
   const configPath = resolve(configDir, 'config.ts');

@@ -7,8 +7,7 @@
  *   clear   Remove sandbox entries for this project (--all: everything)
  */
 
-import { readdirSync } from 'node:fs';
-import { rm as rmAsync } from 'node:fs/promises';
+import { readdir, rm as rmAsync } from 'node:fs/promises';
 
 import { defineCommand, runMain } from 'citty';
 
@@ -37,7 +36,7 @@ const listCommand = defineCommand({
       return;
     }
 
-    const entries = readdirSync(sandboxBase);
+    const entries = await readdir(sandboxBase);
 
     if (listAll) {
       if (entries.length === 0) {
@@ -96,7 +95,7 @@ const clearCommand = defineCommand({
       return;
     }
 
-    const entries = readdirSync(sandboxBase);
+    const entries = await readdir(sandboxBase);
 
     const removeEntries = async (toRemove: string[]) => {
       await Promise.all(

@@ -5,7 +5,8 @@
  * or the filesystem. Also includes filesystem-based tests for removeAllHiddenDirs.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -64,14 +65,14 @@ describe('removeAllHiddenDirs', () => {
     const tmp = mkdtempSync(join(process.cwd(), 'sandbox-test-'));
     try {
       // feat-a/tests/public, feat-a/tests/hidden
-      mkdirSync(join(tmp, 'feat-a', 'tests', 'public'), { recursive: true });
-      mkdirSync(join(tmp, 'feat-a', 'tests', 'hidden'), { recursive: true });
+      await mkdir(join(tmp, 'feat-a', 'tests', 'public'), { recursive: true });
+      await mkdir(join(tmp, 'feat-a', 'tests', 'hidden'), { recursive: true });
       await writeUtf8(join(tmp, 'feat-a', 'tests', 'hidden', 'bar.spec.ts'), '');
       // feat-b/tests/hidden
-      mkdirSync(join(tmp, 'feat-b', 'tests', 'hidden'), { recursive: true });
+      await mkdir(join(tmp, 'feat-b', 'tests', 'hidden'), { recursive: true });
       await writeUtf8(join(tmp, 'feat-b', 'tests', 'hidden', 'edge.spec.ts'), '');
       // feat-c/nested/hidden (deep nesting)
-      mkdirSync(join(tmp, 'feat-c', 'nested', 'hidden'), { recursive: true });
+      await mkdir(join(tmp, 'feat-c', 'nested', 'hidden'), { recursive: true });
       await writeUtf8(join(tmp, 'feat-c', 'nested', 'hidden', 'deep.ts'), '');
 
       const removed = await removeAllHiddenDirs(tmp);
@@ -94,7 +95,7 @@ describe('removeAllHiddenDirs', () => {
   it('returns 0 when no hidden dirs are present', async () => {
     const tmp = mkdtempSync(join(process.cwd(), 'sandbox-test-'));
     try {
-      mkdirSync(join(tmp, 'feat', 'tests', 'public'), { recursive: true });
+      await mkdir(join(tmp, 'feat', 'tests', 'public'), { recursive: true });
       await writeUtf8(join(tmp, 'feat', 'tests', 'public', 'foo.spec.ts'), '');
 
       const removed = await removeAllHiddenDirs(tmp);
@@ -166,8 +167,8 @@ describe('createSandbox + destroySandbox (integration)', () => {
 
       const saifDir = 'saifac';
       const featureTests = join(projectDir, saifDir, 'features', 'my-feature', 'tests');
-      mkdirSync(join(featureTests, 'public'), { recursive: true });
-      mkdirSync(join(featureTests, 'hidden'), { recursive: true });
+      await mkdir(join(featureTests, 'public'), { recursive: true });
+      await mkdir(join(featureTests, 'hidden'), { recursive: true });
       await writeUtf8(join(featureTests, 'tests.json'), JSON.stringify(TEST_CATALOG, null, 2));
       await writeUtf8(
         join(featureTests, 'public', 'foo.spec.ts'),
@@ -186,7 +187,7 @@ describe('createSandbox + destroySandbox (integration)', () => {
         'tests',
         'hidden',
       );
-      mkdirSync(otherFeatureHidden, { recursive: true });
+      await mkdir(otherFeatureHidden, { recursive: true });
       await writeUtf8(
         join(otherFeatureHidden, 'edge.spec.ts'),
         "import { expect } from 'vitest';\n",
@@ -319,8 +320,8 @@ describe('createSandbox + destroySandbox (integration)', () => {
       };
 
       const loginTests = join(projectDir, saifDir, 'features', '(auth)', 'login', 'tests');
-      mkdirSync(join(loginTests, 'public'), { recursive: true });
-      mkdirSync(join(loginTests, 'hidden'), { recursive: true });
+      await mkdir(join(loginTests, 'public'), { recursive: true });
+      await mkdir(join(loginTests, 'hidden'), { recursive: true });
       await writeUtf8(join(loginTests, 'tests.json'), JSON.stringify(NESTED_CATALOG, null, 2));
       await writeUtf8(
         join(loginTests, 'public', 'login.spec.ts'),
@@ -341,7 +342,7 @@ describe('createSandbox + destroySandbox (integration)', () => {
         'tests',
         'hidden',
       );
-      mkdirSync(profileHidden, { recursive: true });
+      await mkdir(profileHidden, { recursive: true });
       await writeUtf8(join(profileHidden, 'edge.spec.ts'), "import { expect } from 'vitest';\n");
 
       const feature = await resolveFeature({
