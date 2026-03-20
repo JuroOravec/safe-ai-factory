@@ -1,5 +1,7 @@
 import { join } from 'node:path';
 
+import { consola } from 'consola';
+
 import { writeUtf8 } from '../../utils/io.js';
 import { validateTypescript } from '../../utils/typescript.js';
 import type { OnDoneOpts, TestProfile, ValidateFilesOpts } from '../types.js';
@@ -7,7 +9,7 @@ import type { OnDoneOpts, TestProfile, ValidateFilesOpts } from '../types.js';
 async function tsPlaywrightValidateFiles(opts: ValidateFilesOpts): Promise<void> {
   const { testsDir, generatedFiles, projectDir, errMessage } = opts;
   if (generatedFiles.length === 0) return;
-  console.log(`\nValidating generated spec files...`);
+  consola.log(`\nValidating generated spec files...`);
   await validateTypescript({
     files: generatedFiles.map((f) => join(testsDir, f)),
     cwd: projectDir,
@@ -28,7 +30,7 @@ export default defineConfig({
 });
 `;
   await writeUtf8(configPath, configContent);
-  console.log(`[design-tests:node-playwright] Written ${configPath}`);
+  consola.log(`[design-tests:node-playwright] Written ${configPath}`);
 }
 
 export const nodePlaywrightProfile: TestProfile = {

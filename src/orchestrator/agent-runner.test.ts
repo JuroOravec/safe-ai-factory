@@ -5,6 +5,7 @@
  * or the filesystem.
  */
 
+import { consola } from 'consola';
 import { describe, expect, it, vi } from 'vitest';
 
 import { filterAgentEnv } from '../provisioners/docker/agent-log.js';
@@ -80,8 +81,8 @@ describe('filterAgentEnv', () => {
     expect(result).toHaveProperty('AGENT_SETTING', 'fine');
   });
 
-  it('emits a console.warn for each stripped key', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('emits a consola.warn for each stripped key', () => {
+    const warn = vi.spyOn(consola, 'warn').mockImplementation(() => {});
     filterAgentEnv({ FACTORY_INITIAL_TASK: 'x', LLM_API_KEY: 'y', SAFE: 'z' });
     expect(warn).toHaveBeenCalledTimes(2);
     expect(warn.mock.calls[0][0]).toContain('FACTORY_INITIAL_TASK');

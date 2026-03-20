@@ -14,6 +14,8 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
+import { consola } from 'consola';
+
 import { getSaifRoot } from '../constants.js';
 import { type ModelOverrides } from '../llm-config.js';
 import type { Feature } from '../specs/discover.js';
@@ -93,8 +95,8 @@ export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTe
     );
   }
 
-  console.log(`[design-tests:write] Reading ${catalogPath}`);
-  console.log(
+  consola.log(`[design-tests:write] Reading ${catalogPath}`);
+  consola.log(
     `[design-tests:write] Test profile: ${testProfile.id} (${testProfile.language} / ${testProfile.framework})`,
   );
   const rawJson = JSON.parse(await readUtf8(catalogPath)) as unknown;
@@ -107,16 +109,16 @@ export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTe
   }
 
   const catalog = parseResult.data;
-  console.log(`[design-tests:write] Loaded ${catalog.testCases.length} test cases`);
+  consola.log(`[design-tests:write] Loaded ${catalog.testCases.length} test cases`);
 
   // Write shared helpers from the profile's template — skip if already exists (unless force).
   const helpersPath = join(testsDir, testProfile.helpersFilename);
   if (!(await pathExists(helpersPath)) || force) {
     const helpersTemplate = await readTemplate(testProfile.id, testProfile.helpersFilename);
     await writeUtf8(helpersPath, helpersTemplate);
-    console.log(`[design-tests:write] Written ${helpersPath}`);
+    consola.log(`[design-tests:write] Written ${helpersPath}`);
   } else {
-    console.log(`[design-tests:write] Skipped ${helpersPath} (already exists)`);
+    consola.log(`[design-tests:write] Skipped ${helpersPath} (already exists)`);
   }
 
   // Write sidecar health checks from the profile's template, if the profile has one.
@@ -125,9 +127,9 @@ export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTe
     if (!(await pathExists(infraPath)) || force) {
       const infraTemplate = await readTemplate(testProfile.id, testProfile.infraFilename);
       await writeUtf8(infraPath, infraTemplate);
-      console.log(`[design-tests:write] Written ${infraPath}`);
+      consola.log(`[design-tests:write] Written ${infraPath}`);
     } else {
-      console.log(`[design-tests:write] Skipped ${infraPath} (already exists)`);
+      consola.log(`[design-tests:write] Skipped ${infraPath} (already exists)`);
     }
   }
 
@@ -136,7 +138,7 @@ export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTe
   const entrypointMap = new Map<string, (typeof catalog.testCases)[number][]>();
   for (const tc of catalog.testCases) {
     if (!tc.entrypoint) {
-      console.warn(`[design-tests:write] Test case ${tc.id} has no entrypoint — skipping`);
+      consola.warn(`[design-tests:write] Test case ${tc.id} has no entrypoint — skipping`);
       continue;
     }
     const existing = entrypointMap.get(tc.entrypoint) ?? [];
@@ -162,12 +164,12 @@ export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTe
         const specPath = join(testsDir, entrypoint);
 
         if ((await pathExists(specPath)) && !force) {
-          console.log(`[design-tests:write] Skipped ${entrypoint} (already exists)`);
+          consola.log(`[design-tests:write] Skipped ${entrypoint} (already exists)`);
           skippedFiles.push(entrypoint);
           return;
         }
 
-        console.log(
+        consola.log(
           `[design-tests:write] Generating ${entrypoint} (${testCases.length} test cases)...`,
         );
 
@@ -184,7 +186,7 @@ export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTe
 
         await mkdir(dirname(specPath), { recursive: true });
         await writeUtf8(specPath, source);
-        console.log(`[design-tests:write] Generated ${specPath}`);
+        consola.log(`[design-tests:write] Generated ${specPath}`);
         generatedFiles.push(entrypoint);
       }),
     );

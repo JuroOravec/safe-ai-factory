@@ -1,3 +1,5 @@
+import { consola } from 'consola';
+
 import { spawnWait } from '../../utils/io.js';
 import type { TestProfile, ValidateFilesOpts } from '../types.js';
 
@@ -11,7 +13,7 @@ async function pytestValidateFiles(opts: ValidateFilesOpts): Promise<void> {
   const pyFiles = generatedFiles.filter((f) => f.endsWith('.py'));
   if (pyFiles.length === 0) return;
 
-  console.log(`\nValidating generated spec files (ruff)...`);
+  consola.log(`\nValidating generated spec files (ruff)...`);
   try {
     const result = await spawnWait({
       command: 'ruff',
@@ -20,17 +22,17 @@ async function pytestValidateFiles(opts: ValidateFilesOpts): Promise<void> {
       timeoutMs: 30_000,
     });
     if (result.code === 0) {
-      console.log(`  Python validation passed.`);
+      consola.log(`  Python validation passed.`);
     } else {
       const output = result.stdout + result.stderr;
-      console.error(`  ${opts.errMessage}`);
+      consola.error(`  ${opts.errMessage}`);
       for (const line of output.split('\n').filter(Boolean).slice(0, 20)) {
-        console.error(`    ${line}`);
+        consola.error(`    ${line}`);
       }
       process.exit(1);
     }
   } catch {
-    console.warn(`  Python validation skipped (ruff not available).`);
+    consola.warn(`  Python validation skipped (ruff not available).`);
   }
 }
 

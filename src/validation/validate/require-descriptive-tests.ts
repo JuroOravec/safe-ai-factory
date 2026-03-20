@@ -1,3 +1,5 @@
+import { consola } from 'consola';
+
 import { readUtf8, spawnCapture } from '../../utils/io.js';
 
 export default async function validateDescriptiveTests() {
@@ -29,8 +31,8 @@ export default async function validateDescriptiveTests() {
       );
 
       if (isTooShort || isGeneric) {
-        console.error(`❌ Non-descriptive test name in ${file}: "${description}"`);
-        console.error(`   Hint: Explain WHAT is being tested and WHAT the expected outcome is.`);
+        consola.error(`❌ Non-descriptive test name in ${file}: "${description}"`);
+        consola.error(`   Hint: Explain WHAT is being tested and WHAT the expected outcome is.`);
         failed = true;
       }
     }

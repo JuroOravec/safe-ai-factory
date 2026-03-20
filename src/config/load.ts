@@ -7,6 +7,7 @@
 
 import { resolve } from 'node:path';
 
+import { consola } from 'consola';
 import { cosmiconfig } from 'cosmiconfig';
 
 import { pathExists } from '../utils/io.js';
@@ -47,8 +48,8 @@ export async function loadSaifConfig(saifDir: string, projectDir: string): Promi
   try {
     return saifConfigSchema.parse(result.config);
   } catch (err) {
-    console.error(`Error parsing config at ${result.filepath}:`);
-    console.error(err);
+    consola.error(`Error parsing config at ${result.filepath}:`);
+    consola.error(err);
     process.exit(1);
   }
 }

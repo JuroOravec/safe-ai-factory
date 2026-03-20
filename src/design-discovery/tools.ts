@@ -11,6 +11,7 @@ import { resolve } from 'node:path';
 import { createTool, type Tool } from '@mastra/core/tools';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { consola } from 'consola';
 import { createJiti } from 'jiti';
 import { z } from 'zod';
 
@@ -92,14 +93,14 @@ async function loadMcpTools(mcpName: string, urlOrValue: string): Promise<Record
 async function loadFileTools(filePath: string, projectDir: string): Promise<Record<string, Tool>> {
   const absolutePath = resolve(projectDir, filePath);
   if (!(await pathExists(absolutePath))) {
-    console.error(`Error: discovery tool file not found: ${absolutePath}`);
+    consola.error(`Error: discovery tool file not found: ${absolutePath}`);
     process.exit(1);
   }
 
   const mod = await jitiInstance.import(absolutePath, { default: true });
   const toolsObj = mod ?? {};
   if (typeof toolsObj !== 'object' || toolsObj === null) {
-    console.error(
+    consola.error(
       `Error: discovery tool file "${filePath}" must export a default object of Mastra tools.`,
     );
     process.exit(1);

@@ -1,3 +1,5 @@
+import { consola } from 'consola';
+
 import { spawnWait } from './io.js';
 
 // TypeScript validation: ensure generated spec files have no syntax/type errors.
@@ -35,16 +37,16 @@ export async function validateTypescript(opts: {
       timeoutMs: 30_000,
     });
     if (tscResult.code === 0) {
-      console.log(`  TypeScript validation passed.`);
+      consola.log(`  TypeScript validation passed.`);
     } else {
       const output = tscResult.stdout + tscResult.stderr;
-      console.error(`  ${errMessage}`);
+      consola.error(`  ${errMessage}`);
       for (const line of output.split('\n').filter(Boolean).slice(0, 20)) {
-        console.error(`    ${line}`);
+        consola.error(`    ${line}`);
       }
       process.exit(1);
     }
   } catch {
-    console.warn(`  TypeScript validation skipped (tsc not available).`);
+    consola.warn(`  TypeScript validation skipped (tsc not available).`);
   }
 }

@@ -9,6 +9,8 @@
 
 import { join } from 'node:path';
 
+import { consola } from 'consola';
+
 import { getHatchetClient } from '../hatchet/client.js';
 import { serializeOrchestratorOpts } from '../hatchet/utils/serialize-opts.js';
 import {
@@ -134,7 +136,7 @@ function withCleanupRegistry<T, R>(
       if (isCleaningUp) return;
       isCleaningUp = true;
 
-      console.log(`\n[orchestrator] ${sig} received — cleaning up...`);
+      consola.log(`\n[orchestrator] ${sig} received — cleaning up...`);
 
       // The terminal sends SIGINT to the whole process group.
       // pnpm (the parent) catches SIGINT and immediately sends SIGTERM to us.
@@ -148,7 +150,7 @@ function withCleanupRegistry<T, R>(
         try {
           await registry.cleanup();
         } catch (err) {
-          console.warn('[orchestrator] Cleanup error:', err);
+          consola.warn('[orchestrator] Cleanup error:', err);
         } finally {
           process.exit(sig === 'SIGINT' ? 130 : 143);
         }
@@ -227,7 +229,7 @@ async function runFail2PassCore(
     testScript,
   } = opts;
 
-  console.log(`\n[orchestrator] MODE: fail2pass — ${feature.name}`);
+  consola.log(`\n[orchestrator] MODE: fail2pass — ${feature.name}`);
 
   const sandbox = await createSandbox({
     feature,
@@ -289,7 +291,7 @@ async function runFail2PassCore(
     }
 
     if (hasFeatureSuccessfullyFailed(result)) {
-      console.log(
+      consola.log(
         '\n[orchestrator] ✓ FAIL2PASS CONFIRMED — feature tests correctly fail on current codebase',
       );
       return {
@@ -298,10 +300,10 @@ async function runFail2PassCore(
         message: 'Tests correctly fail on current codebase. Ready to start the iterative loop.',
       };
     } else {
-      console.error(
+      consola.error(
         '\n[orchestrator] ✗ FAIL2PASS REJECTED — no feature tests failed on current codebase',
       );
-      console.error('Either the feature already exists or the tests are invalid.');
+      consola.error('Either the feature already exists or the tests are invalid.');
       return {
         success: false,
         attempts: 1,
@@ -346,7 +348,7 @@ async function runStartCore(
     runStorage,
   } = opts;
 
-  console.log(`\n[orchestrator] MODE: start — ${feature.name}`);
+  consola.log(`\n[orchestrator] MODE: start — ${feature.name}`);
 
   const sandboxSourceDir = getSandboxSourceDir(opts);
 
@@ -405,7 +407,7 @@ async function runStartCore(
   // on the worker via deserializeOrchestratorOpts — no ambient in-process state needed.
   const hatchet = getHatchetClient();
   if (hatchet) {
-    console.log('[orchestrator] Hatchet token detected — dispatching via Hatchet workflow.');
+    consola.log('[orchestrator] Hatchet token detected — dispatching via Hatchet workflow.');
 
     const serializedOpts = serializeOrchestratorOpts(opts);
     const featRunWorkflow = createFeatRunWorkflow();
@@ -473,7 +475,7 @@ async function runResumeCore(
     throw new Error(`Run not found: ${runId}. List runs with: saifac run ls`);
   }
 
-  console.log(`\n[orchestrator] MODE: resume — ${artifact.config.featureName} (run ${runId})`);
+  consola.log(`\n[orchestrator] MODE: resume — ${artifact.config.featureName} (run ${runId})`);
 
   // Create temp worktree in `.saifac/worktrees/resume-<runId>`
   // to reconstruct the state of the workspace at the time of the run (+ agent's changes)
@@ -588,8 +590,8 @@ async function runTestsCore(
     throw new Error(`Patch file not found: ${patchPath}`);
   }
 
-  console.log(`\n[orchestrator] MODE: test — ${feature.name}`);
-  console.log(`[orchestrator] Patch: ${patchPath}`);
+  consola.log(`\n[orchestrator] MODE: test — ${feature.name}`);
+  consola.log(`[orchestrator] Patch: ${patchPath}`);
 
   const sandbox = await createSandbox({
     feature,
@@ -619,7 +621,7 @@ async function runTestsCore(
   try {
     while (attempts < testRetries) {
       attempts++;
-      console.log(`\n[orchestrator] Test attempt ${attempts}/${testRetries}`);
+      consola.log(`\n[orchestrator] Test attempt ${attempts}/${testRetries}`);
 
       const runId = `${sandbox.runId}-${attempts}`;
       const provisioner = createProvisioner(stagingEnvironment);
@@ -666,7 +668,7 @@ async function runTestsCore(
       }
 
       if (result.status === 'passed') {
-        console.log('\n[orchestrator] ✓ ALL TESTS PASSED');
+        consola.log('\n[orchestrator] ✓ ALL TESTS PASSED');
         await applyPatchToHost({
           codePath: sandbox.codePath,
           projectDir,
@@ -685,7 +687,7 @@ async function runTestsCore(
           message: `Patch verified and applied to host repository after ${attempts} attempt(s).`,
         };
       } else if (result.status === 'aborted') {
-        console.log(`\n[orchestrator] Tests aborted after ${attempts} attempt(s).`);
+        consola.log(`\n[orchestrator] Tests aborted after ${attempts} attempt(s).`);
         return {
           success: false,
           attempts,
@@ -693,7 +695,7 @@ async function runTestsCore(
         };
       }
 
-      console.log(`\n[orchestrator] Test attempt ${attempts} FAILED`);
+      consola.log(`\n[orchestrator] Test attempt ${attempts} FAILED`);
 
       if (resolveAmbiguity !== 'off' && result.testSuites) {
         const VagueSpecsCheckResult = await runVagueSpecsCheckerForFailure({
@@ -709,7 +711,7 @@ async function runTestsCore(
         if (VagueSpecsCheckResult.ambiguityResolved) {
           // Spec updated and tests regenerated — retry the same patch against the new tests.
           // Don't count this attempt against testRetries since the spec was at fault.
-          console.log(
+          consola.log(
             '[orchestrator] Spec ambiguity resolved — retrying tests with updated tests.',
           );
           attempts--;
@@ -770,7 +772,7 @@ export async function runDebug(
     stageScript,
   } = opts;
 
-  console.log(`\n[orchestrator] DEBUG MODE — ${feature.name}`);
+  consola.log(`\n[orchestrator] DEBUG MODE — ${feature.name}`);
 
   const sandbox = await createSandbox({
     feature,
@@ -807,14 +809,14 @@ export async function runDebug(
       stagePath: sandbox.stagePath,
     });
 
-    console.log(`\n[debug] Staging app ready — target: ${stagingHandle.targetUrl}`);
-    console.log(`[debug] Sidecar: ${stagingHandle.sidecarUrl}`);
-    console.log('[debug] Press Ctrl+C to stop.\n');
+    consola.log(`\n[debug] Staging app ready — target: ${stagingHandle.targetUrl}`);
+    consola.log(`[debug] Sidecar: ${stagingHandle.sidecarUrl}`);
+    consola.log('[debug] Press Ctrl+C to stop.\n');
 
     // Block until SIGINT
     await new Promise<void>((resolve) => {
       process.once('SIGINT', () => {
-        console.log('\n[debug] SIGINT received — tearing down...');
+        consola.log('\n[debug] SIGINT received — tearing down...');
         resolve();
       });
     });
@@ -823,7 +825,7 @@ export async function runDebug(
     await destroySandbox(sandbox.sandboxBasePath);
     process.removeListener('SIGINT', ignoreSignal);
     process.removeListener('SIGTERM', ignoreSignal);
-    console.log('[debug] Cleanup complete.');
+    consola.log('[debug] Cleanup complete.');
   }
 }
 

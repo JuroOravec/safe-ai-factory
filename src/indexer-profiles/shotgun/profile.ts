@@ -19,6 +19,7 @@
  */
 
 import { createTool, type Tool } from '@mastra/core/tools';
+import { consola } from 'consola';
 import { z } from 'zod';
 
 import type { IndexerGetToolOpts, IndexerInitOpts, IndexerProfile } from '../types.js';
@@ -46,7 +47,7 @@ export const shotgunIndexerProfile: IndexerProfile = {
         printCmd: true,
       });
     } else {
-      console.log('CONTEXT7_API_KEY not set — skipping Context7 configuration (optional).');
+      consola.log('CONTEXT7_API_KEY not set — skipping Context7 configuration (optional).');
     }
 
     // Index the codebase

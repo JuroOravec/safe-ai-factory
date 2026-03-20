@@ -19,6 +19,7 @@ import { join, resolve } from 'node:path';
 
 import { cancel, confirm, intro, isCancel, outro, text } from '@clack/prompts';
 import { defineCommand, runMain } from 'citty';
+import { consola } from 'consola';
 
 import {
   DEFAULT_AGENT_PROFILE,
@@ -146,7 +147,7 @@ const newCommand = defineCommand({
     const saifDir = parseSaifDir(args);
 
     if (nonInteractive && !namePreFill) {
-      console.error('Error: --name/-n is required when using --yes/-y');
+      consola.error('Error: --name/-n is required when using --yes/-y');
       process.exit(1);
     }
 
@@ -201,10 +202,10 @@ const newCommand = defineCommand({
     if (description) {
       const proposalPath = resolve(featureDir, 'proposal.md');
       await writeUtf8(proposalPath, `## What Changes\n\n${description}\n`);
-      console.log(`\nCreated: ${featureDir}`);
-      console.log(`  proposal.md: ${description}`);
+      consola.log(`\nCreated: ${featureDir}`);
+      consola.log(`  proposal.md: ${description}`);
     } else {
-      console.log(`\nCreated: ${featureDir}`);
+      consola.log(`\nCreated: ${featureDir}`);
     }
   },
 });
@@ -270,13 +271,13 @@ async function _runDesignDiscovery(args: {
   const feature = await getFeatOrPrompt(args, projectDir);
   const discovery = parseDiscoveryOptions(args, projectDir, config);
   if (!shouldRunDiscovery(discovery)) {
-    console.error(
+    consola.error(
       'Error: design-discovery requires discoveryMcps or discoveryTools (via --discovery-mcp, --discovery-tool, or config).',
     );
     process.exit(1);
   }
   const overrides = parseModelOverrides(args, config);
-  console.log(`\nDiscovery (context gathering): ${feature.name}`);
+  consola.log(`\nDiscovery (context gathering): ${feature.name}`);
   await runDiscovery({
     feature,
     projectDir,
@@ -303,7 +304,7 @@ async function _runDesignSpecs(args: {
   const nonInteractive = args.yes === true;
   const force = args.force === true;
   if (nonInteractive && !getFeatNameFromArgs(args)) {
-    console.error('Error: --name/-n is required when using --yes/-y');
+    consola.error('Error: --name/-n is required when using --yes/-y');
     process.exit(1);
   }
   const feature = await getFeatOrPrompt(args, projectDir);
@@ -351,14 +352,14 @@ async function _runDesignSpecs(args: {
 
   // 1c. Run the designer if needed
   if (runDesigner) {
-    console.log(`\n${designerProfile.displayName} (spec generation): ${feature.name}`);
+    consola.log(`\n${designerProfile.displayName} (spec generation): ${feature.name}`);
     await designerProfile.run({
       ...designerBaseOpts,
       model: typeof args.model === 'string' ? args.model.trim() : undefined,
       prompt: designerPrompt,
     });
   } else {
-    console.log(`\nSkipping designer (${feature.relativePath} already has required spec files).`);
+    consola.log(`\nSkipping designer (${feature.relativePath} already has required spec files).`);
   }
 
   return {
@@ -378,7 +379,7 @@ const designSpecsCommand = defineCommand({
   args: designSpecsArgs,
   async run({ args }) {
     await _runDesignSpecs(args);
-    console.log('\nDone.');
+    consola.log('\nDone.');
   },
 });
 
@@ -391,7 +392,7 @@ const designDiscoveryCommand = defineCommand({
   args: designDiscoveryArgs,
   async run({ args }) {
     await _runDesignDiscovery(args);
-    console.log('\nDone.');
+    consola.log('\nDone.');
   },
 });
 
@@ -444,9 +445,9 @@ async function _runDesignTests({
 
   if (!skipCatalog) {
     // 2a. Read specs and generate a plan of what to test as markdown and JSON.
-    console.log(`\nTests Catalog: ${feature.name} (profile: ${testProfile.id})`);
+    consola.log(`\nTests Catalog: ${feature.name} (profile: ${testProfile.id})`);
     if (indexerProfile) {
-      console.log(`  Indexer: ${indexerProfile.displayName} (project: ${projectName})`);
+      consola.log(`  Indexer: ${indexerProfile.displayName} (project: ${projectName})`);
     }
     const designResult = await runDesignTests({
       feature,
@@ -456,14 +457,14 @@ async function _runDesignTests({
       projectName,
       overrides,
     });
-    console.log(`  Test plan:  ${designResult.testPlanPath}`);
-    console.log(`  Catalog:    ${designResult.catalogPath}`);
+    consola.log(`  Test plan:  ${designResult.testPlanPath}`);
+    consola.log(`  Catalog:    ${designResult.catalogPath}`);
   } else {
-    console.log(`\nSkipping catalog generation (--skip-catalog). Reading existing tests.json.`);
+    consola.log(`\nSkipping catalog generation (--skip-catalog). Reading existing tests.json.`);
   }
 
   // 2b. Write actual tests from the test plan.
-  console.log(`\nGenerating spec files from catalog...`);
+  consola.log(`\nGenerating spec files from catalog...`);
   const implResult = await generateTests({
     feature,
     force,
@@ -471,15 +472,15 @@ async function _runDesignTests({
     overrides,
   });
 
-  console.log(`\nTest scaffolding complete:`);
-  console.log(`  Test cases:      ${implResult.testCaseCount}`);
+  consola.log(`\nTest scaffolding complete:`);
+  consola.log(`  Test cases:      ${implResult.testCaseCount}`);
   if (implResult.generatedFiles.length > 0) {
-    console.log(`  Generated files: ${implResult.generatedFiles.length}`);
-    for (const f of implResult.generatedFiles) console.log(`    + ${f}`);
+    consola.log(`  Generated files: ${implResult.generatedFiles.length}`);
+    for (const f of implResult.generatedFiles) consola.log(`    + ${f}`);
   }
   if (implResult.skippedFiles.length > 0) {
-    console.log(`  Skipped (exist): ${implResult.skippedFiles.length}`);
-    for (const f of implResult.skippedFiles) console.log(`    ~ ${f}`);
+    consola.log(`  Skipped (exist): ${implResult.skippedFiles.length}`);
+    for (const f of implResult.skippedFiles) consola.log(`    ~ ${f}`);
   }
 
   // 2c. Validate the generated tests.
@@ -516,7 +517,7 @@ const designTestsCommand = defineCommand({
       args,
     });
 
-    console.log('\nDone.');
+    consola.log('\nDone.');
   },
 });
 
@@ -565,7 +566,7 @@ async function _runDesignFail2pass(opts: {
 
   const stagingEnvironment = parseStagingEnvironment(config);
 
-  console.log(`\nFail2Pass verification: ${feature.name}`);
+  consola.log(`\nFail2Pass verification: ${feature.name}`);
   const result = await runFail2Pass({
     sandboxProfileId: sandboxProfile.id,
     feature,
@@ -583,7 +584,7 @@ async function _runDesignFail2pass(opts: {
     startupScript,
   });
 
-  console.log(`\n${result.message}`);
+  consola.log(`\n${result.message}`);
   if (!result.success) process.exit(1);
 }
 
@@ -606,7 +607,7 @@ const designFail2passCommand = defineCommand({
       config,
       args: args as DesignFail2passArgs,
     });
-    console.log('\nDone.');
+    consola.log('\nDone.');
   },
 });
 
@@ -656,7 +657,7 @@ const designCommand = defineCommand({
       config,
       args: args as DesignFail2passArgs,
     });
-    console.log('\nDone.');
+    consola.log('\nDone.');
   },
 });
 
@@ -692,10 +693,10 @@ const runCommand = defineCommand({
       resume: null,
     });
 
-    console.log(`\n${result.message}`);
+    consola.log(`\n${result.message}`);
     if (result.runId) {
-      console.log(`\nResume with:`);
-      console.log(`  saifac run resume ${result.runId}`);
+      consola.log(`\nResume with:`);
+      consola.log(`  saifac run resume ${result.runId}`);
     }
     if (!result.success) process.exit(1);
   },
@@ -748,27 +749,27 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
   const stagingEnvironment = parseStagingEnvironment(config);
   const codingEnvironment = parseCodingEnvironment(config);
 
-  console.log(`\nStarting iterative loop: ${feature.name}`);
-  console.log(`  Max runs: ${maxRuns}`);
-  console.log(`  Test retries: ${testRetries}`);
-  console.log(`  Spec ambiguity resolution: ${resolveAmbiguity}`);
-  console.log(`  Test image: ${testImage}`);
+  consola.log(`\nStarting iterative loop: ${feature.name}`);
+  consola.log(`  Max runs: ${maxRuns}`);
+  consola.log(`  Test retries: ${testRetries}`);
+  consola.log(`  Spec ambiguity resolution: ${resolveAmbiguity}`);
+  consola.log(`  Test image: ${testImage}`);
   if (dangerousDebug) {
-    console.log('  Leash: disabled (host execution)');
+    consola.log('  Leash: disabled (host execution)');
   } else {
-    console.log(`  Leash: enabled (image: ${coderImage})`);
-    console.log(`  Cedar policy: ${cedarPolicyPath}`);
+    consola.log(`  Leash: enabled (image: ${coderImage})`);
+    consola.log(`  Cedar policy: ${cedarPolicyPath}`);
   }
-  console.log(`  Startup script: ${sandboxProfile.id} profile default`);
-  console.log(`  Gate script: ${sandboxProfile.id} profile default`);
-  console.log(`  Agent: ${agentProfile.displayName} (profile: ${agentProfile.id})`);
-  console.log(`  Stage script: ${sandboxProfile.id} profile default`);
-  console.log('  Test script: built-in (test-default.sh)');
-  console.log(`  Agent log format: ${agentLogFormat}`);
-  console.log(`  Agent env vars: ${Object.keys(agentEnv).join(', ') || 'none'}`);
-  console.log(`  Gate retries: ${gateRetries}`);
-  if (push) console.log(`  Push: ${push}${pr ? ` (+ PR via ${gitProvider.id})` : ''}`);
-  if (runArgs.verbose === true) console.log('  Verbose: enabled');
+  consola.log(`  Startup script: ${sandboxProfile.id} profile default`);
+  consola.log(`  Gate script: ${sandboxProfile.id} profile default`);
+  consola.log(`  Agent: ${agentProfile.displayName} (profile: ${agentProfile.id})`);
+  consola.log(`  Stage script: ${sandboxProfile.id} profile default`);
+  consola.log('  Test script: built-in (test-default.sh)');
+  consola.log(`  Agent log format: ${agentLogFormat}`);
+  consola.log(`  Agent env vars: ${Object.keys(agentEnv).join(', ') || 'none'}`);
+  consola.log(`  Gate retries: ${gateRetries}`);
+  if (push) consola.log(`  Push: ${push}${pr ? ` (+ PR via ${gitProvider.id})` : ''}`);
+  if (runArgs.verbose === true) consola.log('  Verbose: enabled');
 
   return {
     sandboxProfileId: sandboxProfile.id,
@@ -838,8 +839,8 @@ const debugCommand = defineCommand({
 
     const stagingEnvironment = parseStagingEnvironment(config);
 
-    console.log(`\nDebug staging container: ${feature.name}`);
-    console.log('  Ctrl+C to stop and clean up.\n');
+    consola.log(`\nDebug staging container: ${feature.name}`);
+    consola.log('  Ctrl+C to stop and clean up.\n');
 
     await runDebug({
       sandboxProfileId: sandboxProfile.id,

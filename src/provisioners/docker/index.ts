@@ -19,6 +19,7 @@ import { arch } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
 
+import { consola } from 'consola';
 import Docker from 'dockerode';
 
 import type { DockerEnvironment } from '../../config/schema.js';
@@ -161,7 +162,7 @@ class DockerRegistry {
       try {
         await handle.container.remove({ force: true });
       } catch (err) {
-        console.warn(`[docker] Warning: could not remove ${handle.name}: ${String(err)}`);
+        consola.warn(`[docker] Warning: could not remove ${handle.name}: ${String(err)}`);
       }
     }
     for (const net of networksToRemove) {
@@ -216,7 +217,7 @@ export class DockerProvisioner implements Provisioner {
         );
       }
 
-      console.log(
+      consola.log(
         `[docker] Starting compose project "${this.composeProjectName}" (file: ${absoluteFile})`,
       );
       await runDocker(
@@ -228,7 +229,7 @@ export class DockerProvisioner implements Provisioner {
       await this.attachComposeSvcToNetwork(absoluteFile);
 
       const serviceNames = await this.listComposeServices(absoluteFile);
-      console.log(
+      consola.log(
         `[docker] Compose project "${this.composeProjectName}" up — services: ${serviceNames.join(', ')}`,
       );
     }
@@ -262,7 +263,7 @@ export class DockerProvisioner implements Provisioner {
     });
     this.registry.registerImage(imageTag);
 
-    console.log(`[docker] Starting staging container: ${containerName}`);
+    consola.log(`[docker] Starting staging container: ${containerName}`);
 
     const appEnvEntries = Object.entries(stagingEnvironment.appEnvironment ?? {}).map(
       ([k, v]) => `${k}=${v}`,
@@ -308,7 +309,7 @@ export class DockerProvisioner implements Provisioner {
     await container.putArchive(tarBuffer, { path: '/factory' });
 
     await container.start();
-    console.log(`[docker] ${containerName} started`);
+    consola.log(`[docker] ${containerName} started`);
 
     const handle: ContainerHandle = { id: container.id, name: containerName, container };
     this.registry.registerContainers([handle]);
@@ -365,10 +366,10 @@ export class DockerProvisioner implements Provisioner {
       `${testScriptPath}:/usr/local/bin/test.sh:ro`,
     ];
 
-    console.log(`[docker] Starting test runner container: ${containerName}`);
-    console.log(`[docker] Test image: ${testImage}`);
-    console.log(`[docker] Target URL: ${stagingHandle.targetUrl}`);
-    console.log(`[docker] Sidecar URL: ${stagingHandle.sidecarUrl}`);
+    consola.log(`[docker] Starting test runner container: ${containerName}`);
+    consola.log(`[docker] Test image: ${testImage}`);
+    consola.log(`[docker] Target URL: ${stagingHandle.targetUrl}`);
+    consola.log(`[docker] Sidecar URL: ${stagingHandle.sidecarUrl}`);
 
     const container = await docker.createContainer({
       Image: testImage,
@@ -396,14 +397,14 @@ export class DockerProvisioner implements Provisioner {
     }
 
     await container.start();
-    console.log(`[docker] ${containerName} started`);
+    consola.log(`[docker] ${containerName} started`);
 
     const handle: ContainerHandle = { id: container.id, name: containerName, container };
     this.registry.registerContainers([handle]);
 
     streamContainerLogs(container, containerName);
 
-    console.log(`[docker] Waiting for test runner to complete...`);
+    consola.log(`[docker] Waiting for test runner to complete...`);
 
     const waitPromise = (container.wait() as Promise<{ StatusCode: number }>).then((r) => {
       signal?.removeEventListener('abort', onAbort);
@@ -416,9 +417,9 @@ export class DockerProvisioner implements Provisioner {
     // resolve naturally with exit code 137 — no dangling promises.
     const onAbort = () => {
       aborted = true;
-      console.log(`[docker] Abort signal received — stopping test runner ${containerName}`);
+      consola.log(`[docker] Abort signal received — stopping test runner ${containerName}`);
       container.stop().catch((err: unknown) => {
-        console.warn(`[docker] Warning: could not stop ${containerName}: ${String(err)}`);
+        consola.warn(`[docker] Warning: could not stop ${containerName}: ${String(err)}`);
       });
     };
 
@@ -431,15 +432,15 @@ export class DockerProvisioner implements Provisioner {
     const logStream = await container.logs({ stdout: true, stderr: true, follow: false });
     const { stdout, stderr } = demuxDockerLogs(logStream as unknown as Buffer);
 
-    console.log(`[docker] Test runner exit code: ${StatusCode}${aborted ? ' (aborted)' : ''}`);
-    if (stdout) console.log(`[docker] Test runner stdout:\n${stdout}`);
-    if (stderr) console.error(`[docker] Test runner stderr:\n${stderr}`);
+    consola.log(`[docker] Test runner exit code: ${StatusCode}${aborted ? ' (aborted)' : ''}`);
+    if (stdout) consola.log(`[docker] Test runner stdout:\n${stdout}`);
+    if (stderr) consola.error(`[docker] Test runner stderr:\n${stderr}`);
 
     this.registry.deregisterContainers([handle]);
     try {
       await container.remove({ force: true });
     } catch (err) {
-      console.warn(`[docker] Warning: could not remove ${containerName}: ${String(err)}`);
+      consola.warn(`[docker] Warning: could not remove ${containerName}: ${String(err)}`);
     }
 
     if (aborted) {
@@ -448,7 +449,7 @@ export class DockerProvisioner implements Provisioner {
 
     const runnerError = detectRunnerError({ exitCode: StatusCode, stdout, stderr });
     if (runnerError) {
-      console.error(`[docker] Test runner error detected: ${runnerError}`);
+      consola.error(`[docker] Test runner error detected: ${runnerError}`);
     }
 
     const testSuites =
@@ -525,7 +526,7 @@ export class DockerProvisioner implements Provisioner {
         FACTORY_AGENT_SCRIPT: agentPath,
         FACTORY_TASK_PATH: join(codePath, '.factory_task.md'),
       };
-      console.log('[agent-runner] Mode: dangerous-debug (host execution, filesystem sandbox only)');
+      consola.log('[agent-runner] Mode: dangerous-debug (host execution, filesystem sandbox only)');
     } else {
       // Leash mode
       const envForward: Record<string, string> = {
@@ -586,7 +587,7 @@ export class DockerProvisioner implements Provisioner {
 
       if (await pathExists(cedarPolicyPath)) {
         leashArgs.push('--policy', cedarPolicyPath);
-        console.log(`[agent-runner] Cedar policy: ${cedarPolicyPath}`);
+        consola.log(`[agent-runner] Cedar policy: ${cedarPolicyPath}`);
       } else {
         throw new Error(`Cedar policy file not found at ${cedarPolicyPath}`);
       }
@@ -644,12 +645,12 @@ export class DockerProvisioner implements Provisioner {
         ...(this.networkName ? { LEASH_WORKSPACE: workspaceId } : {}),
       };
 
-      console.log(`[agent-runner] Mode: leash (container: ${coderImage})`);
-      console.log(`[agent-runner] Sandbox mount: ${codePath} → ${CONTAINER_WORKSPACE}`);
+      consola.log(`[agent-runner] Mode: leash (container: ${coderImage})`);
+      consola.log(`[agent-runner] Sandbox mount: ${codePath} → ${CONTAINER_WORKSPACE}`);
     }
 
-    console.log(`[agent-runner] Starting agent (model: ${llmModel})`);
-    console.log(
+    consola.log(`[agent-runner] Starting agent (model: ${llmModel})`);
+    consola.log(
       `[agent-runner] Command: ${cmd} ${argsForPrint!.map((s) => s.slice(0, 100)).join(' ')}`,
     );
 
@@ -735,11 +736,11 @@ export class DockerProvisioner implements Provisioner {
       },
     ).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[agent-runner] Process error: ${msg}`);
+      consola.error(`[agent-runner] Process error: ${msg}`);
       return { exitCode: 1, output: msg };
     });
 
-    console.log(`[agent-runner] Finished with exit code ${exitCode}`);
+    consola.log(`[agent-runner] Finished with exit code ${exitCode}`);
     return { success: exitCode === 0, exitCode, output };
   }
 
@@ -751,7 +752,7 @@ export class DockerProvisioner implements Provisioner {
 
     // 2. Tear down compose stack (if one was started)
     if (this.composeFile && this.composeProjectName) {
-      console.log(`[docker] Tearing down compose project "${this.composeProjectName}"`);
+      consola.log(`[docker] Tearing down compose project "${this.composeProjectName}"`);
       try {
         await runDocker(
           [
@@ -766,9 +767,9 @@ export class DockerProvisioner implements Provisioner {
           ],
           { stdio: 'inherit' },
         );
-        console.log(`[docker] Compose project "${this.composeProjectName}" down`);
+        consola.log(`[docker] Compose project "${this.composeProjectName}" down`);
       } catch (err) {
-        console.warn(
+        consola.warn(
           `[docker] Warning: failed to tear down compose project "${this.composeProjectName}": ${String(err)}`,
         );
       }
@@ -800,7 +801,7 @@ export class DockerProvisioner implements Provisioner {
           `[docker] config environments.staging.app.build.dockerfile "${dockerfile}" not found at ${dockerfilePath}`,
         );
       }
-      console.log(`[docker] Using custom Dockerfile: ${dockerfilePath}`);
+      consola.log(`[docker] Using custom Dockerfile: ${dockerfilePath}`);
     } else {
       dockerfilePath = resolveSandboxStageDockerfilePath(sandboxProfileId);
       if (!(await pathExists(dockerfilePath))) {
@@ -808,7 +809,7 @@ export class DockerProvisioner implements Provisioner {
           `[docker] Profile "${sandboxProfileId}" requires Dockerfile.stage at ${dockerfilePath} but it is missing.`,
         );
       }
-      console.log(`[docker] Using profile ${sandboxProfileId} Dockerfile.stage`);
+      consola.log(`[docker] Using profile ${sandboxProfileId} Dockerfile.stage`);
     }
 
     // Write a .dockerignore to keep the build context clean
@@ -817,11 +818,11 @@ export class DockerProvisioner implements Provisioner {
       ['node_modules', '.git', '*.log', 'dist', 'build', '.cache'].join('\n') + '\n',
     );
 
-    console.log(`[docker] Building staging container image: ${imageTag}`);
+    consola.log(`[docker] Building staging container image: ${imageTag}`);
     await runDocker(['build', '-f', dockerfilePath, '-t', imageTag, codePath], {
       stdio: 'inherit',
     });
-    console.log(`[docker] Staging container image built: ${imageTag}`);
+    consola.log(`[docker] Staging container image built: ${imageTag}`);
   }
 
   private async listComposeServices(absoluteFile: string): Promise<string[]> {
@@ -867,11 +868,11 @@ export class DockerProvisioner implements Provisioner {
             stdio: 'inherit',
           },
         );
-        console.log(
+        consola.log(
           `[docker] Connected compose service "${service}" (${containerName}) to network "${this.networkName}"`,
         );
       } catch (err) {
-        console.warn(
+        consola.warn(
           `[docker] Warning: could not attach compose service "${service}" to network "${this.networkName}": ${String(err)}`,
         );
       }
@@ -892,7 +893,7 @@ async function ensureCreateNetwork(name: string): Promise<void> {
       (err.message.includes('409') || err.message.includes('already exists'));
     if (!isConflict) throw err;
 
-    console.warn(
+    consola.warn(
       `[docker] Network ${name} already exists (leftover from prior run) — removing and recreating.`,
     );
     await removeDockerNetwork(name);
@@ -908,7 +909,7 @@ async function removeDockerNetwork(networkName: string): Promise<void> {
       await n.remove();
     }
   } catch (err) {
-    console.warn(`[docker] Warning: could not remove network ${networkName}: ${String(err)}`);
+    consola.warn(`[docker] Warning: could not remove network ${networkName}: ${String(err)}`);
   }
 }
 
@@ -941,14 +942,14 @@ async function waitForContainerReady(opts: {
   const deadline = Date.now() + timeoutMs;
   let attempt = 0;
 
-  console.log(`[docker] Waiting for ${containerName} to be ready on port ${port}...`);
+  consola.log(`[docker] Waiting for ${containerName} to be ready on port ${port}...`);
 
   while (Date.now() < deadline) {
     attempt++;
     try {
       const info = await container.inspect();
       if (!info.State.Running) {
-        console.warn(
+        consola.warn(
           `[docker] ${containerName} exited (code ${info.State.ExitCode ?? '?'}) before becoming ready`,
         );
         return;
@@ -962,16 +963,16 @@ async function waitForContainerReady(opts: {
       await new Promise<void>((res) => stream.on('end', res));
       const inspect = await exec.inspect();
       if ((inspect.ExitCode ?? -1) === 0) {
-        console.log(`[docker] ${containerName} is ready (attempt ${attempt})`);
+        consola.log(`[docker] ${containerName} is ready (attempt ${attempt})`);
         return;
       }
     } catch (err) {
-      console.log(`[docker] Health check error (attempt ${attempt}): ${String(err)}`);
+      consola.log(`[docker] Health check error (attempt ${attempt}): ${String(err)}`);
     }
     await sleep(500);
   }
 
-  console.warn(`[docker] ${containerName} did not become ready within ${timeoutMs}ms`);
+  consola.warn(`[docker] ${containerName} did not become ready within ${timeoutMs}ms`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1109,11 +1110,11 @@ function startLeashNetworkAttach(networkName: string, workspaceId: string): Netw
       const out = stdout.trim();
 
       if (out === 'true') {
-        console.log(
+        consola.log(
           `[agent-runner] Attaching container "${containerName}" to network "${networkName}"...`,
         );
         await runDocker(['network', 'connect', networkName, containerName], { stdio: 'inherit' });
-        console.log(`[agent-runner] Container "${containerName}" attached to "${networkName}".`);
+        consola.log(`[agent-runner] Container "${containerName}" attached to "${networkName}".`);
         return;
       }
     } catch {

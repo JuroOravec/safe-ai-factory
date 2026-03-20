@@ -46,7 +46,7 @@ export const shotgunDesignerProfile: DesignerProfile = {
     // Run `shotgun-sh --spec-dir <featureDir> run -n <proposalPrompt>`
     await runShotgunCli(['--spec-dir', feature.relativePath, 'run', ...runArgs], {
       projectDir: cwd,
-      // Shotgun needs these environment variables to stream the output to the console.
+      // Shotgun needs these environment variables to stream the output to the terminal.
       env: { PYTHONUNBUFFERED: '1', SHOTGUN_LOGGING_TO_CONSOLE: '1' },
       printCmd: true,
     });

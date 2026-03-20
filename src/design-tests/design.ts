@@ -11,6 +11,7 @@ import { mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { Tool } from '@mastra/core/tools';
+import { consola } from 'consola';
 
 import type { IndexerProfile } from '../indexer-profiles/index.js';
 import { type ModelOverrides } from '../llm-config.js';
@@ -149,7 +150,7 @@ export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTests
 
   const testsDir = join(feature.absolutePath, 'tests');
 
-  console.log(`[design-tests:plan] Reading spec files from ${feature.absolutePath}`);
+  consola.log(`[design-tests:plan] Reading spec files from ${feature.absolutePath}`);
   const featureFiles = await readFeatureFiles(feature.absolutePath);
 
   if (Object.keys(featureFiles).length === 0) {
@@ -159,13 +160,13 @@ export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTests
     );
   }
 
-  console.log(`[design-tests:plan] Found ${Object.keys(featureFiles).length} spec files`);
+  consola.log(`[design-tests:plan] Found ${Object.keys(featureFiles).length} spec files`);
   if (indexerTool) {
-    console.log(
+    consola.log(
       `[design-tests:plan] Codebase index: ${indexerProfile!.displayName} (project: ${projectName})`,
     );
   }
-  console.log(`[design-tests:plan] Step 1a: Generating test plan...`);
+  consola.log(`[design-tests:plan] Step 1a: Generating test plan...`);
 
   // Step 1a: Planner agent → Markdown test plan
   const plannerPrompt = buildPlannerPrompt(featureFiles, extraPrompt);
@@ -201,9 +202,9 @@ export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTests
   await mkdir(testsDir, { recursive: true });
   const testPlanPath = join(testsDir, 'tests.md');
   await writeUtf8(testPlanPath, testPlan);
-  console.log(`[design-tests:plan] Step 1a complete → ${testPlanPath}`);
+  consola.log(`[design-tests:plan] Step 1a complete → ${testPlanPath}`);
 
-  console.log(`[design-tests:plan] Step 1b: Generating tests.json...`);
+  consola.log(`[design-tests:plan] Step 1b: Generating tests.json...`);
 
   let catalog: TestCatalog;
   try {
@@ -232,7 +233,7 @@ export async function runDesignTests(opts: RunTestsDesignOpts): Promise<RunTests
 
   const catalogPath = join(testsDir, 'tests.json');
   await writeUtf8(catalogPath, JSON.stringify(catalog, null, 2) + '\n');
-  console.log(`[design-tests:plan] Step 1b complete → ${catalogPath}`);
+  consola.log(`[design-tests:plan] Step 1b complete → ${catalogPath}`);
 
   return {
     testPlanPath,

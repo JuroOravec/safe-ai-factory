@@ -10,6 +10,7 @@
 import { readdir, rm as rmAsync } from 'node:fs/promises';
 
 import { defineCommand, runMain } from 'citty';
+import { consola } from 'consola';
 
 import { DEFAULT_SANDBOX_BASE_DIR } from '../../orchestrator/sandbox.js';
 import { pathExists } from '../../utils/io.js';
@@ -32,7 +33,7 @@ const listCommand = defineCommand({
     const listAll = args.all === true;
 
     if (!(await pathExists(sandboxBase))) {
-      console.log(`${sandboxBase} does not exist — no entries found.`);
+      consola.log(`${sandboxBase} does not exist — no entries found.`);
       return;
     }
 
@@ -40,12 +41,12 @@ const listCommand = defineCommand({
 
     if (listAll) {
       if (entries.length === 0) {
-        console.log(`No entries found in ${sandboxBase}.`);
+        consola.log(`No entries found in ${sandboxBase}.`);
         return;
       }
-      console.log(`${sandboxBase} (${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}):`);
+      consola.log(`${sandboxBase} (${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}):`);
       for (const entry of entries) {
-        console.log(`${sandboxBase}/${entry}`);
+        consola.log(`${sandboxBase}/${entry}`);
       }
       return;
     }
@@ -56,15 +57,15 @@ const listCommand = defineCommand({
     const matching = entries.filter((e) => e.startsWith(prefix));
 
     if (matching.length === 0) {
-      console.log(`No entries matching "${prefix}*" found in ${sandboxBase}.`);
+      consola.log(`No entries matching "${prefix}*" found in ${sandboxBase}.`);
       return;
     }
 
-    console.log(
+    consola.log(
       `${sandboxBase} — ${matching.length} entr${matching.length === 1 ? 'y' : 'ies'} for project "${projName}":`,
     );
     for (const entry of matching) {
-      console.log(`${sandboxBase}/${entry}`);
+      consola.log(`${sandboxBase}/${entry}`);
     }
   },
 });
@@ -91,7 +92,7 @@ const clearCommand = defineCommand({
     const clearAll = args.all === true;
 
     if (!(await pathExists(sandboxBase))) {
-      console.log(`${sandboxBase} does not exist — nothing to clear.`);
+      consola.log(`${sandboxBase} does not exist — nothing to clear.`);
       return;
     }
 
@@ -102,14 +103,14 @@ const clearCommand = defineCommand({
         toRemove.map(async (entry) => {
           // E.g. `/tmp/factory-sandbox/crawlee-one-feat-abc1234`
           await rmAsync(`${sandboxBase}/${entry}`, { recursive: true, force: true });
-          console.log(`  removed ${entry}`);
+          consola.log(`  removed ${entry}`);
         }),
       );
     };
 
     if (clearAll) {
       await removeEntries(entries);
-      console.log(
+      consola.log(
         `\nCleared ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} from ${sandboxBase}.`,
       );
       return;
@@ -121,12 +122,12 @@ const clearCommand = defineCommand({
     const matching = entries.filter((e) => e.startsWith(prefix));
 
     if (matching.length === 0) {
-      console.log(`No entries matching "${prefix}*" found in ${sandboxBase}.`);
+      consola.log(`No entries matching "${prefix}*" found in ${sandboxBase}.`);
       return;
     }
 
     await removeEntries(matching);
-    console.log(
+    consola.log(
       `\nCleared ${matching.length} entr${matching.length === 1 ? 'y' : 'ies'} for project "${projName}" from ${sandboxBase}.`,
     );
   },

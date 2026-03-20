@@ -1,3 +1,5 @@
+import { consola } from 'consola';
+
 import { spawnCapture } from '../../utils/io.js';
 
 /**
@@ -26,11 +28,11 @@ export default async function validateE2eTestNaming() {
   }
 
   if (violations.length > 0) {
-    console.error('❌ E2E test files must use the suffix convention, not prefix.');
-    console.error('   Use xxx-e2e.test.ts or xxx.e2e.test.ts, not e2e-xxx.test.ts');
-    console.error('');
+    consola.error('❌ E2E test files must use the suffix convention, not prefix.');
+    consola.error('   Use xxx-e2e.test.ts or xxx.e2e.test.ts, not e2e-xxx.test.ts');
+    consola.error('');
     for (const f of violations) {
-      console.error(`   ${f}`);
+      consola.error(`   ${f}`);
     }
     throw new Error('One or more e2e test files use the prefix naming (e2e-xxx).');
   }

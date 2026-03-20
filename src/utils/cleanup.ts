@@ -2,6 +2,8 @@
 // Cleanup registry — tracks live provisioners for graceful shutdown
 // ---------------------------------------------------------------------------
 
+import { consola } from 'consola';
+
 /** Minimal provisioner interface used by CleanupRegistry (avoids circular deps). */
 export interface ProvisionerRef {
   teardown(opts: { runId: string }): Promise<void>;
@@ -39,7 +41,7 @@ export class CleanupRegistry {
       try {
         await this.beforeCleanupHook();
       } catch (err) {
-        console.warn('[orchestrator] Before-cleanup hook error:', err);
+        consola.warn('[orchestrator] Before-cleanup hook error:', err);
       }
     }
     const provisionersToDown = [...this.provisioners];

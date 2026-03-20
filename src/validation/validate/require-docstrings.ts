@@ -1,3 +1,5 @@
+import { consola } from 'consola';
+
 import { readUtf8, spawnCapture } from '../../utils/io.js';
 
 export default async function validateDocstrings() {
@@ -32,7 +34,7 @@ export default async function validateDocstrings() {
       const trimmedBefore = textBefore.trimEnd();
 
       if (!trimmedBefore.endsWith('*/')) {
-        console.error(`❌ Missing docstring for 'export ${exportType} ${exportName}' in ${file}`);
+        consola.error(`❌ Missing docstring for 'export ${exportType} ${exportName}' in ${file}`);
         failed = true;
       } else {
         const lastCommentStart = trimmedBefore.lastIndexOf('/*');
@@ -40,7 +42,7 @@ export default async function validateDocstrings() {
           lastCommentStart === -1 ||
           !trimmedBefore.substring(lastCommentStart).startsWith('/**')
         ) {
-          console.error(
+          consola.error(
             `❌ Invalid docstring (must start with /**) for 'export ${exportType} ${exportName}' in ${file}`,
           );
           failed = true;

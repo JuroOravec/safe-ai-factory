@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 
 import { runTests } from '@vscode/test-electron';
+import { consola } from 'consola';
 
 /**
  * Entry point for VS Code extension tests. Runs outside VS Code in Node.
@@ -23,7 +24,7 @@ async function main(): Promise<void> {
       launchArgs,
     });
   } catch {
-    console.error('Failed to run tests');
+    consola.error('Failed to run tests');
     process.exit(1);
   }
 }

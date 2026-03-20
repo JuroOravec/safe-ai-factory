@@ -9,6 +9,8 @@ import { chmod, mkdir, readdir, rm } from 'node:fs/promises';
 import { arch } from 'node:os';
 import { join } from 'node:path';
 
+import { consola } from 'consola';
+
 import { getSaifRoot } from '../../../constants.js';
 import { pathExists, spawnAsync } from '../../../utils/io.js';
 
@@ -55,7 +57,7 @@ export async function ensureArgusBinary(hostArch: 'arm64' | 'x64'): Promise<stri
   const url = `https://github.com/${REPO}/releases/download/${RELEASE_TAG}/${asset}`;
   const tmpTar = join(outDir, `tmp-argus-${hostArch}.tar.gz`);
 
-  console.log(`[argus] Downloading v${ARGUS_VERSION} for Linux ${hostArch}...`);
+  consola.log(`[argus] Downloading v${ARGUS_VERSION} for Linux ${hostArch}...`);
   try {
     await spawnAsync({
       command: 'curl',
@@ -94,7 +96,7 @@ export async function ensureArgusBinary(hostArch: 'arm64' | 'x64'): Promise<stri
   await rm(tmpExtract, { recursive: true, force: true });
   await rm(tmpTar, { recursive: true, force: true });
 
-  console.log(`[argus] Installed to ${binaryPath}`);
+  consola.log(`[argus] Installed to ${binaryPath}`);
   return binaryPath;
 }
 

@@ -1,6 +1,8 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { consola } from 'consola';
+
 import { pathExists, spawnWait, writeUtf8 } from '../../utils/io.js';
 import type { OnDoneOpts, TestProfile, ValidateFilesOpts } from '../types.js';
 
@@ -20,7 +22,7 @@ test-output = "immediate-final"
 `;
   await mkdir(configDir, { recursive: true });
   await writeUtf8(configPath, content);
-  console.log(`[design-tests:rust-rusttest] Written ${configPath}`);
+  consola.log(`[design-tests:rust-rusttest] Written ${configPath}`);
 }
 
 /**
@@ -33,7 +35,7 @@ async function rusttestValidateFiles(opts: ValidateFilesOpts): Promise<void> {
   if (generatedFiles.length === 0) return;
   if (!generatedFiles.some((f) => f.endsWith('.rs'))) return;
 
-  console.log(`\nValidating generated spec files (cargo check --tests)...`);
+  consola.log(`\nValidating generated spec files (cargo check --tests)...`);
   try {
     const result = await spawnWait({
       command: 'cargo',
@@ -42,17 +44,17 @@ async function rusttestValidateFiles(opts: ValidateFilesOpts): Promise<void> {
       timeoutMs: 60_000,
     });
     if (result.code === 0) {
-      console.log(`  Rust validation passed.`);
+      consola.log(`  Rust validation passed.`);
     } else {
       const output = result.stdout + result.stderr;
-      console.error(`  ${opts.errMessage}`);
+      consola.error(`  ${opts.errMessage}`);
       for (const line of output.split('\n').filter(Boolean).slice(0, 20)) {
-        console.error(`    ${line}`);
+        consola.error(`    ${line}`);
       }
       process.exit(1);
     }
   } catch {
-    console.warn(`  Rust validation skipped (cargo not available).`);
+    consola.warn(`  Rust validation skipped (cargo not available).`);
   }
 }
 
@@ -78,7 +80,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 `;
   await writeUtf8(cargoTomlPath, content);
-  console.log(`[design-tests:rust-rusttest] Written ${cargoTomlPath}`);
+  consola.log(`[design-tests:rust-rusttest] Written ${cargoTomlPath}`);
 }
 
 /**
@@ -110,7 +112,7 @@ async function rusttestOnDone(opts: OnDoneOpts): Promise<void> {
 
     if (!(await pathExists(modRsPath)) || force) {
       await writeUtf8(modRsPath, modRsContent);
-      console.log(`[design-tests:rust-rusttest] Written ${modRsPath}`);
+      consola.log(`[design-tests:rust-rusttest] Written ${modRsPath}`);
       generatedFiles.push(`${subdir}/mod.rs`);
     }
   }

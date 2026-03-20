@@ -53,6 +53,7 @@
     "coverage": "vitest run --coverage"
   },
   "devDependencies": {
+    "consola": "^3.4.2",
     "@eslint/js": "^9",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22",

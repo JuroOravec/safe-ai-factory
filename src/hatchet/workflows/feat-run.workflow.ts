@@ -38,6 +38,7 @@
 import { join } from 'node:path';
 
 import type { JsonValue } from '@hatchet-dev/typescript-sdk/v1/types.js';
+import { consola } from 'consola';
 import { z } from 'zod';
 
 import { buildInitialTask, runVagueSpecsCheckerForFailure } from '../../orchestrator/loop.js';
@@ -328,7 +329,7 @@ export function createFeatRunWorkflow() {
       let lastRunId = '';
 
       for (let attempt = 1; attempt <= maxRuns; attempt++) {
-        console.log(`\n[hatchet] ===== ATTEMPT ${attempt}/${maxRuns} =====`);
+        consola.log(`\n[hatchet] ===== ATTEMPT ${attempt}/${maxRuns} =====`);
 
         // Hatchet: `runChild` resolves to the child workflow's final aggregate output. For a
         // multi-task DAG, that object is keyed by each step's `name` (see TS SDK
@@ -374,7 +375,7 @@ export function createFeatRunWorkflow() {
         }
 
         if (testOut.status === 'aborted') {
-          console.log('[hatchet] Test run aborted by cancellation.');
+          consola.log('[hatchet] Test run aborted by cancellation.');
           return {
             success: false,
             attempt,
@@ -392,14 +393,14 @@ export function createFeatRunWorkflow() {
         errorFeedback = base + hint;
         lastErrorFeedback = errorFeedback;
 
-        console.log(`\n[hatchet] Attempt ${attempt} FAILED.`);
+        consola.log(`\n[hatchet] Attempt ${attempt} FAILED.`);
 
         // Reset sandbox for next coder round
         await gitResetHard({ cwd: sandboxRaw.codePath });
         await gitClean({ cwd: sandboxRaw.codePath });
       }
 
-      console.error(`\n[hatchet] Max runs (${maxRuns}) reached without success.`);
+      consola.error(`\n[hatchet] Max runs (${maxRuns}) reached without success.`);
       return {
         success: false,
         attempt: maxRuns,
@@ -483,11 +484,11 @@ export function createFeatRunWorkflow() {
           opts: loopOpts,
         });
         await runStorage.saveRun(sandboxRaw.runId, artifact);
-        console.log(
+        consola.log(
           `[hatchet] Run state saved. Resume with: saifac run resume ${sandboxRaw.runId}`,
         );
       } catch (err) {
-        console.warn('[hatchet] Failed to save run state:', err);
+        consola.warn('[hatchet] Failed to save run state:', err);
       }
     },
   });

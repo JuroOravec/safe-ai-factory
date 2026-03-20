@@ -113,6 +113,7 @@
     "@mastra/core": "^1.7.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "citty": "^0.2.1",
+    "consola": "^3.4.2",
     "cosmiconfig": "^9.0.1",
     "dockerode": "^4.0.9",
     "fast-xml-parser": "^5.4.2",

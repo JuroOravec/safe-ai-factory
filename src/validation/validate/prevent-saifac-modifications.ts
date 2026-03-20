@@ -1,3 +1,5 @@
+import { consola } from 'consola';
+
 import { spawnCapture } from '../../utils/io.js';
 
 export default async function preventSpecModifications() {
@@ -38,17 +40,17 @@ export default async function preventSpecModifications() {
   const saifModifications = lines.filter((line) => line.includes('saifac/'));
 
   if (saifModifications.length > 0) {
-    console.error(
+    consola.error(
       '❌ CRITICAL SECURITY BREACH: The Coder sidecar attempted to modify files in the saifac/ directory.',
     );
-    console.error('   Uncommitted changes detected in saifac/:');
+    consola.error('   Uncommitted changes detected in saifac/:');
     for (const file of saifModifications) {
-      console.error(`     - ${file.trim()}`);
+      consola.error(`     - ${file.trim()}`);
     }
-    console.error(
+    consola.error(
       '   Hint: The saifac/ directory contains authoritative ground-truth constraints and is strictly READ-ONLY for AI workers.',
     );
-    console.error(
+    consola.error(
       '   You must implement the logic in src/ or scripts/ to satisfy the saifac, not modify the saifac themselves.',
     );
     throw new Error('AI Agent attempted to modify read-only saifac/ directory.');

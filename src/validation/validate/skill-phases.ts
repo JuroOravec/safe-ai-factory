@@ -10,6 +10,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import { consola } from 'consola';
+
 const SKILLS_DIR = '.cursor/skills';
 
 /** Derive skill name from path: act/dev -> act-dev, project/polish-docs -> project-polish-docs */
@@ -205,13 +207,13 @@ export default async function validateSkillPhases(): Promise<void> {
 
   if (failures.length > 0) {
     for (const { skillName, violations } of failures) {
-      console.error(`FAIL: ${skillName}`);
-      console.error(violations.join('\n'));
+      consola.error(`FAIL: ${skillName}`);
+      consola.error(violations.join('\n'));
     }
     throw new Error(
       'Validation failed. Fix the violations above.\nFormat required: ### Phase N: Title or ### Phase Na: Title',
     );
   }
 
-  console.log('All skills pass phase format validation.');
+  consola.log('All skills pass phase format validation.');
 }

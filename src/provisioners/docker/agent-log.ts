@@ -6,6 +6,8 @@
  * them without circular dependencies.
  */
 
+import { consola } from 'consola';
+
 /**
  * Reserved env var prefixes and keys that must not be overridden by agentEnv.
  */
@@ -37,7 +39,7 @@ export function filterAgentEnv(agentEnv: Record<string, string>): Record<string,
   const result: Record<string, string> = {};
   for (const [key, val] of Object.entries(agentEnv)) {
     if (key.startsWith('FACTORY_') || RESERVED_ENV_KEYS.has(key)) {
-      console.warn(
+      consola.warn(
         `[agent-runner] WARNING: --agent-env ${key} is a reserved factory variable and will be ignored.`,
       );
       continue;

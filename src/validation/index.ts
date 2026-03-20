@@ -5,6 +5,8 @@
  * Exported as runCheck() for use by the commands CLI.
  */
 
+import { consola } from 'consola';
+
 import { spawnUserCmd, spawnUserCmdCapture } from '../utils/io.js';
 
 const phases = [
@@ -51,7 +53,7 @@ export async function runCheck(opts: { reporter?: string }): Promise<void> {
     const phaseName = `Phase ${i + 1}: ${phase.name}`;
     try {
       if (!isAgentReporter) {
-        console.log(`\n--- Running ${phaseName} ---`);
+        consola.log(`\n--- Running ${phaseName} ---`);
       }
       await runPhase({ name: phaseName, command: phase.command, captureOutput: isAgentReporter });
     } catch (error) {
@@ -60,7 +62,7 @@ export async function runCheck(opts: { reporter?: string }): Promise<void> {
         const output = err.output;
         const lines = output.split('\n');
         const lastLines = lines.slice(-50).join('\n').trim();
-        console.log(
+        consola.log(
           JSON.stringify({
             status: 'FAILED',
             phase: phaseName,
@@ -70,15 +72,15 @@ export async function runCheck(opts: { reporter?: string }): Promise<void> {
         );
         process.exit(1);
       } else {
-        console.error(`\n❌ ${phaseName} failed with exit code ${err.code}`);
+        consola.error(`\n❌ ${phaseName} failed with exit code ${err.code}`);
         process.exit(1);
       }
     }
   }
 
   if (isAgentReporter) {
-    console.log(JSON.stringify({ status: 'PASSED' }));
+    consola.log(JSON.stringify({ status: 'PASSED' }));
   } else {
-    console.log('\n✅ All phases passed successfully.');
+    consola.log('\n✅ All phases passed successfully.');
   }
 }

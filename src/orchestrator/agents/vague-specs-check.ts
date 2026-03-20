@@ -19,6 +19,7 @@
  */
 
 import { Agent } from '@mastra/core/agent';
+import { consola } from 'consola';
 import { z } from 'zod';
 
 import { type ModelOverrides, resolveAgentModel } from '../../llm-config.js';
@@ -176,7 +177,7 @@ Produce your JSON verdict now.`;
         lastErr = new Error(
           `Schema validation failed: ${JSON.stringify(result.error.issues, null, 2)}`,
         );
-        console.warn(
+        consola.warn(
           `[vague-specs-check] Attempt ${attempt}/${MAX_ATTEMPTS}: invalid JSON schema, retrying...`,
         );
         continue;
@@ -185,11 +186,11 @@ Produce your JSON verdict now.`;
       return result.data;
     } catch (err) {
       lastErr = err;
-      console.warn(`[vague-specs-check] Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${String(err)}`);
+      consola.warn(`[vague-specs-check] Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${String(err)}`);
     }
   }
 
-  console.warn(`[vague-specs-check] All ${MAX_ATTEMPTS} attempts failed. Last: ${String(lastErr)}`);
+  consola.warn(`[vague-specs-check] All ${MAX_ATTEMPTS} attempts failed. Last: ${String(lastErr)}`);
   return fallback();
 }
 

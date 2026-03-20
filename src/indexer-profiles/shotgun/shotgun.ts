@@ -12,6 +12,8 @@
  * @see {@link file://.cursor/skills/project/setup-swe-factory/SKILL.md Phase 2}
  */
 
+import { consola } from 'consola';
+
 import { spawnAsync, spawnCapture } from '../../utils/io.js';
 
 export interface ShotgunQueryResult {
@@ -60,7 +62,7 @@ export async function runShotgunCli(args: string[], opts: RunShotgunCliOptions):
     const display = [python, ...allArgs]
       .map((a, i) => (i === 0 ? a : formatArgForDisplay(a)))
       .join(' ');
-    console.log(`  $ ${display}`);
+    consola.log(`  $ ${display}`);
   }
   await spawnAsync({
     command: python,
@@ -88,7 +90,7 @@ export async function queryShotgunIndex(
     graphId,
     formatArgForDisplay(question),
   ].join(' ');
-  console.log(`  $ ${display}`);
+  consola.log(`  $ ${display}`);
 
   try {
     const raw = await spawnCapture({
@@ -116,7 +118,7 @@ export async function runShotgunCapture(
     const display = [python, ...allArgs]
       .map((a, i) => (i === 0 ? a : formatArgForDisplay(a)))
       .join(' ');
-    console.log(`  $ ${display}`);
+    consola.log(`  $ ${display}`);
   }
   return spawnCapture({
     command: python,

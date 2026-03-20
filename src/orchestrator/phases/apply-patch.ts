@@ -4,6 +4,8 @@
 
 import { join } from 'node:path';
 
+import { consola } from 'consola';
+
 import { generatePRSummary } from '../../git/agents/pr-summarizer.js';
 import type { GitProvider } from '../../git/types.js';
 import type { ModelOverrides } from '../../llm-config.js';
@@ -69,7 +71,7 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
   const patchFile = join(sandboxBasePath, 'patch.diff');
 
   if (!(await pathExists(patchFile))) {
-    console.warn('[orchestrator] No patch.diff found in sandbox; skipping host apply');
+    consola.warn('[orchestrator] No patch.diff found in sandbox; skipping host apply');
     return;
   }
 
@@ -103,7 +105,7 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
     // fall back to 'main'
   }
 
-  console.log(`[orchestrator] Creating worktree at ${wtPath} on branch ${branchName}...`);
+  consola.log(`[orchestrator] Creating worktree at ${wtPath} on branch ${branchName}...`);
 
   // 1. Create worktree + branch — main worktree HEAD is never touched
   await gitWorktreeAdd({ cwd: projectDir, path: wtPath, branch: branchName, env: gitEnv });
@@ -118,14 +120,14 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
       message: `feat(${feature.name}): auto-generated implementation`,
       verbose,
     });
-    console.log(`[orchestrator] Committed patch on branch ${branchName}`);
+    consola.log(`[orchestrator] Committed patch on branch ${branchName}`);
 
     // 4. Push
     if (push) {
       const pushUrl = await gitProvider.resolvePushUrl(push, projectDir);
-      console.log(`[orchestrator] Pushing ${branchName} to remote...`);
+      consola.log(`[orchestrator] Pushing ${branchName} to remote...`);
       await gitPush({ cwd: wtPath, env: gitEnv, remote: pushUrl, branch: branchName });
-      console.log(`[orchestrator] Branch ${branchName} pushed.`);
+      consola.log(`[orchestrator] Branch ${branchName} pushed.`);
 
       // 5. Create PR
       if (pr) {
@@ -135,7 +137,7 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
         let prTitle = `feat(${feature.name}): auto-generated implementation`;
         let prBody = `Automated implementation produced by the [SAIFAC](https://github.com/JuroOravec/safe-ai-factory) for feature \`${feature.name}\`.\n\nRun ID: \`${runId}\``;
         try {
-          console.log(`[orchestrator] Generating AI PR summary for ${feature.name}...`);
+          consola.log(`[orchestrator] Generating AI PR summary for ${feature.name}...`);
           const summary = await generatePRSummary({
             feature,
             patchFile,
@@ -143,14 +145,14 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
           });
           prTitle = summary.title;
           prBody = summary.body + `\n\n---\n_Run ID: \`${runId}\`_`;
-          console.log(`[orchestrator] AI PR title: ${prTitle}`);
+          consola.log(`[orchestrator] AI PR title: ${prTitle}`);
         } catch (err) {
-          console.warn(
+          consola.warn(
             `[orchestrator] PR summarizer failed (using generic title/body): ${String(err)}`,
           );
         }
 
-        console.log(`[orchestrator] Creating Pull Request on ${repoSlug}...`);
+        consola.log(`[orchestrator] Creating Pull Request on ${repoSlug}...`);
         const prUrl = await gitProvider.createPullRequest({
           repoSlug,
           head: branchName,
@@ -158,10 +160,10 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
           title: prTitle,
           body: prBody,
         });
-        console.log(`[orchestrator] Pull Request created: ${prUrl}`);
+        consola.log(`[orchestrator] Pull Request created: ${prUrl}`);
       }
     } else {
-      console.log(
+      consola.log(
         `[orchestrator] Branch "${branchName}" is ready locally. ` +
           `Use --push <target> to push it upstream.`,
       );
@@ -177,7 +179,7 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
       } catch {
         // best-effort
       }
-      console.warn(`[orchestrator] git worktree remove warning: ${String(err)}`);
+      consola.warn(`[orchestrator] git worktree remove warning: ${String(err)}`);
     }
   }
 }

@@ -7,6 +7,7 @@
 
 import * as path from 'node:path';
 
+import { consola } from 'consola';
 import * as vscode from 'vscode';
 
 import { SaifCliService } from './cliService';
@@ -15,7 +16,7 @@ import { saifLogger } from './logger';
 import { RunItem, RunProjectItem, RunsTreeProvider } from './RunsTreeProvider';
 
 export async function activate(context: vscode.ExtensionContext) {
-  console.log('Safe AI Factory extension is now active!');
+  consola.log('Safe AI Factory extension is now active!');
 
   const cliService = new SaifCliService();
 

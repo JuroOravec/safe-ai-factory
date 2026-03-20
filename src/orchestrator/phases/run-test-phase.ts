@@ -7,6 +7,8 @@
 
 import { join } from 'node:path';
 
+import { consola } from 'consola';
+
 import { createProvisioner } from '../../provisioners/index.js';
 import type { TestsResult } from '../../provisioners/types.js';
 import type { CleanupRegistry } from '../../utils/cleanup.js';
@@ -63,7 +65,7 @@ export async function runTestPhase(input: RunTestPhaseInput): Promise<RunTestPha
 
   for (let testAttempt = 1; testAttempt <= testRetries; testAttempt++) {
     testRunId = `${sandbox.runId}-${attempt}-${testAttempt}`;
-    console.log(
+    consola.log(
       `\n[orchestrator] Test attempt ${testAttempt}/${testRetries} (outer attempt ${attempt})`,
     );
 

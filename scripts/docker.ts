@@ -13,6 +13,7 @@
 import { resolve } from 'node:path';
 
 import { defineCommand, runMain } from 'citty';
+import { consola } from 'consola';
 
 import { getSaifRoot } from '../src/constants.js';
 import {
@@ -54,7 +55,7 @@ async function parseProjectName(opts: { project?: string }): Promise<string> {
 
 function validateImageTag(tag: string, flagName: string): void {
   if (!/^[a-zA-Z0-9_.\-:/@]+$/.test(tag)) {
-    console.error(
+    consola.error(
       `Invalid ${flagName} value: "${tag}". Image tags must contain only letters, digits, hyphens, underscores, dots, colons, slashes, and @.`,
     );
     process.exit(1);
@@ -81,12 +82,12 @@ const testBuildCommand = defineCommand({
       ? Object.values(SUPPORTED_PROFILES)
       : [args['test-profile'] ? resolveTestProfile(args['test-profile']) : DEFAULT_PROFILE];
 
-    console.log(
+    consola.log(
       buildAll
         ? `\nBuilding all ${profilesToBuild.length} test runner images...`
         : '\nBuilding test runner image...',
     );
-    console.log('  (this only needs to run once; images are cached locally)\n');
+    consola.log('  (this only needs to run once; images are cached locally)\n');
 
     for (const profile of profilesToBuild) {
       const tag = buildAll
@@ -96,12 +97,12 @@ const testBuildCommand = defineCommand({
 
       const dockerfilePath = resolveTestDockerfilePath(profile.id);
       if (!(await pathExists(dockerfilePath))) {
-        console.error(`${dockerfilePath} not found for profile ${profile.id}`);
+        consola.error(`${dockerfilePath} not found for profile ${profile.id}`);
         process.exit(1);
       }
 
-      console.log(`Building: ${tag}`);
-      console.log(`  Dockerfile: ${dockerfilePath}`);
+      consola.log(`Building: ${tag}`);
+      consola.log(`  Dockerfile: ${dockerfilePath}`);
 
       try {
         await spawnAsync({
@@ -111,16 +112,16 @@ const testBuildCommand = defineCommand({
           stdio: 'inherit',
         });
       } catch {
-        console.error(`\ndocker build failed for ${profile.id}`);
+        consola.error(`\ndocker build failed for ${profile.id}`);
         process.exit(1);
       }
-      console.log(`  => ${tag}\n`);
+      consola.log(`  => ${tag}\n`);
     }
 
-    console.log('Test image(s) built successfully.');
+    consola.log('Test image(s) built successfully.');
     if (!buildAll) {
       const tag = args['test-image']?.trim() || `factory-test-${profilesToBuild[0]!.id}:latest`;
-      console.log(`Use it with: npx saifac feat run --test-image ${tag}`);
+      consola.log(`Use it with: npx saifac feat run --test-image ${tag}`);
     }
   },
 });
@@ -142,13 +143,13 @@ const coderBaseBuildCommand = defineCommand({
 
     const dockerfilePath = resolve(repoRoot, 'Dockerfile.coder-base');
     if (!(await pathExists(dockerfilePath))) {
-      console.error(`Dockerfile.coder-base not found at ${dockerfilePath}`);
+      consola.error(`Dockerfile.coder-base not found at ${dockerfilePath}`);
       process.exit(1);
     }
 
-    console.log(`\nBuilding coder base image: ${tag}`);
-    console.log(`  Dockerfile: ${dockerfilePath}`);
-    console.log('  (extend this image to bring your own coder agent)\n');
+    consola.log(`\nBuilding coder base image: ${tag}`);
+    consola.log(`  Dockerfile: ${dockerfilePath}`);
+    consola.log('  (extend this image to bring your own coder agent)\n');
 
     try {
       await spawnAsync({
@@ -158,15 +159,15 @@ const coderBaseBuildCommand = defineCommand({
         stdio: 'inherit',
       });
     } catch {
-      console.error(`\ndocker build failed`);
+      consola.error(`\ndocker build failed`);
       process.exit(1);
     }
 
-    console.log(`\nCoder base image built: ${tag}`);
-    console.log('Extend it in your own Dockerfile:');
-    console.log(`  FROM ${tag}`);
-    console.log('  RUN <install your coder agent here>');
-    console.log(`Use it with: npx saifac feat run --coder-image <your-image>`);
+    consola.log(`\nCoder base image built: ${tag}`);
+    consola.log('Extend it in your own Dockerfile:');
+    consola.log(`  FROM ${tag}`);
+    consola.log('  RUN <install your coder agent here>');
+    consola.log(`Use it with: npx saifac feat run --coder-image <your-image>`);
   },
 });
 
@@ -191,12 +192,12 @@ const coderBuildCommand = defineCommand({
       ? Object.values(SUPPORTED_SANDBOX_PROFILES)
       : [args.profile ? resolveSandboxProfile(args.profile) : DEFAULT_SANDBOX_PROFILE];
 
-    console.log(
+    consola.log(
       buildAll
         ? `\nBuilding all ${profilesToBuild.length} coder images...`
         : '\nBuilding coder image...',
     );
-    console.log('  (this only needs to run once; images are cached locally)\n');
+    consola.log('  (this only needs to run once; images are cached locally)\n');
 
     for (const profile of profilesToBuild) {
       const tag = buildAll
@@ -206,13 +207,13 @@ const coderBuildCommand = defineCommand({
 
       const dockerfilePath = resolveSandboxCoderDockerfilePath(profile.id);
       if (!(await pathExists(dockerfilePath))) {
-        console.error(`${dockerfilePath} not found for profile ${profile.id}`);
+        consola.error(`${dockerfilePath} not found for profile ${profile.id}`);
         process.exit(1);
       }
 
-      console.log(`Building: ${tag}`);
-      console.log(`  Profile:    ${profile.id} (${profile.displayName})`);
-      console.log(`  Dockerfile: ${dockerfilePath}`);
+      consola.log(`Building: ${tag}`);
+      consola.log(`  Profile:    ${profile.id} (${profile.displayName})`);
+      consola.log(`  Dockerfile: ${dockerfilePath}`);
 
       try {
         await spawnAsync({
@@ -222,18 +223,18 @@ const coderBuildCommand = defineCommand({
           stdio: 'inherit',
         });
       } catch {
-        console.error(`\ndocker build failed for ${profile.id}`);
+        consola.error(`\ndocker build failed for ${profile.id}`);
         process.exit(1);
       }
-      console.log(`  => ${tag}\n`);
+      consola.log(`  => ${tag}\n`);
     }
 
-    console.log('Coder image(s) built successfully.');
+    consola.log('Coder image(s) built successfully.');
     if (!buildAll) {
       const profile = profilesToBuild[0]!;
       const tag = args['coder-image']?.trim() || profile.coderImageTag;
-      console.log(`Use it with: saifac feat run --profile ${profile.id}`);
-      console.log(`Override: saifac feat run --coder-image ${tag}`);
+      consola.log(`Use it with: saifac feat run --profile ${profile.id}`);
+      consola.log(`Override: saifac feat run --coder-image ${tag}`);
     }
   },
 });
@@ -259,12 +260,12 @@ const stageBuildCommand = defineCommand({
       ? Object.values(SUPPORTED_SANDBOX_PROFILES)
       : [args.profile ? resolveSandboxProfile(args.profile) : DEFAULT_SANDBOX_PROFILE];
 
-    console.log(
+    consola.log(
       buildAll
         ? `\nBuilding all ${profilesToBuild.length} stage images...`
         : '\nBuilding stage container image...',
     );
-    console.log('  (build context: repo root)\n');
+    consola.log('  (build context: repo root)\n');
 
     for (const profile of profilesToBuild) {
       const tag = buildAll
@@ -274,13 +275,13 @@ const stageBuildCommand = defineCommand({
 
       const dockerfilePath = resolveSandboxStageDockerfilePath(profile.id);
       if (!(await pathExists(dockerfilePath))) {
-        console.error(`${dockerfilePath} not found for profile ${profile.id}`);
+        consola.error(`${dockerfilePath} not found for profile ${profile.id}`);
         process.exit(1);
       }
 
-      console.log(`Building: ${tag}`);
-      console.log(`  Profile:    ${profile.id} (${profile.displayName})`);
-      console.log(`  Dockerfile: ${dockerfilePath}`);
+      consola.log(`Building: ${tag}`);
+      consola.log(`  Profile:    ${profile.id} (${profile.displayName})`);
+      consola.log(`  Dockerfile: ${dockerfilePath}`);
 
       try {
         await spawnAsync({
@@ -290,13 +291,13 @@ const stageBuildCommand = defineCommand({
           stdio: 'inherit',
         });
       } catch {
-        console.error(`\ndocker build failed for ${profile.id}`);
+        consola.error(`\ndocker build failed for ${profile.id}`);
         process.exit(1);
       }
-      console.log(`  => ${tag}\n`);
+      consola.log(`  => ${tag}\n`);
     }
 
-    console.log('Stage image(s) built successfully.');
+    consola.log('Stage image(s) built successfully.');
   },
 });
 
@@ -339,7 +340,7 @@ const clearCommand = defineCommand({
           })
         ).trim();
       } catch {
-        console.error('Failed to list Docker containers. Is Docker running?');
+        consola.error('Failed to list Docker containers. Is Docker running?');
         process.exit(1);
       }
       const names = lines ? lines.split('\n').filter(Boolean) : [];
@@ -353,22 +354,22 @@ const clearCommand = defineCommand({
             cwd: process.cwd(),
             stdio: 'pipe',
           });
-          console.log(`  removed container: ${name}`);
+          consola.log(`  removed container: ${name}`);
           removed++;
         } catch (err) {
-          console.warn(`  warning: could not remove container ${name}: ${String(err)}`);
+          consola.warn(`  warning: could not remove container ${name}: ${String(err)}`);
         }
       }
       return removed;
     };
 
-    console.log(`\nListing staging containers (prefix: ${stagingPrefix}*)...`);
+    consola.log(`\nListing staging containers (prefix: ${stagingPrefix}*)...`);
     removedContainers += await removeContainersByPrefix(stagingPrefix);
 
-    console.log(`\nListing test runner containers (prefix: ${testRunnerPrefix}*)...`);
+    consola.log(`\nListing test runner containers (prefix: ${testRunnerPrefix}*)...`);
     removedContainers += await removeContainersByPrefix(testRunnerPrefix);
 
-    console.log(`\nListing Docker images (prefix: ${stagingPrefix}*)...`);
+    consola.log(`\nListing Docker images (prefix: ${stagingPrefix}*)...`);
     let imageLines: string;
     try {
       imageLines = (
@@ -385,7 +386,7 @@ const clearCommand = defineCommand({
         })
       ).trim();
     } catch {
-      console.error('Failed to list Docker images. Is Docker running?');
+      consola.error('Failed to list Docker images. Is Docker running?');
       process.exit(1);
     }
     const imageTags = imageLines ? imageLines.split('\n').filter(Boolean) : [];
@@ -401,14 +402,14 @@ const clearCommand = defineCommand({
           cwd: process.cwd(),
           stdio: 'pipe',
         });
-        console.log(`  removed image: ${tag}`);
+        consola.log(`  removed image: ${tag}`);
         removedImages++;
       } catch (err) {
-        console.warn(`  warning: could not remove image ${tag}: ${String(err)}`);
+        consola.warn(`  warning: could not remove image ${tag}: ${String(err)}`);
       }
     }
 
-    console.log(`\nListing factory networks (prefix: ${networkPrefix}*)...`);
+    consola.log(`\nListing factory networks (prefix: ${networkPrefix}*)...`);
     let networkLines: string;
     try {
       networkLines = (
@@ -419,7 +420,7 @@ const clearCommand = defineCommand({
         })
       ).trim();
     } catch {
-      console.error('Failed to list Docker networks. Is Docker running?');
+      consola.error('Failed to list Docker networks. Is Docker running?');
       process.exit(1);
     }
     const networkNames = networkLines ? networkLines.split('\n').filter(Boolean) : [];
@@ -432,15 +433,15 @@ const clearCommand = defineCommand({
           cwd: process.cwd(),
           stdio: 'pipe',
         });
-        console.log(`  removed network: ${name}`);
+        consola.log(`  removed network: ${name}`);
         removedNetworks++;
       } catch (err) {
-        console.warn(`  warning: could not remove network ${name}: ${String(err)}`);
+        consola.warn(`  warning: could not remove network ${name}: ${String(err)}`);
       }
     }
 
     const scope = clearAll ? 'all factory projects' : `project "${projName}"`;
-    console.log(
+    consola.log(
       `\nDocker clear complete for ${scope}: ` +
         `${removedContainers} container(s), ${removedImages} image(s), ${removedNetworks} network(s) removed.`,
     );

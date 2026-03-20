@@ -5,6 +5,7 @@
 import { join, resolve } from 'node:path';
 
 import { cancel, intro, isCancel, outro, select } from '@clack/prompts';
+import { consola } from 'consola';
 
 import {
   type AgentProfile,
@@ -124,7 +125,7 @@ export function parseCommaSeparatedOverrides(
   const seenKeys = new Set<string>();
 
   const exit = (msg: string): never => {
-    console.error(`Error: ${errorPrefix} ${msg}`);
+    consola.error(`Error: ${errorPrefix} ${msg}`);
     process.exit(1);
   };
 
@@ -177,7 +178,7 @@ export function parseRunId(args: { runId?: string; _?: string[] }): string {
   const runIdRaw = args.runId ?? args._?.[0];
   const runId = typeof runIdRaw === 'string' ? runIdRaw.trim() : '';
   if (!runId) {
-    console.error('Error: run ID is required.');
+    consola.error('Error: run ID is required.');
     process.exit(1);
   }
   return runId;
@@ -208,7 +209,7 @@ export function validateFeatureName(name: string): void {
     `^${FEATURE_PATH_SEGMENT.source}(?:/${FEATURE_PATH_SEGMENT.source})*$`,
   );
   if (!pathRegex.test(name)) {
-    console.error(
+    consola.error(
       `Invalid feature name: "${name}". Use kebab-case (add-login) or path (auth)/login.`,
     );
     process.exit(1);
@@ -288,7 +289,7 @@ export async function getFeatOrPrompt(
   const features = [...featuresMap.keys()];
 
   if (features.length === 0) {
-    console.error('No features found. Run `saifac feat new` first.');
+    consola.error('No features found. Run `saifac feat new` first.');
     process.exit(1);
   }
 
@@ -324,7 +325,7 @@ export function parseDesignerProfile(
   try {
     return resolveDesignerProfile(id);
   } catch (err) {
-    console.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
+    consola.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
     process.exit(1);
   }
 }
@@ -348,7 +349,7 @@ export function parseIndexerProfile(
   try {
     return resolveIndexerProfile(id);
   } catch (err) {
-    console.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
+    consola.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
     process.exit(1);
   }
 }
@@ -367,7 +368,7 @@ export function parseTestProfile(
   try {
     return resolveTestProfile(id);
   } catch (err) {
-    console.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
+    consola.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
     process.exit(1);
   }
 }
@@ -375,7 +376,7 @@ export function parseTestProfile(
 /** Validates that a Docker image tag is safe to interpolate into shell commands. */
 export function validateImageTag(tag: string, flagName: string): void {
   if (!/^[a-zA-Z0-9_.\-:/@]+$/.test(tag)) {
-    console.error(
+    consola.error(
       `Invalid ${flagName} value: "${tag}". ` +
         `Image tags must contain only letters, digits, hyphens, underscores, dots, colons, slashes, and @ signs.`,
     );
@@ -391,7 +392,7 @@ export function parseSandboxProfile(args: OrchestratorArgs, config?: SaifConfig)
   try {
     return resolveSandboxProfile(id);
   } catch (err) {
-    console.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
+    consola.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
     process.exit(1);
   }
 }
@@ -425,7 +426,7 @@ export async function parseStartupScript(opts: {
   }
   const scriptPath = resolve(projectDir, raw.trim());
   if (!(await pathExists(scriptPath))) {
-    console.error(`Error: --startup-script file not found: ${scriptPath}`);
+    consola.error(`Error: --startup-script file not found: ${scriptPath}`);
     process.exit(1);
   }
   return readUtf8(scriptPath);
@@ -445,7 +446,7 @@ export async function parseGateScript(opts: {
   }
   const scriptPath = resolve(projectDir, raw.trim());
   if (!(await pathExists(scriptPath))) {
-    console.error(`Error: --gate-script file not found: ${scriptPath}`);
+    consola.error(`Error: --gate-script file not found: ${scriptPath}`);
     process.exit(1);
   }
   return readUtf8(scriptPath);
@@ -465,7 +466,7 @@ export async function parseStageScript(opts: {
   }
   const scriptPath = resolve(projectDir, raw.trim());
   if (!(await pathExists(scriptPath))) {
-    console.error(`Error: --stage-script file not found: ${scriptPath}`);
+    consola.error(`Error: --stage-script file not found: ${scriptPath}`);
     process.exit(1);
   }
   return readUtf8(scriptPath);
@@ -485,7 +486,7 @@ export async function parseAgentScripts(opts: {
   if (typeof rawStart === 'string' && rawStart.trim()) {
     const p = resolve(projectDir, rawStart.trim());
     if (!(await pathExists(p))) {
-      console.error(`Error: --agent-start-script file not found: ${p}`);
+      consola.error(`Error: --agent-start-script file not found: ${p}`);
       process.exit(1);
     }
     agentStartScript = await readUtf8(p);
@@ -498,7 +499,7 @@ export async function parseAgentScripts(opts: {
   if (typeof rawScript === 'string' && rawScript.trim()) {
     const p = resolve(projectDir, rawScript.trim());
     if (!(await pathExists(p))) {
-      console.error(`Error: --agent-script file not found: ${p}`);
+      consola.error(`Error: --agent-script file not found: ${p}`);
       process.exit(1);
     }
     agentScript = await readUtf8(p);
@@ -523,7 +524,7 @@ export async function parseTestScript(opts: {
   }
   const scriptPath = resolve(projectDir, raw.trim());
   if (!(await pathExists(scriptPath))) {
-    console.error(`Error: --test-script file not found: ${scriptPath}`);
+    consola.error(`Error: --test-script file not found: ${scriptPath}`);
     process.exit(1);
   }
   return readUtf8(scriptPath);
@@ -646,7 +647,7 @@ export function parseMaxRuns(args: FeatRunArgs, config?: SaifConfig): number {
   if (typeof raw === 'string') {
     const parsed = parseInt(raw, 10);
     if (isNaN(parsed) || parsed < 1) {
-      console.error(`Invalid --max-runs value: ${raw}. Must be a positive integer.`);
+      consola.error(`Invalid --max-runs value: ${raw}. Must be a positive integer.`);
       process.exit(1);
     }
     return parsed;
@@ -659,7 +660,7 @@ export function parseTestRetries(args: FeatRunArgs, config?: SaifConfig): number
   if (typeof raw === 'string') {
     const parsed = parseInt(raw, 10);
     if (isNaN(parsed) || parsed < 1) {
-      console.error(`Invalid --test-retries value: ${raw}. Must be a positive integer.`);
+      consola.error(`Invalid --test-retries value: ${raw}. Must be a positive integer.`);
       process.exit(1);
     }
     return parsed;
@@ -674,7 +675,7 @@ export function parseResolveAmbiguity(
   const raw = args['resolve-ambiguity'];
   if (raw === 'prompt' || raw === 'ai' || raw === 'off') return raw;
   if (raw) {
-    console.warn(`[cli] Unknown --resolve-ambiguity value "${raw}"; using "ai".`);
+    consola.warn(`[cli] Unknown --resolve-ambiguity value "${raw}"; using "ai".`);
   }
   return config?.defaults?.resolveAmbiguity ?? 'ai';
 }
@@ -712,7 +713,7 @@ export function parseGateRetries(args: FeatRunArgs, config?: SaifConfig): number
   if (typeof raw === 'string') {
     const parsed = parseInt(raw, 10);
     if (isNaN(parsed) || parsed < 1) {
-      console.error(`Invalid --gate-retries value: ${raw}. Must be a positive integer.`);
+      consola.error(`Invalid --gate-retries value: ${raw}. Must be a positive integer.`);
       process.exit(1);
     }
     return parsed;
@@ -770,7 +771,7 @@ export async function parseAgentEnv(opts: {
       if (!(await pathExists(p))) missing.push(p);
     }
     if (missing.length > 0) {
-      console.error(`Error: --agent-env-file: file(s) not found: ${missing.join(', ')}`);
+      consola.error(`Error: --agent-env-file: file(s) not found: ${missing.join(', ')}`);
       process.exit(1);
     }
 
@@ -782,7 +783,7 @@ export async function parseAgentEnv(opts: {
         if (!trimmed || trimmed.startsWith('#')) continue;
         const eq = trimmed.indexOf('=');
         if (eq === -1) {
-          console.warn(
+          consola.warn(
             `[cli] WARNING: skipping malformed agent-env-file line (no '='): ${trimmed}`,
           );
           continue;
@@ -805,19 +806,19 @@ export async function parseAgentEnv(opts: {
       // `KEY` (no `=`) is invalid
       const eq = seg.indexOf('=');
       if (eq === -1) {
-        console.error(`Error: --agent-env: invalid pair "${seg}" (no '='). Expected KEY=VALUE.`);
+        consola.error(`Error: --agent-env: invalid pair "${seg}" (no '='). Expected KEY=VALUE.`);
         process.exit(1);
       }
       // `=VAL` (no `KEY`) is invalid
       const key = seg.slice(0, eq).trimEnd();
       if (!key) {
-        console.error(`Error: --agent-env: invalid pair "${seg}" (empty key). Expected KEY=VALUE.`);
+        consola.error(`Error: --agent-env: invalid pair "${seg}" (empty key). Expected KEY=VALUE.`);
         process.exit(1);
       }
       // `KEY=` (no `VAL`) is invalid
       const value = seg.slice(eq + 1).trimStart();
       if (!value) {
-        console.error(
+        consola.error(
           `Error: --agent-env: invalid pair "${seg}" (empty value). Expected KEY=VALUE.`,
         );
         process.exit(1);
@@ -839,7 +840,7 @@ export function parseAgentLogFormat(
   if (raw === 'raw') return 'raw';
   if (raw === 'openhands') return 'openhands';
   if (raw) {
-    console.warn(
+    consola.warn(
       `[cli] Unknown --agent-log-format "${raw}"; falling back to profile default (${agentProfile.defaultLogFormat}).`,
     );
   }
@@ -857,7 +858,7 @@ export function parsePr(args: FeatRunArgs, config?: SaifConfig): boolean {
   const fromConfig = config?.defaults?.pr ?? false;
   const effective = hasPr || fromConfig;
   if (effective && !parsePush(args, config)) {
-    console.error('Error: --pr requires --push <target>.');
+    consola.error('Error: --pr requires --push <target>.');
     process.exit(1);
   }
   return hasPr || fromConfig;
@@ -872,7 +873,7 @@ export function parseGitProvider(args: FeatRunArgs, config?: SaifConfig): GitPro
   try {
     return getGitProvider(id);
   } catch (err) {
-    console.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
+    consola.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
     process.exit(1);
   }
 }
@@ -885,7 +886,7 @@ export function parseAgentProfile(args: OrchestratorArgs, config?: SaifConfig): 
   try {
     return resolveAgentProfile(id);
   } catch (err) {
-    console.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
+    consola.error(`Error: ${String(err instanceof Error ? err.message : err)}`);
     process.exit(1);
   }
 }
@@ -945,7 +946,7 @@ export function parseDiscoveryOptions(
   for (const part of mcpParts) {
     if (!part) continue;
     if (!part.includes('=')) {
-      console.error(
+      consola.error(
         'Error: --discovery-mcp requires named entries (name=url). Bare URLs are not allowed.',
       );
       process.exit(1);
@@ -954,7 +955,7 @@ export function parseDiscoveryOptions(
     const key = part.slice(0, eqIdx).trim();
     const value = part.slice(eqIdx + 1).trim();
     if (!key || !value) {
-      console.error('Error: --discovery-mcp malformed entry (empty key or value).');
+      consola.error('Error: --discovery-mcp malformed entry (empty key or value).');
       process.exit(1);
     }
     mcps[key] = value;
@@ -972,7 +973,7 @@ export function parseDiscoveryOptions(
   const hasFile =
     typeof args['discovery-prompt-file'] === 'string' && args['discovery-prompt-file'].trim();
   if (hasPrompt && hasFile) {
-    console.error('Error: --discovery-prompt and --discovery-prompt-file are mutually exclusive.');
+    consola.error('Error: --discovery-prompt and --discovery-prompt-file are mutually exclusive.');
     process.exit(1);
   }
   const prompt = hasPrompt ? args['discovery-prompt']!.trim() : d?.discoveryPrompt?.trim();

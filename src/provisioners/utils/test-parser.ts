@@ -5,6 +5,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
+import { consola } from 'consola';
 
 import { readUtf8 } from '../../utils/io.js';
 import type { AssertionResult, AssertionSuiteResult } from '../types.js';
@@ -129,7 +130,7 @@ export async function parseJUnitXmlFromFile(
       return { name: suiteName, status: suiteFailed ? 'failed' : 'passed', assertionResults };
     });
   } catch (err) {
-    console.warn(
+    consola.warn(
       `[test-parser] Failed to parse JUnit XML report from ${reportPath}: ${String(err)}`,
     );
     return undefined;

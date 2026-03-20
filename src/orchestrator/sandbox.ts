@@ -24,6 +24,7 @@
 import { chmod, mkdir, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { consola } from 'consola';
 import { minimatch } from 'minimatch';
 
 import type { TestCatalog } from '../design-tests/schema.js';
@@ -217,7 +218,7 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   const agentPath = join(sandboxBasePath, 'agent.sh');
   const stagePath = join(sandboxBasePath, 'stage.sh');
 
-  console.log(`[sandbox] Creating isolated sandbox at ${sandboxBasePath}`);
+  consola.log(`[sandbox] Creating isolated sandbox at ${sandboxBasePath}`);
   await mkdir(codePath, { recursive: true });
 
   // rsync the repo into code/, respecting .gitignore to skip node_modules etc.
@@ -242,7 +243,7 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   const saifBase = join(codePath, saifDir);
   const featuresHidden = await removeAllHiddenDirs(join(saifBase, 'features'));
   if (featuresHidden > 0) {
-    console.log(
+    consola.log(
       `[sandbox] Removed ${featuresHidden} hidden/ dir(s) from code copy (agent cannot see holdout tests)`,
     );
   }
@@ -258,7 +259,7 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
 
   const hiddenCount = catalog.testCases.filter((tc) => tc.visibility === 'hidden').length;
   const publicCount = publicCatalog.testCases.length;
-  console.log(`[sandbox] ${publicCount} public test cases visible to agent, ${hiddenCount} hidden`);
+  consola.log(`[sandbox] ${publicCount} public test cases visible to agent, ${hiddenCount} hidden`);
 
   // Initialize a fresh git repo inside code/ for patch extraction
   await gitInit({ cwd: codePath, stdio: 'inherit' });
@@ -276,37 +277,37 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
       GIT_COMMITTER_EMAIL: 'factory@localhost',
     },
   });
-  console.log(`[sandbox] git init + initial commit done in ${codePath}`);
+  consola.log(`[sandbox] git init + initial commit done in ${codePath}`);
 
   // Write gate.sh: user-supplied content or the built-in pnpm check default.
   // Mounted read-only at /factory/gate.sh inside the coder container.
   await writeUtf8(gatePath, gateScript);
   await chmod(gatePath, 0o755);
-  console.log(`[sandbox] Gate script written to ${gatePath}`);
+  consola.log(`[sandbox] Gate script written to ${gatePath}`);
 
   // Write startup.sh — always present; mounted read-only at /factory/startup.sh.
   // Set via --profile or --startup-script.
   await writeUtf8(startupPath, startupScript);
   await chmod(startupPath, 0o755);
-  console.log(`[sandbox] Startup script written to ${startupPath}`);
+  consola.log(`[sandbox] Startup script written to ${startupPath}`);
 
   // Write agent-start.sh — mounted read-only at /factory/agent-start.sh.
   // Run once after project startup, before the agent loop. Used to install the agent.
   await writeUtf8(agentStartPath, agentStartScript);
   await chmod(agentStartPath, 0o755);
-  console.log(`[sandbox] Agent start script written to ${agentStartPath}`);
+  consola.log(`[sandbox] Agent start script written to ${agentStartPath}`);
 
   // Write agent.sh — mounted read-only at /factory/agent.sh.
   // Defaults to the agent profile's agent.sh (OpenHands). Override with --agent-script.
   await writeUtf8(agentPath, agentScript);
   await chmod(agentPath, 0o755);
-  console.log(`[sandbox] Agent script written to ${agentPath}`);
+  consola.log(`[sandbox] Agent script written to ${agentPath}`);
 
   // Write stage.sh — mounted read-only in the staging container at /factory/stage.sh.
   // Set via --profile or --stage-script.
   await writeUtf8(stagePath, stageScript);
   await chmod(stagePath, 0o755);
-  console.log(`[sandbox] Stage script written to ${stagePath}`);
+  consola.log(`[sandbox] Stage script written to ${stagePath}`);
 
   return {
     sandboxBasePath,
@@ -325,7 +326,7 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
  * Safe to call even if the directory does not exist.
  */
 export async function destroySandbox(sandboxBasePath: string): Promise<void> {
-  console.log(`[sandbox] Removing sandbox ${sandboxBasePath}`);
+  consola.log(`[sandbox] Removing sandbox ${sandboxBasePath}`);
   await rm(sandboxBasePath, { recursive: true, force: true });
 }
 
@@ -406,7 +407,7 @@ export function filterPatchHunks(patch: string, exclude: PatchExcludeRule[]): st
   }
 
   if (dropped.length > 0) {
-    console.warn(
+    consola.warn(
       `[sandbox] Dropped ${dropped.length} file(s) from patch (reward-hacking prevention):\n` +
         dropped.map((p) => `  - ${p}`).join('\n'),
     );
@@ -431,6 +432,6 @@ export async function applyPatch(codePath: string, patchPath: string): Promise<v
   if (!(await pathExists(patchPath))) {
     throw new Error(`Patch file not found: ${patchPath}`);
   }
-  console.log(`[sandbox] Applying patch from ${patchPath}`);
+  consola.log(`[sandbox] Applying patch from ${patchPath}`);
   await gitApply({ cwd: codePath, patchFile: patchPath, stdio: 'inherit' });
 }

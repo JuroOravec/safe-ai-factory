@@ -1,5 +1,7 @@
 import { join } from 'node:path';
 
+import { consola } from 'consola';
+
 import { validateTypescript } from '../../utils/typescript.js';
 import type { TestProfile } from '../types.js';
 
@@ -11,7 +13,7 @@ async function vitestValidateFiles(opts: {
 }): Promise<void> {
   const { testsDir, generatedFiles, projectDir, errMessage } = opts;
   if (generatedFiles.length === 0) return;
-  console.log(`\nValidating generated spec files...`);
+  consola.log(`\nValidating generated spec files...`);
   await validateTypescript({
     files: generatedFiles.map((f) => join(testsDir, f)),
     cwd: projectDir,

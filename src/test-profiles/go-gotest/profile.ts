@@ -1,5 +1,7 @@
 import { join } from 'node:path';
 
+import { consola } from 'consola';
+
 import { spawnWait } from '../../utils/io.js';
 import type { TestProfile, ValidateFilesOpts } from '../types.js';
 
@@ -13,7 +15,7 @@ async function gotestValidateFiles(opts: ValidateFilesOpts): Promise<void> {
   if (generatedFiles.length === 0) return;
   if (!generatedFiles.some((f) => f.endsWith('_test.go'))) return;
 
-  console.log(`\nValidating generated spec files (go vet)...`);
+  consola.log(`\nValidating generated spec files (go vet)...`);
 
   // go vet needs to be run per package directory, not per file.
   const subdirs = [
@@ -34,16 +36,16 @@ async function gotestValidateFiles(opts: ValidateFilesOpts): Promise<void> {
       });
       if (result.code !== 0) {
         const output = result.stdout + result.stderr;
-        console.error(`  ${opts.errMessage}`);
+        consola.error(`  ${opts.errMessage}`);
         for (const line of output.split('\n').filter(Boolean).slice(0, 20)) {
-          console.error(`    ${line}`);
+          consola.error(`    ${line}`);
         }
         process.exit(1);
       }
     }
-    console.log(`  Go validation passed.`);
+    consola.log(`  Go validation passed.`);
   } catch {
-    console.warn(`  Go validation skipped (go not available).`);
+    consola.warn(`  Go validation skipped (go not available).`);
   }
 }
 

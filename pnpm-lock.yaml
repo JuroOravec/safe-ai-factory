@@ -86,6 +86,9 @@ importers:
       citty:
         specifier: ^0.2.1
         version: 0.2.1
+      consola:
+        specifier: ^3.4.2
+        version: 3.4.2
       cosmiconfig:
         specifier: ^9.0.1
         version: 9.0.1(typescript@5.9.3)

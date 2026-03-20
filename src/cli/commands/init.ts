@@ -8,6 +8,7 @@
  */
 
 import { defineCommand, runMain } from 'citty';
+import { consola } from 'consola';
 
 import { scaffoldSaifConfig } from '../../config/scaffold.js';
 import { resolveIndexerProfile } from '../../indexer-profiles/index.js';
@@ -37,15 +38,15 @@ const initCommand = defineCommand({
 
     const scaffolded = await scaffoldSaifConfig(saifDir, projectDir);
     if (scaffolded) {
-      console.log(`\nCreated ${saifDir}/config.ts (no config found).`);
+      consola.log(`\nCreated ${saifDir}/config.ts (no config found).`);
     }
 
-    console.log(
+    consola.log(
       `\nIndexing codebase with ${indexerProfile.displayName} (project: ${projectName})...`,
     );
     await indexerProfile.init({ projectDir, projectName });
 
-    console.log('\nInit complete.');
+    consola.log('\nInit complete.');
   },
 });
 

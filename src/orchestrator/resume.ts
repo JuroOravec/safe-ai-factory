@@ -8,6 +8,8 @@
 import { mkdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { consola } from 'consola';
+
 import {
   buildRunArtifact,
   deserializeArtifactConfig,
@@ -49,7 +51,7 @@ export async function captureBaseGitState(projectDir: string): Promise<RunStorag
       basePatchDiff = [unstaged, staged].filter(Boolean).join('\n').trim() || undefined;
     }
   } catch (err) {
-    console.warn('[orchestrator] Could not capture base git state for run storage:', err);
+    consola.warn('[orchestrator] Could not capture base git state for run storage:', err);
     baseCommitSha = '';
   }
   return { baseCommitSha, basePatchDiff };
@@ -109,7 +111,7 @@ export async function createResumeWorktree(
   const worktreePath = join(worktreeDir, `resume-${runId}`);
   const branchName = `factory-resume-${runId}`;
 
-  console.log(`[orchestrator] Preparing workspace from storage...`);
+  consola.log(`[orchestrator] Preparing workspace from storage...`);
 
   await gitWorktreeAdd({
     cwd: projectDir,
@@ -210,7 +212,7 @@ export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promis
 
   // Save the artifact to runStorage so the user can resume later.
   await runStorage.saveRun(runId, artifact);
-  console.log(`[orchestrator] Run state saved (Ctrl+C). Resume with: saifac run resume ${runId}`);
+  consola.log(`[orchestrator] Run state saved (Ctrl+C). Resume with: saifac run resume ${runId}`);
 }
 
 // ---------------------------------------------------------------------------

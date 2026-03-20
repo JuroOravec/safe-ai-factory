@@ -6,6 +6,7 @@
 import { join } from 'node:path';
 
 import { isCancel, text } from '@clack/prompts';
+import { consola } from 'consola';
 
 import type {
   NormalizedCodingEnvironment,
@@ -300,9 +301,9 @@ export async function runIterativeLoop(
           opts: loopOpts,
         });
         await runStorage.saveRun(runId, artifact);
-        console.log(`[orchestrator] Run state saved. Resume with: saifac run resume ${runId}`);
+        consola.log(`[orchestrator] Run state saved. Resume with: saifac run resume ${runId}`);
       } catch (err) {
-        console.warn('[orchestrator] Failed to save run state:', err);
+        consola.warn('[orchestrator] Failed to save run state:', err);
       }
     }
     if (!sandboxDestroyed) {
@@ -329,7 +330,7 @@ export async function runIterativeLoop(
   return await withCleanup(async () => {
     while (attempts < maxRuns) {
       attempts++;
-      console.log(`\n[orchestrator] ===== ATTEMPT ${attempts}/${maxRuns} =====`);
+      consola.log(`\n[orchestrator] ===== ATTEMPT ${attempts}/${maxRuns} =====`);
 
       // 1. Run agent (fresh context every iteration — Ralph Wiggum)
       //    The coding provisioner sets up its network + compose services, runs the agent,
@@ -376,13 +377,13 @@ export async function runIterativeLoop(
       });
 
       if (!patchContent.trim()) {
-        console.warn('[orchestrator] OpenHands produced no changes (empty patch). Skipping tests.');
+        consola.warn('[orchestrator] OpenHands produced no changes (empty patch). Skipping tests.');
         errorFeedback =
           'No changes were made. Please implement the feature as described in the plan.';
         continue;
       }
 
-      console.log(`[orchestrator] Extracted patch (${patchContent.length} bytes)`);
+      consola.log(`[orchestrator] Extracted patch (${patchContent.length} bytes)`);
 
       // Re-apply the patch for tests (extractPatch resets to base state).
       // patchPath is outside codePath so git clean cannot have deleted it.
@@ -398,7 +399,7 @@ export async function runIterativeLoop(
       while (testAttempts < testRetries) {
         testAttempts++;
         lastRunId = `${sandbox.runId}-${attempts}-${testAttempts}`;
-        console.log(
+        consola.log(
           `\n[orchestrator] Test attempt ${testAttempts}/${testRetries} (outer attempt ${attempts}/${maxRuns})`,
         );
 
@@ -448,7 +449,7 @@ export async function runIterativeLoop(
 
         if (result.status === 'passed') {
           // 4. Success path
-          console.log('\n[orchestrator] ✓ ALL TESTS PASSED — applying patch to host');
+          consola.log('\n[orchestrator] ✓ ALL TESTS PASSED — applying patch to host');
           await applyPatchToHost({
             codePath: sandbox.codePath,
             projectDir,
@@ -469,7 +470,7 @@ export async function runIterativeLoop(
             message: `Feature implemented successfully in ${attempts} attempt(s).`,
           };
         } else if (result.status === 'aborted') {
-          console.log(`\n[orchestrator] Tests aborted after ${attempts} attempt(s).`);
+          consola.log(`\n[orchestrator] Tests aborted after ${attempts} attempt(s).`);
           await destroySandbox(sandbox.sandboxBasePath);
           sandboxDestroyed = true;
           return {
@@ -499,7 +500,7 @@ export async function runIterativeLoop(
           if (VagueSpecsCheckResult.ambiguityResolved) {
             // Spec was updated and tests regenerated — retry tests with updated suite.
             // Don't count this attempt against testRetries since the spec was at fault.
-            console.log(
+            consola.log(
               '[orchestrator] Spec ambiguity resolved — retrying tests with updated tests.',
             );
             testAttempts--;
@@ -522,7 +523,7 @@ export async function runIterativeLoop(
         'Re-read the plan and specification, and fix the implementation.';
       errorFeedback = base + hint;
 
-      console.log(
+      consola.log(
         `\n[orchestrator] Attempt ${attempts} FAILED (tests failed after ${testAttempts} run(s)).`,
       );
 
@@ -532,7 +533,7 @@ export async function runIterativeLoop(
     }
 
     // Max attempts reached
-    console.error(`\n[orchestrator] Max runs (${maxRuns}) reached without success.`);
+    consola.error(`\n[orchestrator] Max runs (${maxRuns}) reached without success.`);
 
     return {
       success: false,
@@ -596,7 +597,7 @@ export async function runVagueSpecsCheckerForFailure(
     ? await readUtf8(specPath)
     : '(specification.md not found)';
 
-  console.log('[vague-specs-check] Running ambiguity check...');
+  consola.log('[vague-specs-check] Running ambiguity check...');
 
   // Stream vague-specs-check thinking in real-time (similar to [think]/[agent] style from OpenHands)
   let thinkBuf = '';
@@ -628,8 +629,8 @@ export async function runVagueSpecsCheckerForFailure(
     process.stdout.write(`[vague-specs-check:think] ${thinkBuf.trim().slice(0, 200)}\n`);
   }
 
-  console.log(`[vague-specs-check] isAmbiguous=${verdict.isAmbiguous}`);
-  console.log(`[vague-specs-check] Reason: ${verdict.reason}`);
+  consola.log(`[vague-specs-check] isAmbiguous=${verdict.isAmbiguous}`);
+  consola.log(`[vague-specs-check] Reason: ${verdict.reason}`);
 
   if (!verdict.isAmbiguous) {
     return {
@@ -639,11 +640,11 @@ export async function runVagueSpecsCheckerForFailure(
   }
 
   // --- Ambiguous spec detected ---
-  console.log(`[vague-specs-check] Proposed spec addition:\n  "${verdict.proposedSpecAddition}"`);
+  consola.log(`[vague-specs-check] Proposed spec addition:\n  "${verdict.proposedSpecAddition}"`);
 
   if (resolveAmbiguity === 'prompt') {
-    console.log(`\n[vague-specs-check] Ambiguity detected. Reason: ${verdict.reason}`);
-    console.log(
+    consola.log(`\n[vague-specs-check] Ambiguity detected. Reason: ${verdict.reason}`);
+    consola.log(
       `[vague-specs-check] Vague Specs Checker suggests: "${verdict.proposedSpecAddition}"`,
     );
 
@@ -653,7 +654,7 @@ export async function runVagueSpecsCheckerForFailure(
     });
 
     if (isCancel(answer) || !answer?.trim()) {
-      console.log('[vague-specs-check] Human skipped — treating failure as genuine.');
+      consola.log('[vague-specs-check] Human skipped — treating failure as genuine.');
       return {
         ambiguityResolved: false,
         sanitizedHint: verdict.sanitizedHintForAgent,
@@ -668,9 +669,9 @@ export async function runVagueSpecsCheckerForFailure(
   if (await pathExists(specPath)) {
     const addition = `\n\n<!-- Vague Specs Checker clarification (auto-added) -->\n${verdict.proposedSpecAddition}\n`;
     await appendUtf8(specPath, addition);
-    console.log(`[vague-specs-check] Appended clarification to ${specPath}`);
+    consola.log(`[vague-specs-check] Appended clarification to ${specPath}`);
   } else {
-    console.warn('[vague-specs-check] specification.md not found — cannot update spec.');
+    consola.warn('[vague-specs-check] specification.md not found — cannot update spec.');
     return {
       ambiguityResolved: false,
       sanitizedHint: verdict.sanitizedHintForAgent,
@@ -679,7 +680,7 @@ export async function runVagueSpecsCheckerForFailure(
 
   // Regenerate tests from the updated spec (design pipeline writes tests.json,
   // then scaffold generates the spec files via the coder agent).
-  console.log('[vague-specs-check] Regenerating tests with updated spec...');
+  consola.log('[vague-specs-check] Regenerating tests with updated spec...');
   try {
     await runDesignTests({
       feature,
@@ -689,9 +690,9 @@ export async function runVagueSpecsCheckerForFailure(
       overrides,
     });
     await generateTests({ feature, testProfile, overrides });
-    console.log('[vague-specs-check] Tests regenerated successfully.');
+    consola.log('[vague-specs-check] Tests regenerated successfully.');
   } catch (err) {
-    console.warn(`[vague-specs-check] Test regeneration failed (non-fatal): ${String(err)}`);
+    consola.warn(`[vague-specs-check] Test regeneration failed (non-fatal): ${String(err)}`);
     return {
       ambiguityResolved: false,
       sanitizedHint: verdict.sanitizedHintForAgent,
@@ -786,7 +787,7 @@ export async function prepareTestRunnerOpts({
 
   const testScriptPath = join(sandboxBasePath, 'test.sh');
   await writeUtf8(testScriptPath, testScript, { mode: 0o755 });
-  console.log(`[orchestrator] test.sh written to ${testScriptPath}`);
+  consola.log(`[orchestrator] test.sh written to ${testScriptPath}`);
 
   return { testsDir, reportDir: sandboxBasePath, testScriptPath };
 }
