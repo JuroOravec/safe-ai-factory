@@ -41,7 +41,7 @@ Both the **Test Runner** and the **Staging Container** use pre-built or per-run 
 | **Override**       | `saifac feat run --coder-image ghcr.io/JuroOravec/safe-ai-factory/saifac-coder:latest`                            |
 | **Disable**        | `saifac feat run --dangerous-debug` — run OpenHands on host, no Leash container, agent runs on host                |
 
-When Leash is enabled (default), `npx leash --image saifac-coder-node-pnpm-python:latest ...` (or profile-specific tag) wraps OpenHands in this image. The sandbox code dir is mounted at `/workspace`. See [swf-comp-d-leash.md](./swf-comp-d-leash.md) for details.
+When Leash is enabled (default), the orchestrator runs the **Leash CLI** (`@strongdm/leash`) with `--image saifac-coder-node-pnpm-python:latest ...` (or profile-specific tag), wrapping OpenHands in this image. The sandbox code dir is mounted at `/workspace`. See [swf-comp-d-leash.md](./swf-comp-d-leash.md) for details.
 
 ### Other Containers
 

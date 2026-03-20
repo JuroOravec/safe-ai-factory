@@ -84,3 +84,13 @@ saifac feat run --coder-image ghcr.io/JuroOravec/safe-ai-factory/saifac-coder:la
 ## Storage
 
 For **public** repositories, GHCR storage and bandwidth are free and unlimited. For private repositories, limits apply (see GitHub docs).
+
+## Docker daemon (host)
+
+The orchestrator uses **dockerode**, which reads **`DOCKER_HOST`** (via [docker-modem](https://github.com/apocas/docker-modem)) instead of the Docker CLI’s context file. If you use **Colima** (or any setup where the socket is not `/var/run/docker.sock`), set `DOCKER_HOST` for example:
+
+```bash
+export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
+```
+
+For symptoms and step-by-step setup, see [Troubleshooting](../troubleshooting.md).

@@ -42,17 +42,19 @@ In an autonomous Software Factory, the Coder Agent is placed in a continuous loo
 
 ## Usage
 
-When Leash is enabled, the Orchestrator runs:
+When Leash is enabled, the Orchestrator runs the **Leash CLI** (`@strongdm/leash`) with the same argv shape as below.
 
 ```bash
-npx leash --no-interactive --verbose
+leash --no-interactive --verbose
       --image saifac-coder-node-pnpm-python:latest
       --volume /tmp/saifac/<feat>-<runId>/code:/workspace
       --policy leash-policy.cedar
-      --agent-env LLM_MODEL=... --agent-env LLM_API_KEY=... [-e LLM_PROVIDER=...] [-e LLM_BASE_URL=...] --agent-env SAIFAC_WORKSPACE_BASE=/workspace
-      --agent-env LEASH_E2E=1 --agent-env LEASH_BOOTSTRAP_SKIP_ENFORCE=1
-      openhands --headless --always-approve --override-with-envs --json -t "..."
+      --env LLM_MODEL=... --env LLM_API_KEY=... [--env LLM_PROVIDER=...] [--env LLM_BASE_URL=...] --env SAIFAC_WORKSPACE_BASE=/workspace
+      --env LEASH_E2E=1 --env LEASH_BOOTSTRAP_SKIP_ENFORCE=1
+      /saifac/coder-start.sh
 ```
+
+To try the same from a shell, use e.g. `pnpm exec leash …` or `npx --package @strongdm/leash leash …` from a directory where dependencies are installed.
 
 Leash spawns two containers:
 
@@ -127,7 +129,7 @@ Override with `--cedar <path>` when running `saifac feat run` or `saifac run res
 
 ### Leash
 
-Leash is pulled in as an npm dependency (`@strongdm/leash`). The Orchestrator invokes `npx leash ...` — no global install required. The `leash` binary is bundled for darwin/linux amd64/arm64.
+Leash is an npm **dependency** of safe-ai-factory (`@strongdm/leash`). The orchestrator resolves `bin/leash.js` from that package and runs it with **`node`**, so it works when safe-ai-factory is installed as a dependency and when `cwd` is the sandbox. Optional override: **`SAIFAC_LEASH_BIN`**. Prebuilt native pieces ship for darwin/linux amd64/arm64.
 
 ### OpenHands
 

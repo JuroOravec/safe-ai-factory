@@ -88,7 +88,7 @@ The pipeline bridges human intent (Markdown PRDs) with deterministic software ge
 5. **Orchestrator** runs Fail2Pass check
    - At least one feature test must fail on current main (partial overlap OK)
 6. **Orchestrator** starts **OpenHands** headlessly
-   - When Leash is enabled (default), runs `npx leash --image saifac-coder-node-pnpm-python:latest ... openhands ...`; Leash manages sandboxing and Cedar policy internally
+   - When Leash is enabled (default), runs the Leash CLI with `--image saifac-coder-node-pnpm-python:latest ... /saifac/coder-start.sh`; Leash manages sandboxing and Cedar policy internally
    - Use `--dangerous-debug` to run OpenHands directly on the host (no container during the agent phase)
 7. **OpenHands** runs autonomously
    - Implements the feature until completion

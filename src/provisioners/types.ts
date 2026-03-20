@@ -249,8 +249,8 @@ export interface Provisioner {
   /**
    * 4. Run the AI coding agent and wait for it to finish.
    *
-   * Docker/Leash: Spawns `npx leash …` as a child process, starts a
-   * background polling loop to attach the Leash target container to the
+   * Docker/Leash: Spawns Leash CLI (`node …/leash.js`) as a child process,
+   * starts a background polling loop to attach the Leash target container to the
    * SAIFAC network (workaround for missing --network flag in Leash CLI),
    * and resolves when the process exits.
    *

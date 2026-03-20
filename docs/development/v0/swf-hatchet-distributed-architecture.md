@@ -333,7 +333,7 @@ iterationWorkflow.task(
   async (ctx) => {
     const { sandboxPath, config } = ctx.workflowInput();
     // Calls codingProvisioner.setup() + runAgent() + teardown().
-    // runAgent() internally: spawns `npx leash ... openhands`, which itself
+    // runAgent() internally: spawns Leash CLI (`node …/leash.js …`), which itself
     //   runs the coder-start.sh loop (agent → gate.sh → reviewer → repeat).
     // Returns patch diff when the inner loop exits (pass or exhausted gate retries).
     const patch = await runAgentPhase(sandboxPath, config);

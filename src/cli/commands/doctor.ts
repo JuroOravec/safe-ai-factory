@@ -6,7 +6,8 @@
  *
  * Checks:
  *   1. Docker is running and reachable.
- *   2. HATCHET_CLIENT_TOKEN — if unset, reports local mode; if set, tests
+ *   2. Leash CLI (`@strongdm/leash`) is installed (required for default agent mode).
+ *   3. HATCHET_CLIENT_TOKEN — if unset, reports local mode; if set, tests
  *      gRPC connectivity to HATCHET_SERVER_URL.
  */
 
@@ -14,7 +15,8 @@ import { defineCommand, runMain } from 'citty';
 import { colors } from 'consola/utils';
 
 import { consola } from '../../logger.js';
-import { spawnCapture } from '../../utils/io.js';
+import { resolveLeashCliPath } from '../../provisioners/docker/resolve-leash-cli.js';
+import { pathExists, spawnCapture } from '../../utils/io.js';
 
 function ok(msg: string) {
   consola.success(msg);
@@ -35,6 +37,23 @@ async function checkDocker(): Promise<boolean> {
     fail('Docker is not running or not reachable. Start Docker and try again.');
     return false;
   }
+}
+
+async function checkLeashCli(): Promise<boolean> {
+  let leashPath: string;
+  try {
+    leashPath = resolveLeashCliPath();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    fail(message);
+    return false;
+  }
+  if (!(await pathExists(leashPath))) {
+    fail(`Leash CLI path does not exist: ${leashPath}`);
+    return false;
+  }
+  ok(`Leash CLI OK (${leashPath})`);
+  return true;
 }
 
 async function checkHatchet(): Promise<boolean> {
@@ -76,7 +95,7 @@ async function checkHatchet(): Promise<boolean> {
 const doctorCommand = defineCommand({
   meta: {
     name: 'doctor',
-    description: 'Check environment health (Docker, Hatchet connectivity)',
+    description: 'Check environment health (Docker, Leash CLI, Hatchet connectivity)',
   },
   async run() {
     consola.log('');
@@ -86,6 +105,7 @@ const doctorCommand = defineCommand({
     const results: boolean[] = [];
 
     results.push(await checkDocker());
+    results.push(await checkLeashCli());
     results.push(await checkHatchet());
 
     const allPassed = results.every(Boolean);

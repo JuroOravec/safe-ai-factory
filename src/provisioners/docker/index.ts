@@ -10,7 +10,7 @@
  *   setup()        → create bridge network + `docker compose up`
  *   startStaging() → docker build + createContainer + putArchive + start + health-wait
  *   runTests()     → createContainer + start + wait + demux logs + parse JUnit XML
- *   runAgent()     → spawn `npx leash` + Leash network-attach workaround
+ *   runAgent()     → spawn Leash CLI + Leash network-attach workaround
  *   teardown()     → containers + images + compose down + network
  */
 
@@ -51,6 +51,7 @@ import type {
 } from '../types.js';
 import { detectRunnerError, parseJUnitXmlFromFile } from '../utils/test-parser.js';
 import { filterAgentEnv, printOpenHandsSegment } from './agent-log.js';
+import { resolveLeashCliPath } from './resolve-leash-cli.js';
 
 // ---------------------------------------------------------------------------
 // Docker client singleton
@@ -630,8 +631,11 @@ export class DockerProvisioner implements Provisioner {
         return a;
       });
 
-      cmd = 'npx';
-      args = leashArgs;
+      // execPath=`/usr/local/bin/node`
+      // leashBin=`/path/to/my-proj/node_modules/@strongdm/leash/bin/leash.js`
+      const leashBin = resolveLeashCliPath();
+      cmd = process.execPath;
+      args = [leashBin, ...leashArgs.slice(1)];
       spawnCwd = codePath;
 
       const workspaceId = leashWorkspaceId(sandboxBasePath);
@@ -639,10 +643,10 @@ export class DockerProvisioner implements Provisioner {
         ...Object.fromEntries(
           Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
         ),
-        // WORKAROUND(leash-network): inject predictable LEASH_WORKSPACE so we can derive
-        // the target container name and attach it to the SAIFAC network after start.
-        // See leashNetworkWorkaround comment below.
-        ...(this.networkName ? { LEASH_WORKSPACE: workspaceId } : {}),
+        // WORKAROUND(leash-network): inject a predictable name via Leash's TARGET_CONTAINER,
+        // so we know which container to attach to the SAIFAC network after Leash starts it.
+        // See other `WORKAROUND(leash-network)` comments in this file.
+        ...(this.networkName ? { TARGET_CONTAINER: `leash-target-${workspaceId}` } : {}),
       };
 
       consola.log(`[agent-runner] Mode: leash (container: ${coderImage})`);
@@ -1087,9 +1091,10 @@ function leashWorkspaceId(sandboxBasePath: string): string {
 // ---------------------------------------------------------------------------
 // WORKAROUND(leash-network): post-start polling + network attach
 //
-// Leash doesn't support a --network flag. We inject a predictable LEASH_WORKSPACE
-// env var so we know the target container name in advance, then poll `docker inspect`
-// until the container appears and connect it to the SAIFAC bridge network.
+// Leash doesn't support a --network flag. We set TARGET_CONTAINER (Leash's own env var
+// for overriding the target container name) to a predictable value so we know which
+// container to attach to the SAIFAC bridge network after Leash starts it. We then
+// poll `docker inspect` until the container appears and call `docker network connect`.
 //
 // See https://github.com/strongdm/leash/issues/69
 // ---------------------------------------------------------------------------

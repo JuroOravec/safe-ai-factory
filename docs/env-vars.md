@@ -92,6 +92,13 @@ persistent configuration or CI.
 For full logging architecture details see
 [docs/development/logging.md](development/logging.md).
 
+## Docker & Leash (host)
+
+| Variable           | Description                                                                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DOCKER_HOST`      | Docker API endpoint (e.g. `unix:///path/to/docker.sock`). See [Troubleshooting](troubleshooting.md). |
+| `SAIFAC_LEASH_BIN` | Optional absolute path to Leash’s `bin/leash.js`. If unset, SAIFAC resolves `@strongdm/leash` from where it is installed.   |
+
 ## Hatchet (optional)
 
 Setting these options enables the Hatchet-backed orchestrator, which adds
