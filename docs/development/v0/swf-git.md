@@ -69,7 +69,7 @@ The host repository's working directory is **never** modified during the loop. A
    git commit -m "Base state"
    ```
 
-   Uses fixed author/committer (`factory`, `factory@localhost`) for reproducibility.
+   Uses fixed author/committer (`saifac`, `saifac@localhost`) for reproducibility.
 
 4. **Why a fresh repo?** The sandbox is a _pure file copy_ used for diffing. The agent (OpenHands) writes files; we need a clean baseline to compute `git diff HEAD` and produce a patch. Cloning the host repo would bring along its history and remotes—unnecessary and potentially confusing when we later apply the patch to a different branch.
 

@@ -21,7 +21,7 @@
 #                                 The script is called once per inner round. It must read
 #                                 the task from $SAIFAC_TASK_PATH and run the coding agent.
 #   SAIFAC_TASK_PATH           — path where the current task prompt is written before each
-#                                 agent invocation (default: /workspace/.factory_task.md).
+#                                 agent invocation (default: /workspace/.saifac_task.md).
 #                                 Agent scripts should read from this file rather than from
 #                                 command-line arguments to avoid escaping and length issues.
 #   SAIFAC_REVIEWER_SCRIPT     — (optional) path to semantic reviewer script. When set and
@@ -33,7 +33,7 @@ set -euo pipefail
 GATE_SCRIPT="${SAIFAC_GATE_SCRIPT:-/saifac/gate.sh}"
 AGENT_SCRIPT="${SAIFAC_AGENT_SCRIPT:-/saifac/agent.sh}"
 GATE_RETRIES="${SAIFAC_GATE_RETRIES:-5}"
-TASK_PATH="${SAIFAC_TASK_PATH:-/workspace/.factory_task.md}"
+TASK_PATH="${SAIFAC_TASK_PATH:-/workspace/.saifac_task.md}"
 
 if [ -z "${SAIFAC_INITIAL_TASK:-}" ]; then
   echo "[coder-start] ERROR: SAIFAC_INITIAL_TASK is not set." >&2

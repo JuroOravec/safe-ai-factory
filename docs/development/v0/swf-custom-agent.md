@@ -263,7 +263,7 @@ saifac feat run \
 In this mode:
 
 - The workspace is the sandbox `code/` directory (path passed as `SAIFAC_WORKSPACE_BASE`)
-- `$SAIFAC_TASK_PATH` points to `{sandbox}/code/.factory_task.md`
+- `$SAIFAC_TASK_PATH` points to `{sandbox}/code/.saifac_task.md`
 - Your agent must be installed on the host
 
 ---

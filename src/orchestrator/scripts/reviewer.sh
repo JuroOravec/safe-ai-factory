@@ -15,7 +15,7 @@
 set -e
 
 WORKSPACE="${SAIFAC_WORKSPACE_BASE:-/workspace}"
-TASK_PATH="${SAIFAC_TASK_PATH:-${WORKSPACE}/.factory_task.md}"
+TASK_PATH="${SAIFAC_TASK_PATH:-${WORKSPACE}/.saifac_task.md}"
 
 # Read the task for the rule prompt (first 2000 chars to avoid huge prompts)
 if [ -f "$TASK_PATH" ]; then

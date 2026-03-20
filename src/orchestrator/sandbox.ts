@@ -271,10 +271,10 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
     stdio: 'inherit',
     env: {
       ...process.env,
-      GIT_AUTHOR_NAME: 'factory',
-      GIT_AUTHOR_EMAIL: 'factory@localhost',
-      GIT_COMMITTER_NAME: 'factory',
-      GIT_COMMITTER_EMAIL: 'factory@localhost',
+      GIT_AUTHOR_NAME: 'saifac',
+      GIT_AUTHOR_EMAIL: 'saifac@localhost',
+      GIT_COMMITTER_NAME: 'saifac',
+      GIT_COMMITTER_EMAIL: 'saifac@localhost',
     },
   });
   consola.log(`[sandbox] git init + initial commit done in ${codePath}`);
@@ -364,10 +364,10 @@ export async function extractPatch(
   const patchPath = join(sandboxBasePath, 'patch.diff');
   const gitEnv = {
     ...process.env,
-    GIT_AUTHOR_NAME: 'factory',
-    GIT_AUTHOR_EMAIL: 'factory@localhost',
-    GIT_COMMITTER_NAME: 'factory',
-    GIT_COMMITTER_EMAIL: 'factory@localhost',
+    GIT_AUTHOR_NAME: 'saifac',
+    GIT_AUTHOR_EMAIL: 'saifac@localhost',
+    GIT_COMMITTER_NAME: 'saifac',
+    GIT_COMMITTER_EMAIL: 'saifac@localhost',
   };
 
   await gitAdd({ cwd: codePath, env: gitEnv });

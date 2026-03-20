@@ -524,7 +524,7 @@ export class DockerProvisioner implements Provisioner {
         SAIFAC_AGENT_START_SCRIPT: agentStartPath,
         SAIFAC_GATE_SCRIPT: `${sandboxBasePath}/gate.sh`,
         SAIFAC_AGENT_SCRIPT: agentPath,
-        SAIFAC_TASK_PATH: join(codePath, '.factory_task.md'),
+        SAIFAC_TASK_PATH: join(codePath, '.saifac_task.md'),
       };
       consola.log('[agent-runner] Mode: dangerous-debug (host execution, filesystem sandbox only)');
     } else {
