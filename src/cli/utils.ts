@@ -721,12 +721,18 @@ export function parseGateRetries(args: FeatRunArgs, config?: SaifConfig): number
   return config?.defaults?.gateRetries ?? 10;
 }
 
-/** Parses --no-reviewer. Default: true (reviewer enabled). */
+/**
+ * Parses reviewer skip flags. Default: true (reviewer enabled).
+ *
+ * citty treats any `--no-<name>` as setting `<name>` to `false` before node:util sees it.
+ * So `--no-reviewer` yields `args.reviewer === false`, not `no-reviewer: true`.
+ */
 export function parseReviewerEnabled(
-  args: { 'no-reviewer'?: boolean },
+  args: { 'no-reviewer'?: boolean; reviewer?: boolean },
   config?: SaifConfig,
 ): boolean {
   if (args['no-reviewer'] === true) return false;
+  if (args.reviewer === false) return false;
   return config?.defaults?.reviewerEnabled ?? true;
 }
 

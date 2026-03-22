@@ -4,7 +4,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { parseModelOverrides, parseStorageOverrides } from './utils.js';
+import type { SaifConfig } from '../config/schema.js';
+import { parseModelOverrides, parseReviewerEnabled, parseStorageOverrides } from './utils.js';
 
 describe('parseModelOverrides', () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
@@ -47,6 +48,26 @@ describe('parseModelOverrides', () => {
       coder: 'openai/gpt-4o',
       'vague-specs-check': 'openai/gpt-4o-mini',
     });
+  });
+});
+
+describe('parseReviewerEnabled', () => {
+  it('disables reviewer when citty sets reviewer=false (--no-reviewer)', () => {
+    expect(parseReviewerEnabled({ reviewer: false })).toBe(false);
+  });
+
+  it('disables reviewer when no-reviewer is explicitly true', () => {
+    expect(parseReviewerEnabled({ 'no-reviewer': true })).toBe(false);
+  });
+
+  it('defaults to enabled when flags omitted', () => {
+    expect(parseReviewerEnabled({})).toBe(true);
+    expect(parseReviewerEnabled({}, {})).toBe(true);
+  });
+
+  it('respects config defaults.reviewerEnabled when no CLI skip', () => {
+    const config: SaifConfig = { defaults: { reviewerEnabled: false } };
+    expect(parseReviewerEnabled({}, config)).toBe(false);
   });
 });
 
