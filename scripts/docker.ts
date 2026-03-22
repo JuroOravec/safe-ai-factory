@@ -5,7 +5,6 @@
  * Usage: pnpm docker <action> [image] [options]
  *   build test       Build test runner image(s) (default: node-vitest, --all: all profiles)
  *   build coder      Build coder image (default: node-pnpm-python, --all: all profiles)
- *   build stage      Build stage image (default: node-pnpm-python, --all: all profiles)
  *   clear            Remove factory containers/images (scoped to project; --all: everything)
  *
  * Optional on all build subcommands: --skip-existing  Skip docker build when the target tag
@@ -22,7 +21,6 @@ import {
   DEFAULT_SANDBOX_PROFILE,
   resolveSandboxCoderDockerfilePath,
   resolveSandboxProfile,
-  resolveSandboxStageDockerfilePath,
   type SandboxProfile,
   SUPPORTED_SANDBOX_PROFILES,
 } from '../src/sandbox-profiles/index.js';
@@ -278,99 +276,6 @@ const coderBuildCommand = defineCommand({
   },
 });
 
-// ── stage build ─────────────────────────────────────────────────────────────
-
-const stageBuildCommand = defineCommand({
-  meta: {
-    name: 'stage',
-    description:
-      'Build stage image. Default: node-pnpm-python. Use --all for all sandbox profiles.',
-  },
-  args: {
-    all: { type: 'boolean', description: 'Build all sandbox profiles' },
-    profile: { type: 'string', description: 'Sandbox profile (default: node-pnpm-python)' },
-    'stage-image': { type: 'string', description: 'Image tag override' },
-    'skip-existing': {
-      type: 'boolean',
-      description: 'Skip build if the target image tag already exists locally',
-    },
-  },
-  async run({ args }) {
-    const repoRoot = getSaifRoot();
-    const buildAll = args.all === true;
-    const skipExisting = args['skip-existing'] === true;
-
-    const profilesToBuild: SandboxProfile[] = buildAll
-      ? Object.values(SUPPORTED_SANDBOX_PROFILES)
-      : [args.profile ? resolveSandboxProfile(args.profile) : DEFAULT_SANDBOX_PROFILE];
-
-    consola.log(
-      buildAll
-        ? `\nBuilding all ${profilesToBuild.length} stage images...`
-        : '\nBuilding stage container image...',
-    );
-    consola.log('  (build context: repo root)\n');
-    if (skipExisting) {
-      consola.log('  (--skip-existing: will not rebuild tags already present locally)\n');
-    }
-
-    let stageBuilt = 0;
-    let stageSkipped = 0;
-
-    const stageTotal = profilesToBuild.length;
-    for (let si = 0; si < profilesToBuild.length; si++) {
-      const profile = profilesToBuild[si]!;
-      const progress = buildAllProgressPrefix({
-        buildAll,
-        indexOneBased: si + 1,
-        total: stageTotal,
-      });
-      const tag = buildAll
-        ? profile.stageImageTag
-        : args['stage-image']?.trim() || profile.stageImageTag;
-      if (!buildAll && args['stage-image']) validateImageTag(tag, '--stage-image');
-
-      const dockerfilePath = resolveSandboxStageDockerfilePath(profile.id);
-      if (!(await pathExists(dockerfilePath))) {
-        consola.error(`${progress}${dockerfilePath} not found for profile ${profile.id}`);
-        process.exit(1);
-      }
-
-      if (skipExisting && (await dockerImageExistsLocally(tag))) {
-        consola.log(`${progress}Skipping (already exists): ${tag}  [${profile.id}]`);
-        stageSkipped++;
-        continue;
-      }
-
-      consola.log(`${progress}Building: ${tag}`);
-      consola.log(`${progress}  Profile:    ${profile.id} (${profile.displayName})`);
-      consola.log(`${progress}  Dockerfile: ${dockerfilePath}`);
-
-      try {
-        await spawnAsync({
-          command: 'docker',
-          args: ['build', '-f', dockerfilePath, '-t', tag, '.'],
-          cwd: repoRoot,
-          stdio: 'inherit',
-        });
-      } catch {
-        consola.error(`\n${progress}docker build failed for ${profile.id}`);
-        process.exit(1);
-      }
-      consola.log(`${progress}  => ${tag}\n`);
-      stageBuilt++;
-    }
-
-    if (stageBuilt === 0 && stageSkipped > 0) {
-      consola.log(`Stage images: ${stageSkipped} already present; nothing to build.`);
-    } else if (stageSkipped > 0) {
-      consola.log(`Stage images: built ${stageBuilt}, skipped ${stageSkipped} (already exist).`);
-    } else {
-      consola.log('Stage image(s) built successfully.');
-    }
-  },
-});
-
 // ── clear ───────────────────────────────────────────────────────────────────
 
 const clearCommand = defineCommand({
@@ -528,7 +433,6 @@ const buildCommand = defineCommand({
   subCommands: {
     test: testBuildCommand,
     coder: coderBuildCommand,
-    stage: stageBuildCommand,
   },
 });
 

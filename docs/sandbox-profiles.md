@@ -60,12 +60,11 @@ Use `--profile <id>` to switch. See [commands](commands/README.md) for full comm
 
 ## Overriding profiles
 
-Sandbox profiles set defaults for the following five settings. You can override any of them individually:
+Sandbox profiles set defaults for the following four settings. You can override any of them individually:
 
 | Override           | What it does                                  |
 | ------------------ | --------------------------------------------- |
-| `--coder-image`    | Custom coder container image                  |
-| `--stage-image`    | Custom staging container image                |
+| `--coder-image`    | Custom image for both coder and staging containers |
 | `--startup-script` | Custom script for installing workspace deps   |
 | `--gate-script`    | Custom script for post-round validation       |
 | `--stage-script`   | Custom script for starting the app in staging |
@@ -82,8 +81,7 @@ If no built-in profile matches your project, omit `--profile` and supply the com
 
 ```bash
 saifac feat run \
-  --coder-image my-coder:latest \
-  --stage-image my-stage:latest \
+  --coder-image my-image:latest \
   --startup-script ./my-install.sh \
   --gate-script ./my-check.sh \
   --stage-script ./my-start.sh

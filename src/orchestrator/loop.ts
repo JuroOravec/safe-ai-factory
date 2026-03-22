@@ -50,7 +50,7 @@ import { getArgusBinaryPath } from './sidecars/reviewer/argus.js';
  * Options used by runIterativeLoop (modes 'start' and 'resume').
  */
 export interface IterativeLoopOpts {
-  /** Sandbox profile id (e.g. 'node-pnpm-python'). Used to resolve Dockerfile.stage for the staging container when tests.json does not specify build.dockerfile. */
+  /** Sandbox profile id (e.g. 'node-pnpm-python'). Used to resolve Dockerfile.coder for the staging container when tests.json does not specify build.dockerfile. */
   sandboxProfileId: SupportedSandboxProfileId;
   /** Resolved feature (name, absolutePath, relativePath). */
   feature: Feature;

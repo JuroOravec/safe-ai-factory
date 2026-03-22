@@ -4,9 +4,8 @@
  * Supported profiles: go, go-node, go-node-python, go-python, node-bun, node-bun-python, node-npm, node-npm-python, node-pnpm, node-pnpm-python, node-yarn, node-yarn-python, python-conda, python-conda-node, python-pip, python-pip-node, python-poetry, python-poetry-node, python-uv, python-uv-node, rust, rust-node, rust-node-python, rust-python
  *
  * Each profile directory contains:
- *   - profile.ts        → SandboxProfile metadata (id, displayName, image tags)
- *   - Dockerfile.coder  → upstream base per profile (e.g. node, python, golang, rust, miniconda); language runtime + package manager
- *   - Dockerfile.stage  → lightweight runtime-only image for the staging container
+ *   - profile.ts        → SandboxProfile metadata (id, displayName, image tag)
+ *   - Dockerfile.coder  → image used for both the coder and staging containers
  *   - startup.sh        → installs workspace deps (used by both coder and staging containers)
  *   - stage.sh          → starts the app (or keeps the container alive for CLI-only projects)
  *   - gate.sh           → validates the workspace after each agent round (language-specific checks)
@@ -86,11 +85,6 @@ export function resolveSandboxCoderDockerfilePath(profileId: SupportedSandboxPro
   return join(_sandboxProfilesDir, profileId, 'Dockerfile.coder');
 }
 
-/** Returns the absolute path to Dockerfile.stage for the given profile id. */
-export function resolveSandboxStageDockerfilePath(profileId: SupportedSandboxProfileId): string {
-  return join(_sandboxProfilesDir, profileId, 'Dockerfile.stage');
-}
-
 /** Reads and returns the content of startup.sh for the given profile id. */
 export async function readSandboxStartupScript(
   profileId: SupportedSandboxProfileId,
@@ -131,6 +125,6 @@ export function resolveSandboxProfile(id: string): SandboxProfile {
   }
   throw new Error(
     `Unsupported sandbox profile "${id}". Supported profiles: ${SUPPORTED_SANDBOX_PROFILE_IDS.join(', ')}.\n` +
-      `To use a custom sandbox, supply --startup-script, --stage-script, --coder-image, and --stage-image instead.`,
+      `To use a custom sandbox, supply --startup-script, --stage-script, and --coder-image instead.`,
   );
 }

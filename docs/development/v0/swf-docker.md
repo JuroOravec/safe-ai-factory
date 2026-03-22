@@ -26,11 +26,8 @@ Both the **Test Runner** and the **Staging Container** use pre-built or per-run 
 
 | What                  | How                                                                                                                                                                                        |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Default**           | **Build mode** — orchestrator builds a runtime-only image (node, pnpm) from `Dockerfile.stage`. Code is **mounted** at start; `startup.sh` installs deps (same script as coder container). |
-| **Custom Dockerfile** | `environments.staging.app.build.dockerfile` in `saifac/config.ts` — use your own Dockerfile for non-Node sandboxes.                                                                        |
-| **Build manually**    | `pnpm docker build stage` — build the sandbox profile's Dockerfile.stage (default: node-pnpm-python; useful for validation or pre-warming cache)                                           |
-
-**Built-in default Dockerfile:** `node:25-alpine` + `pnpm` global install only. No code in image — workspace is mounted, `startup.sh` runs at container start. Container startup uses `/bin/sh` so it is compatible with Alpine (no bash).
+| **Default**           | **Build mode** — orchestrator builds an ephemeral image from the profile's `Dockerfile.coder` (same image as the coder container). Code is **mounted** at start; `startup.sh` installs deps. |
+| **Custom Dockerfile** | `environments.staging.app.build.dockerfile` in `saifac/config.ts` — use your own Dockerfile for non-standard sandboxes.                                                                      |
 
 ### Leash Coder Image (Agent Container)
 
@@ -87,25 +84,12 @@ The orchestrator runs `docker build` to create a **runtime-only** image (node, p
 
 **Dockerfile resolution:**
 
-| `saifac/config.ts` `environments.staging.app` | Dockerfile used                                                  |
-| --------------------------------------------- | ---------------------------------------------------------------- |
-| `build` absent or `build.dockerfile` absent   | Sandbox profile's `Dockerfile.stage` (default: node-pnpm-python) |
-| `build: { dockerfile: "Dockerfile.stage" }`   | Custom project Dockerfile                                        |
+| `saifac/config.ts` `environments.staging.app` | Dockerfile used                                              |
+| --------------------------------------------- | ------------------------------------------------------------ |
+| `build` absent or `build.dockerfile` absent   | Sandbox profile's `Dockerfile.coder` (default: node-pnpm-python) |
+| `build: { dockerfile: "path/to/Dockerfile" }` | Custom project Dockerfile                                    |
 
-**Built-in default Dockerfile** (used when no custom path is provided):
-
-```dockerfile
-FROM node:25-alpine
-
-WORKDIR /workspace
-
-# Install pnpm globally so the default startup.sh (pnpm install) works out of the box.
-# Project dependencies are NOT installed here — startup.sh runs inside the container
-# at runtime (after the workspace is mounted) to match the coder container's behaviour.
-RUN npm install -g pnpm --no-progress
-```
-
-**Custom Dockerfile example** — for non-Node sandboxes, in `saifac/config.ts`:
+**Custom Dockerfile example** — for non-standard sandboxes, in `saifac/config.ts`:
 
 ```typescript
 environments: {
@@ -115,7 +99,7 @@ environments: {
     app: {
       sidecarPort: 8080,
       sidecarPath: '/exec',
-      build: { dockerfile: 'Dockerfile.stage' },
+      build: { dockerfile: 'Dockerfile.custom' },
     },
   },
 }
@@ -277,12 +261,11 @@ export default {
 | `saifac feat run`                           | Uses GHCR images for test runner and coder; pulls if not present locally                                |
 | `saifac feat design-fail2pass`              | Same behaviour                                                                                          |
 | `saifac run test <runId>`                 | Re-test a stored run’s patch (staging + test runner); no coding agent                                  |
-| `pnpm docker build test [--all]`            | Build test runner image(s) locally (for development or offline use)                                     |
-| `pnpm docker build coder`                   | Build (or rebuild) the coder image from the sandbox profile's `Dockerfile.coder`                        |
-| `pnpm docker build stage`                   | Build the sandbox profile's `Dockerfile.stage` (optional; staging image built per-iteration by default) |
-| `saifac feat run --test-image my-test:v2`   | Use a custom test runner image                                                                          |
-| `saifac feat run --dangerous-debug`         | Skip Leash; run OpenHands on host                                                                       |
-| `saifac feat run --coder-image my-coder:v2` | Use a custom coder image                                                                                |
+| `pnpm docker build test [--all]`            | Build test runner image(s) locally (for development or offline use)                          |
+| `pnpm docker build coder`                   | Build (or rebuild) the coder image from the sandbox profile's `Dockerfile.coder`             |
+| `saifac feat run --test-image my-test:v2`   | Use a custom test runner image                                                               |
+| `saifac feat run --dangerous-debug`         | Skip Leash; run OpenHands on host                                                            |
+| `saifac feat run --coder-image my-coder:v2` | Use a custom coder image (also used for the staging container)                               |
 
 ---
 

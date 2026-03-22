@@ -26,7 +26,7 @@ import type { DockerEnvironment } from '../../config/schema.js';
 import { getSaifRoot, saifacTaskFilePath } from '../../constants.js';
 import { consola } from '../../logger.js';
 import {
-  resolveSandboxStageDockerfilePath,
+  resolveSandboxCoderDockerfilePath,
   type SupportedSandboxProfileId,
 } from '../../sandbox-profiles/index.js';
 import type { Feature } from '../../specs/discover.js';
@@ -961,13 +961,13 @@ export class DockerProvisioner implements Provisioner {
       }
       consola.log(`[docker] Using custom Dockerfile: ${dockerfilePath}`);
     } else {
-      dockerfilePath = resolveSandboxStageDockerfilePath(sandboxProfileId);
+      dockerfilePath = resolveSandboxCoderDockerfilePath(sandboxProfileId);
       if (!(await pathExists(dockerfilePath))) {
         throw new Error(
-          `[docker] Profile "${sandboxProfileId}" requires Dockerfile.stage at ${dockerfilePath} but it is missing.`,
+          `[docker] Profile "${sandboxProfileId}" requires Dockerfile.coder at ${dockerfilePath} but it is missing.`,
         );
       }
-      consola.log(`[docker] Using profile ${sandboxProfileId} Dockerfile.stage`);
+      consola.log(`[docker] Using profile ${sandboxProfileId} Dockerfile.coder`);
     }
 
     // Write a .dockerignore to keep the build context clean
