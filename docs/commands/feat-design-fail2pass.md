@@ -25,7 +25,7 @@ saifac feature design-fail2pass [options]
 | `--saifac-dir`       | —     | string | Path to saifac directory (default: `saifac`)                                                    |
 | `--project-dir`      | —     | string | Project directory (default: current working directory)                                          |
 | `--project`          | `-p`  | string | Project name override (default: package.json "name")                                            |
-| `--sandbox-base-dir` | —     | string | Base directory for sandbox entries (default: `/tmp/saifac`)                            |
+| `--sandbox-base-dir` | —     | string | Base directory for sandbox entries (default: `/tmp/saifac/sandboxes`)                    |
 | `--profile`          | —     | string | Sandbox profile (default: node-pnpm-python). Sets defaults for startup-script and stage-script. |
 | `--test-profile`     | —     | string | Test profile id (default: node-vitest)                                                          |
 | `--test-script`      | —     | string | Path to a shell script that overrides test.sh inside the Test Runner container.                 |

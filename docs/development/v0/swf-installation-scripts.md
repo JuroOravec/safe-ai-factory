@@ -64,7 +64,7 @@ We address these with two pluggable lifecycle hooks and a layered Docker image d
 After sandbox creation (`createSandbox`):
 
 ```
-/tmp/saifac/{proj}-{feat}-{runId}/
+/tmp/saifac/sandboxes/{proj}-{feat}-{runId}/
   gate.sh       ← always written; copied into saifac/ for the coder container mount
   startup.sh    ← always written from profile or --startup-script; copied into saifac/
   saifac/       ← assembled per run (copies of coder-start.sh, gate, startup, agent scripts, reviewer when enabled); mounted :ro at /saifac

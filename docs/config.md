@@ -85,7 +85,7 @@ See [Environments and Infrastructure](services.md) for a user guide. See [Softwa
 | Field            | Type   | Example                  | CLI equivalent       |
 | ---------------- | ------ | ------------------------ | -------------------- |
 | `project`        | string | `"my-app"`               | `-p` / `--project`   |
-| `sandboxBaseDir` | string | `"/tmp/saifac"` | `--sandbox-base-dir` |
+| `sandboxBaseDir` | string | `"/tmp/saifac/sandboxes"` | `--sandbox-base-dir` |
 
 ### Run params
 

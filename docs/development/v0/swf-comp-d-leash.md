@@ -47,7 +47,7 @@ When Leash is enabled, the Orchestrator runs the **Leash CLI** (`@strongdm/leash
 ```bash
 leash --no-interactive --verbose
       --image saifac-coder-node-pnpm-python:latest
-      --volume /tmp/saifac/<feat>-<runId>/code:/workspace
+      --volume /tmp/saifac/sandboxes/<feat>-<runId>/code:/workspace
       --policy leash-policy.cedar
       --env LLM_MODEL=... --env LLM_API_KEY=... [--env LLM_PROVIDER=...] [--env LLM_BASE_URL=...] --env SAIFAC_WORKSPACE_BASE=/workspace
       --env LEASH_E2E=1 --env LEASH_BOOTSTRAP_SKIP_ENFORCE=1
@@ -95,7 +95,7 @@ Leash's full network enforcement uses a MITM proxy that intercepts all outbound 
 
 ### What We Rely On
 
-- **Pure file copy sandbox** — `rsync` copies the repo to `/tmp/saifac/.../code`; agent only sees that copy.
+- **Pure file copy sandbox** — `rsync` copies the repo to `/tmp/saifac/sandboxes/.../code`; agent only sees that copy.
 - **Cedar policy** — `leash-policy.cedar` permits read/write in `/workspace`, explicitly forbids writes to `/workspace/saifac/`.
 - **Patch filtering** — any `saifac/` changes are dropped before the patch is applied to the host.
 

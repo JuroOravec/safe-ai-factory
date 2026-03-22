@@ -75,7 +75,7 @@ The Orchestrator passes these environment variables to the Test Runner container
 Each of `public/`, `hidden/`, `helpers.ts`, and `infra.spec.ts` is mounted only if it exists on the host. The `test.sh` and `reportDir` mounts are always present.
 
 - `testsDir` = `{projectDir}/{saifDir}/features/{featureName}/tests`
-- `reportDir` = sandbox root (e.g. `/tmp/saifac/proj-feat-abc123`)
+- `reportDir` = sandbox root (e.g. `/tmp/saifac/sandboxes/proj-feat-abc123`)
 - `test.sh` is written by the Orchestrator from `test-default.sh` (or a custom `--test-script`).
 
 ### Exit Code Contract

@@ -318,6 +318,7 @@ export async function runIterativeLoop(
     if (!sandboxDestroyed) {
       await destroySandbox(sandbox.sandboxBasePath);
     }
+    registry.clearEmergencySandboxPath();
   };
 
   // Wrapper for the main loop so we can derive didSucceed from returned value and cleanup on error.

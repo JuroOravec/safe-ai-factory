@@ -428,9 +428,8 @@ export function createFeatRunWorkflow() {
       const sandboxRaw = await ctx.parentOutput(provisionTask);
       const opts = deserializeOrchestratorOpts(input.serializedOpts);
 
-      await destroySandbox(sandboxRaw.sandboxBasePath);
-
       if (!loopResult.success) {
+        await destroySandbox(sandboxRaw.sandboxBasePath);
         return { applied: false };
       }
 
@@ -439,6 +438,7 @@ export function createFeatRunWorkflow() {
         projectDir: opts.projectDir,
         feature: opts.feature,
         runId: loopResult.lastRunId,
+        hostBasePatchPath: sandboxRaw.hostBasePatchPath,
         push: opts.push,
         pr: opts.pr,
         gitProvider: opts.gitProvider,
@@ -446,11 +446,14 @@ export function createFeatRunWorkflow() {
         verbose: !!opts.verbose,
       });
 
+      await destroySandbox(sandboxRaw.sandboxBasePath);
       return { applied: true };
     },
   });
 
-  // on-failure: persist RunArtifact for `saifac run resume` (addresses step 1.8)
+  // on-failure: persist RunArtifact for `saifac run resume` (addresses step 1.8), then remove
+  // the sandbox. Without cleanup here, failures before `apply-patch` never run destroySandbox
+  // (that task only runs when convergence-loop completes successfully).
   workflow.onFailure({
     name: 'on-failure',
     fn: async (input, ctx) => {
@@ -462,39 +465,47 @@ export function createFeatRunWorkflow() {
         return;
       }
 
-      const patchPath = join(sandboxRaw.sandboxBasePath, 'patch.diff');
-      const runPatchDiff = (await pathExists(patchPath)) ? await readUtf8(patchPath) : '';
-      if (!runPatchDiff.trim()) return;
-
-      let loopResult: ConvergenceOutput | null = null;
       try {
-        loopResult = await ctx.parentOutput(convergenceTask);
-      } catch {
-        // convergence-loop may not have completed
-      }
+        const patchPath = join(sandboxRaw.sandboxBasePath, 'patch.diff');
+        const runPatchDiff = (await pathExists(patchPath)) ? await readUtf8(patchPath) : '';
+        if (!runPatchDiff.trim()) return;
 
-      const opts = deserializeOrchestratorOpts(input.serializedOpts);
-      const runStorage = opts.runStorage;
-      if (!runStorage) return;
+        let loopResult: ConvergenceOutput | null = null;
+        try {
+          loopResult = await ctx.parentOutput(convergenceTask);
+        } catch {
+          // convergence-loop may not have completed
+        }
 
-      try {
-        const { runStorage: _rs, resume: _res, ...loopOpts } = opts;
-        const artifact = buildRunArtifact({
-          runId: sandboxRaw.runId,
-          baseCommitSha: input.runContext.baseCommitSha,
-          basePatchDiff: input.runContext.basePatchDiff,
-          runPatchDiff,
-          specRef: opts.feature.relativePath,
-          lastFeedback: loopResult?.lastErrorFeedback,
-          status: 'failed',
-          opts: loopOpts,
-        });
-        await runStorage.saveRun(sandboxRaw.runId, artifact);
-        consola.log(
-          `[hatchet] Run state saved. Resume with: saifac run resume ${sandboxRaw.runId}`,
-        );
-      } catch (err) {
-        consola.warn('[hatchet] Failed to save run state:', err);
+        const opts = deserializeOrchestratorOpts(input.serializedOpts);
+        const runStorage = opts.runStorage;
+        if (!runStorage) return;
+
+        try {
+          const { runStorage: _rs, resume: _res, ...loopOpts } = opts;
+          const artifact = buildRunArtifact({
+            runId: sandboxRaw.runId,
+            baseCommitSha: input.runContext.baseCommitSha,
+            basePatchDiff: input.runContext.basePatchDiff,
+            runPatchDiff,
+            specRef: opts.feature.relativePath,
+            lastFeedback: loopResult?.lastErrorFeedback,
+            status: 'failed',
+            opts: loopOpts,
+          });
+          await runStorage.saveRun(sandboxRaw.runId, artifact);
+          consola.log(
+            `[hatchet] Run state saved. Resume with: saifac run resume ${sandboxRaw.runId}`,
+          );
+        } catch (err) {
+          consola.warn('[hatchet] Failed to save run state:', err);
+        }
+      } finally {
+        try {
+          await destroySandbox(sandboxRaw.sandboxBasePath);
+        } catch (err) {
+          consola.warn('[hatchet] Failed to remove sandbox after workflow failure:', err);
+        }
       }
     },
   });

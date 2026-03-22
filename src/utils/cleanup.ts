@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { consola } from '../logger.js';
+import { destroySandbox } from '../orchestrator/sandbox.js';
 
 /** Minimal provisioner interface used by CleanupRegistry (avoids circular deps). */
 export interface ProvisionerRef {
@@ -20,10 +21,26 @@ export interface ProvisionerRef {
 export class CleanupRegistry {
   private provisioners: Array<{ provisioner: ProvisionerRef; runId: string }> = [];
   private beforeCleanupHook?: () => Promise<void>;
+  /**
+   * Sandbox dir to remove on SIGINT/SIGTERM. The iterative loop normally destroys the sandbox in
+   * its own `finally`, but the signal handler calls `process.exit` before that runs — without this,
+   * Disposable sandbox dirs under the sandbox base (e.g. `/tmp/saifac/sandboxes/...`) accumulate after every interrupted run.
+   */
+  private emergencySandboxPath?: string;
 
   /** Optional hook run before teardown (e.g. save run state on Ctrl+C) */
   setBeforeCleanup(hook: () => Promise<void>): void {
     this.beforeCleanupHook = hook;
+  }
+
+  /** Register a sandbox directory to delete when the registry runs signal cleanup. */
+  setEmergencySandboxPath(path: string): void {
+    this.emergencySandboxPath = path;
+  }
+
+  /** Call when the sandbox was already removed (success/abort paths) so signal cleanup is a no-op. */
+  clearEmergencySandboxPath(): void {
+    this.emergencySandboxPath = undefined;
   }
 
   /** Register a provisioner so it is torn down on SIGINT/SIGTERM. */
@@ -49,6 +66,16 @@ export class CleanupRegistry {
 
     for (const { provisioner, runId } of provisionersToDown) {
       await provisioner.teardown({ runId });
+    }
+
+    if (this.emergencySandboxPath) {
+      const path = this.emergencySandboxPath;
+      this.emergencySandboxPath = undefined;
+      try {
+        await destroySandbox(path);
+      } catch (err) {
+        consola.warn('[orchestrator] Emergency sandbox cleanup error:', err);
+      }
     }
   }
 }

@@ -1,21 +1,26 @@
 #!/usr/bin/env tsx
 /**
- * Cache CLI — manage factory sandbox entries in /tmp/saifac/.
+ * Cache CLI — manage disposable sandbox dirs under the sandbox base (default: /tmp/saifac/sandboxes/).
  *
  * Usage: pnpm cache <subcommand> [options]
  *   list    List sandbox dirs for this project (--all: all projects)
- *   clear   Remove sandbox entries for this project (--all: everything)
+ *   clear   Remove sandbox entries for this project (--all: everything in the base dir)
  */
 
 import { readdir, rm as rmAsync } from 'node:fs/promises';
+import { normalize, resolve } from 'node:path';
 
 import { defineCommand, runMain } from 'citty';
 
 import { consola } from '../../logger.js';
-import { DEFAULT_SANDBOX_BASE_DIR } from '../../orchestrator/sandbox.js';
+import { DEFAULT_SANDBOX_BASE_DIR, SAIFAC_TEMP_ROOT } from '../../orchestrator/sandbox.js';
 import { pathExists } from '../../utils/io.js';
 import { projectDirArg, sandboxBaseDirArg } from '../args.js';
 import { parseProjectDir, parseSandboxBaseDir, resolveProjectName } from '../utils.js';
+
+function isSaifacTempRoot(dir: string): boolean {
+  return normalize(resolve(dir)) === normalize(resolve(SAIFAC_TEMP_ROOT));
+}
 
 const listCommand = defineCommand({
   meta: {
@@ -90,6 +95,13 @@ const clearCommand = defineCommand({
   async run({ args }) {
     const sandboxBase = parseSandboxBaseDir(args);
     const clearAll = args.all === true;
+
+    if (clearAll && isSaifacTempRoot(sandboxBase)) {
+      throw new Error(
+        `Refusing to clear the entire SAIF temp root (${SAIFAC_TEMP_ROOT}): that would remove shared data such as bin/. ` +
+          `Use the default sandbox base (${DEFAULT_SANDBOX_BASE_DIR}) or pass --sandbox-base-dir pointing at your sandboxes directory, not the temp root.`,
+      );
+    }
 
     if (!(await pathExists(sandboxBase))) {
       consola.log(`${sandboxBase} does not exist — nothing to clear.`);

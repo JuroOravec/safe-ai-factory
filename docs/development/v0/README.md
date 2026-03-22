@@ -169,7 +169,7 @@ Here is how we integrate these components into our current multi-agent monorepo:
 
 ### Step 4: Secure the Execution Sandbox
 
-- Wrap the Coder Agent and test execution in a **pure file copy** sandbox: the Orchestrator uses `rsync` (honoring `.gitignore`) to copy the repo to `/tmp/saifac/{feature}-{runId}/code`, so the agent cannot corrupt the host's `.git` or files. Use Docker containers (borrowing concepts from **SWE-Factory**) or **Leash** to ensure that when the agent is blindly trying to fix a test 50 times in a row, it doesn't accidentally execute a destructive database query or delete the workspace.
+- Wrap the Coder Agent and test execution in a **pure file copy** sandbox: the Orchestrator uses `rsync` (honoring `.gitignore`) to copy the repo to `/tmp/saifac/sandboxes/{feature}-{runId}/code`, so the agent cannot corrupt the host's `.git` or files. Use Docker containers (borrowing concepts from **SWE-Factory**) or **Leash** to ensure that when the agent is blindly trying to fix a test 50 times in a row, it doesn't accidentally execute a destructive database query or delete the workspace.
 
 ---
 

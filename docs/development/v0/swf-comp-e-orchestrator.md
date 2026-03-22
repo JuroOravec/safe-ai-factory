@@ -51,7 +51,7 @@ This phase runs directly on the developer's machine and is NOT automated. It exi
 
 Once the constraints are approved, the autonomous loop begins. To prevent polluting the active workspace, the Orchestrator isolates this work.
 
-5. **Isolate via Pure File Copy:** The Orchestrator creates true isolation by copying the current repository to a disposable folder (e.g., `/tmp/saifac/feature-x`). It uses tools like `rsync` with `--filter=':- .gitignore'` to ensure it doesn't copy `node_modules` or build artifacts. After rsync, it recursively removes _all_ `hidden/` directories under `saifac/features/` from the code copy so the agent cannot see holdout tests from any feature (current or others). This guarantees that even if the agent maliciously deletes `.git` or corrupts files, the host repository is 100% safe, and the agent has no access to hidden tests.
+5. **Isolate via Pure File Copy:** The Orchestrator creates true isolation by copying the current repository to a disposable folder (e.g., `/tmp/saifac/sandboxes/feature-x`). It uses tools like `rsync` with `--filter=':- .gitignore'` to ensure it doesn't copy `node_modules` or build artifacts. After rsync, it recursively removes _all_ `hidden/` directories under `saifac/features/` from the code copy so the agent cannot see holdout tests from any feature (current or others). This guarantees that even if the agent maliciously deletes `.git` or corrupts files, the host repository is 100% safe, and the agent has no access to hidden tests.
 6. **Fail2Pass Check (Sanity Check):**
    - Within the isolated sandbox, the Orchestrator runs the Black-Box test harness (e.g., Playwright or HTTP request to the Sidecar) against the holdout tests. For a web app or CLI wrapped in a Sidecar, this requires spinning up the app and invoking the test runner.
    - It parses the Vitest JSON report to check that _at least one_ feature test (excluding infrastructure health checks) failed. If all feature tests pass, the loop aborts — the feature already exists or the tests are invalid.
@@ -91,7 +91,7 @@ This is where we enforce the "Perfect Black Box" to prevent reward hacking. We m
     - The Orchestrator applies `patch.diff` to the actual host repository.
     - It triggers `/opsx:archive` via an **async** subprocess helper (e.g. `child_process.exec` from `node:child_process/promises`, or `spawn` with Promises) so OpenSpec updates the master documentation — avoid blocking `execSync` in real implementations.
     - It uses the GitHub API (via `octokit`) to open a Pull Request.
-    - It removes the entire disposable sandbox (`rm -rf /tmp/saifac/{feat}-{runId}/`). Holdout tests lived in that directory alongside `code/`; no separate `/tmp/saifac-holdouts/` folder.
+    - It removes the entire disposable sandbox (`rm -rf /tmp/saifac/sandboxes/{feat}-{runId}/`). Holdout tests lived in that directory alongside `code/`.
 
 ---
 
@@ -162,7 +162,7 @@ async function generateSpecsAndTests(featureName: string, proposalPath: string) 
 async function runFactoryFloor(featureName: string) {
   const hostRepoPath = __dirname;
   const runId = Math.random().toString(36).substring(7);
-  const sandboxBasePath = `/tmp/saifac/${featureName}-${runId}`;
+  const sandboxBasePath = `/tmp/saifac/sandboxes/${featureName}-${runId}`;
   const codePath = `${sandboxBasePath}/code`;
 
   // NOTE 1: OpenSpec supports nested paths (e.g. /specs/accounts/feat.md).

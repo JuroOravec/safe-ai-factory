@@ -1,6 +1,6 @@
 /**
  * Ensures the Argus binary for Linux (amd64/arm64) is present.
- * Downloads from the fork release on first use; caches under `/tmp/saifac/bin/`.
+ * Downloads from the fork release on first use; caches under `/tmp/saifac/bin/` (sibling of `sandboxes/`).
  *
  * We use **musl** builds so the binary has no GLIBC dependency and runs inside any Linux
  * container regardless of libc version. The coder containers are based on Debian Bookworm
@@ -23,9 +23,10 @@ import { join } from 'node:path';
 
 import { consola } from '../../../logger.js';
 import { pathExists, spawnAsync } from '../../../utils/io.js';
+import { SAIFAC_TEMP_ROOT } from '../../sandbox.js';
 
 /** Host cache dir (not under the repo). Override with `SAIF_REVIEWER_BIN_DIR`. */
-const REVIEWER_BIN_DIR = process.env.SAIF_REVIEWER_BIN_DIR?.trim() || join('/tmp', 'saifac', 'bin');
+const REVIEWER_BIN_DIR = process.env.SAIF_REVIEWER_BIN_DIR?.trim() || join(SAIFAC_TEMP_ROOT, 'bin');
 
 /** Fork release version — bump this when cutting a new fork release. */
 const ARGUS_VERSION = '0.5.6';

@@ -126,7 +126,7 @@ Leash manages its own containers; we never pull StrongDM images. Use `--dangerou
 
 ### Host-to-Docker Code Flow (Local vs Remote)
 
-**Our Factory:** We use a **pure file copy** approach. The Orchestrator uses `rsync` (honoring `.gitignore`) to copy the repo to a disposable `/tmp/saifac/{feature}-{runId}/code` directory. After rsync, _all_ `hidden/` directories under `saifac/features/` are recursively removed from the code copy so the agent cannot see holdout tests from any feature. This guarantees the agent cannot corrupt the host's `.git` or files, and cannot read hidden tests. OpenHands uses this directory as its workspace. By default (Leash enabled), OpenHands runs inside the Leash coder container; with `--dangerous-debug` it runs on the host.
+**Our Factory:** We use a **pure file copy** approach. The Orchestrator uses `rsync` (honoring `.gitignore`) to copy the repo to a disposable `/tmp/saifac/sandboxes/{feature}-{runId}/code` directory. After rsync, _all_ `hidden/` directories under `saifac/features/` are recursively removed from the code copy so the agent cannot see holdout tests from any feature. This guarantees the agent cannot corrupt the host's `.git` or files, and cannot read hidden tests. OpenHands uses this directory as its workspace. By default (Leash enabled), OpenHands runs inside the Leash coder container; with `--dangerous-debug` it runs on the host.
 
 **OpenHands' traditional flow (for reference):**
 

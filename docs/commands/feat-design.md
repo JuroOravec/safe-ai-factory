@@ -41,7 +41,7 @@ saifac feature design [options]
 | `--project`          | `-p`  | string  | Project name override for the indexer (default: package.json "name")                                                                                            |
 | `--test-profile`     | —     | string  | Test profile id (default: node-vitest)                                                                                                                          |
 | `--indexer`          | —     | string  | Indexer profile for codebase search (default: shotgun). Pass `none` to disable.                                                                                 |
-| `--sandbox-base-dir` | —     | string  | Base directory for sandbox entries (default: `/tmp/saifac`)                                                                                            |
+| `--sandbox-base-dir` | —     | string  | Base directory for sandbox entries (default: `/tmp/saifac/sandboxes`)                                                                                  |
 | `--profile`          | —     | string  | Sandbox profile (default: node-pnpm-python). Sets defaults for startup-script and stage-script.                                                                 |
 | `--test-script`      | —     | string  | Path to a shell script that overrides test.sh inside the Test Runner container.                                                                                 |
 | `--test-image`       | —     | string  | Test runner Docker image tag (default: saifac-test-\<profile\>:latest)                                                                                         |

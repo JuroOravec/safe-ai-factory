@@ -164,7 +164,7 @@ The default gate script used when no custom `--gate-script` is provided. Each sa
 After sandbox creation:
 
 ```
-/tmp/saifac/{proj}-{feat}-{runId}/
+/tmp/saifac/sandboxes/{proj}-{feat}-{runId}/
   gate.sh              ← written by createSandbox; mounted :ro at /saifac/gate.sh
   startup.sh           ← written by createSandbox; mounted :ro at /saifac/startup.sh
   agent.sh             ← written by createSandbox; mounted :ro at /saifac/agent.sh

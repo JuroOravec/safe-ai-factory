@@ -244,6 +244,7 @@ async function runFail2PassCore(
     stageScript,
     verbose: opts.verbose,
   });
+  registry.setEmergencySandboxPath(sandbox.sandboxBasePath);
   const testRunnerOpts = await prepareTestRunnerOpts({
     feature,
     sandboxBasePath: sandbox.sandboxBasePath,
@@ -315,6 +316,7 @@ async function runFail2PassCore(
     registry.deregisterProvisioner(provisioner);
     await provisioner.teardown({ runId: sandbox.runId });
     await destroySandbox(sandbox.sandboxBasePath);
+    registry.clearEmergencySandboxPath();
   }
 }
 
@@ -366,41 +368,11 @@ async function runStartCore(
     runContext = await captureBaseGitState(projectDir);
   }
 
-  const sandbox = await createSandbox({
-    feature,
-    projectDir: sandboxSourceDir,
-    saifDir,
-    projectName,
-    sandboxBaseDir,
-    gateScript,
-    startupScript,
-    agentInstallScript,
-    agentScript,
-    stageScript,
-    verbose: opts.verbose,
-  });
-
-  // ─── Save run artifact (on Ctrl+C / failure) ───────────────────────────────
-  // This runs before teardown. If the agent produced any diff (patch.diff exists and is non-empty),
-  // we persist an artifact to runStorage so the user can resume later with `saifac run resume <runId>`.
-  if (runStorage) {
-    registry.setBeforeCleanup(async () => {
-      await saveRunOnError({
-        sandbox,
-        runContext,
-        opts: opts as IterativeLoopOpts & {
-          gitProvider: { id: string };
-          testProfile: { id: string };
-        },
-        runStorage,
-        saifDir,
-      });
-    });
-  }
-
   // ─── Hatchet path ─────────────────────────────────────────────────────────
   // When HATCHET_CLIENT_TOKEN is set, dispatch via Hatchet (distributed mode).
-  // Signal handling is skipped here — Hatchet owns the worker process lifecycle.
+  // IMPORTANT: Do not call createSandbox here — the worker's provision-sandbox task creates
+  // the only sandbox. A local createSandbox before this branch used to leak sandboxes on
+  // every Hatchet dispatch.
   //
   // OrchestratorOpts is not JSON-serializable (contains gitProvider/testProfile class
   // instances, patchExclude RegExp), so we serialize it at dispatch and reconstruct it
@@ -437,6 +409,40 @@ async function runStartCore(
       // after the cleanup.
       await worker.stop();
     }
+  }
+
+  const sandbox = await createSandbox({
+    feature,
+    projectDir: sandboxSourceDir,
+    saifDir,
+    projectName,
+    sandboxBaseDir,
+    gateScript,
+    startupScript,
+    agentInstallScript,
+    agentScript,
+    stageScript,
+    verbose: opts.verbose,
+  });
+
+  registry.setEmergencySandboxPath(sandbox.sandboxBasePath);
+
+  // ─── Save run artifact (on Ctrl+C / failure) ───────────────────────────────
+  // This runs before teardown. If the agent produced any diff (patch.diff exists and is non-empty),
+  // we persist an artifact to runStorage so the user can resume later with `saifac run resume <runId>`.
+  if (runStorage) {
+    registry.setBeforeCleanup(async () => {
+      await saveRunOnError({
+        sandbox,
+        runContext,
+        opts: opts as IterativeLoopOpts & {
+          gitProvider: { id: string };
+          testProfile: { id: string };
+        },
+        runStorage,
+        saifDir,
+      });
+    });
   }
 
   // ─── Existing in-process path ──────────────────────────────────────────────
@@ -678,6 +684,7 @@ async function runTestsCore(
     stageScript,
     verbose,
   });
+  registry.setEmergencySandboxPath(sandbox.sandboxBasePath);
   const testRunnerOpts = await prepareTestRunnerOpts({
     feature,
     sandboxBasePath: sandbox.sandboxBasePath,
@@ -746,6 +753,7 @@ async function runTestsCore(
           projectDir,
           feature,
           runId,
+          hostBasePatchPath: sandbox.hostBasePatchPath,
           push,
           pr,
           gitProvider,
@@ -798,6 +806,7 @@ async function runTestsCore(
     };
   } finally {
     await destroySandbox(sandbox.sandboxBasePath);
+    registry.clearEmergencySandboxPath();
   }
 }
 

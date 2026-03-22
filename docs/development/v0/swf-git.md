@@ -24,7 +24,7 @@ The Software Factory uses Git in three distinct phases:
 
 | Phase       | Where                                                     | Purpose                                                                                                                                                                |
 | ----------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sandbox** | Isolated `code/` directory inside `/tmp/saifac/` | A _fresh_ Git repo (not a clone) used solely for diffing agent changes against a baseline. The host's `.git` is never mounted or copied, to avoid exposing git history |
+| **Sandbox** | Isolated `code/` directory inside `/tmp/saifac/sandboxes/` | A _fresh_ Git repo (not a clone) used solely for diffing agent changes against a baseline. The host's `.git` is never mounted or copied, to avoid exposing git history |
 | **Tests**   | Same sandbox                                              | The extracted patch is applied to the sandbox with `git apply` so the staging containers can verify the implementation.                                                |
 | **Success** | Host repository                                           | A Git worktree is used to create a feature branch, apply the patch, commit, and optionally push/PR—_without ever changing the main working tree's checked-out branch_. |
 

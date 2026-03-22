@@ -2,7 +2,7 @@
 
 Remove sandbox entries for this project (--all: everything).
 
-Deletes factory sandbox entries from `/tmp/saifac/` (or a custom path). By default removes only entries for the current project (from `package.json` name). Use `--all` to remove entries for all projects.
+Deletes factory sandbox entries under `/tmp/saifac/sandboxes/` by default (or a custom `--sandbox-base-dir`). Does not touch `/tmp/saifac/bin/` or other siblings. By default removes only entries for the current project (from `package.json` name). Use `--all` to remove every entry in the sandbox base directory. If `--sandbox-base-dir` resolves to `/tmp/saifac` (the temp root), `clear --all` is refused so shared caches are not wiped.
 
 ## Usage
 
@@ -16,7 +16,7 @@ saifac cache clear [options]
 | -------------------- | ----- | ------- | -------------------------------------------------------- |
 | `--all`              | —     | boolean | Remove entries for all projects                          |
 | `--project`          | `-p`  | string  | Project name override (default: `package.json`)          |
-| `--sandbox-base-dir` | —     | string  | Sandbox base directory (default: `/tmp/saifac`) |
+| `--sandbox-base-dir` | —     | string  | Sandbox base directory (default: `/tmp/saifac/sandboxes`) |
 
 ## Examples
 
@@ -46,7 +46,7 @@ saifac cache clear --sandbox-base-dir /var/cache/factory
 
 ## What it does
 
-1. Resolves the sandbox base dir (default: `/tmp/saifac`)
+1. Resolves the sandbox base dir (default: `/tmp/saifac/sandboxes`)
 2. If `--all`: removes all entries in the base dir
 3. Otherwise: removes only entries matching `<project>-*` (project from `package.json` or `--project`)
 4. Prints each removed entry path

@@ -2,7 +2,7 @@
  * Sandbox management for the Software Factory Orchestrator.
  *
  * Creates an isolated copy of the repository in a sandbox base directory
- * (default: /tmp/saifac/) so the agent can work without touching
+ * (default: /tmp/saifac/sandboxes/) so the agent can work without touching
  * the host's .git history or files.
  *
  * Directory structure produced:
@@ -63,7 +63,7 @@ export async function removeAllHiddenDirs(baseDir: string): Promise<number> {
 export interface Sandbox {
   /** Run ID suffix used in the sandbox directory name */
   runId: string;
-  /** /tmp/saifac/{proj}-{feat}-{runId} */
+  /** e.g. /tmp/saifac/sandboxes/{proj}-{feat}-{runId} */
   sandboxBasePath: string;
   /** sandboxBasePath/code — rsync copy of the repo */
   codePath: string;
@@ -107,7 +107,14 @@ export interface Sandbox {
   stagePath: string;
 }
 
-export const DEFAULT_SANDBOX_BASE_DIR = '/tmp/saifac';
+/**
+ * Host root for factory temp files (e.g. Argus under `{SAIFAC_TEMP_ROOT}/bin/`).
+ * Not the sandbox directory — use {@link DEFAULT_SANDBOX_BASE_DIR} for disposable run copies.
+ */
+export const SAIFAC_TEMP_ROOT = join('/tmp', 'saifac');
+
+/** Disposable rsync sandboxes; `cache list` / `cache clear` use this path by default. */
+export const DEFAULT_SANDBOX_BASE_DIR = join(SAIFAC_TEMP_ROOT, 'sandboxes');
 
 export interface CreateSandboxOpts {
   /** Resolved feature (name, absolutePath, relativePath). */
@@ -128,7 +135,7 @@ export interface CreateSandboxOpts {
   saifDir: string;
   /**
    * Base directory where sandbox entries are created.
-   * Defaults to `/tmp/saifac`.
+   * Defaults to `/tmp/saifac/sandboxes` (see {@link DEFAULT_SANDBOX_BASE_DIR}).
    */
   sandboxBaseDir: string;
   /**
