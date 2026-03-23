@@ -128,7 +128,9 @@ export async function createResumeWorktree(
     if (basePatchDiff?.trim()) {
       await applyPatchFromString(basePatchDiff);
     }
-    await applyPatchFromString(runPatchDiff);
+    if (runPatchDiff.trim()) {
+      await applyPatchFromString(runPatchDiff);
+    }
   } catch (err: unknown) {
     await cleanupResumeWorkspace({ worktreePath, projectDir, branchName }, () => {
       throw new Error(
@@ -176,39 +178,34 @@ export interface CreateSaveRunHandlerParams {
   runContext: RunStorageContext;
   opts: BuildRunArtifactOpts;
   runStorage: RunStorage;
-  saifDir: string;
 }
 
 /**
  * Returns an async handler for registry.setBeforeCleanup.
- * When the user hits Ctrl+C or the loop exits due to failure, the callback persists an artifact
- * if patch.diff exists and is non-empty, so the user can resume with saifac run resume.
+ * When the user hits Ctrl+C before the loop finishes, persists a failed run artifact (patch may be empty).
  */
 export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promise<void> {
-  const { sandbox, runContext, opts, runStorage, saifDir } = params;
+  const { sandbox, runContext, opts, runStorage } = params;
 
   const runId = sandbox.runId;
   const patchPath = join(sandbox.sandboxBasePath, 'patch.diff');
-
-  if (!(await pathExists(patchPath))) return;
-
-  const runPatchDiff = await readUtf8(patchPath);
-  if (!runPatchDiff.trim()) return;
+  const runPatchDiff = (await pathExists(patchPath)) ? (await readUtf8(patchPath)).trimEnd() : '';
 
   const artifact = buildRunArtifact({
     runId,
     baseCommitSha: runContext.baseCommitSha,
     basePatchDiff: runContext.basePatchDiff,
     runPatchDiff,
-    specRef: `${saifDir}/features/${opts.feature.name}`,
+    specRef: opts.feature.relativePath,
     lastFeedback: runContext.lastErrorFeedback,
     status: 'failed',
     opts,
   });
 
-  // Save the artifact to runStorage so the user can resume later.
   await runStorage.saveRun(runId, artifact);
-  consola.log(`[orchestrator] Run state saved (Ctrl+C). Resume with: saifac run resume ${runId}`);
+  consola.log(
+    `[orchestrator] Run artifact saved (interrupted). Resume with: saifac run resume ${runId}`,
+  );
 }
 
 // ---------------------------------------------------------------------------

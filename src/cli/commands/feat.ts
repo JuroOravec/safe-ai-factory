@@ -702,7 +702,7 @@ const runCommand = defineCommand({
     });
 
     consola.log(`\n${result.message}`);
-    if (result.runId) {
+    if (result.runId && runArgs.runStorage && !result.success) {
       consola.log(`\nResume with:`);
       consola.log(`  saifac run resume ${result.runId}`);
     }

@@ -1,7 +1,7 @@
 /**
  * Run storage types for persisting agent run artifacts.
  *
- * Used when a run fails (or is aborted) so it can be resumed later via `saifac run resume <runId>`.
+ * Persisted for every run when storage is enabled (completed or failed) for `run ls`, resume, and tests.
  */
 
 import type { SerializedLoopOpts } from './utils/serialize.js';

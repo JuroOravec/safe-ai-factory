@@ -213,7 +213,7 @@ export interface IterativeLoopOpts {
 export interface OrchestratorResult {
   success: boolean;
   attempts: number;
-  /** Run ID for resuming (run state saved to .saifac/runs/) */
+  /** Run ID for resuming when run storage is enabled (artifact under .saifac/runs/) */
   runId?: string;
   /** Path to the winning patch.diff if success=true */
   patchPath?: string;
@@ -230,8 +230,14 @@ export interface RunStorageContext {
 }
 
 export async function runIterativeLoop(
-  sandbox: SandboxPaths,
-  opts: IterativeLoopOpts & { registry: CleanupRegistry },
+  sandbox: Sandbox,
+  opts: IterativeLoopOpts & {
+    runStorage: RunStorage | null;
+    runContext: RunStorageContext | null;
+    /** When resuming from storage: seed the first agent round with this feedback */
+    initialErrorFeedback: string | null;
+    registry: CleanupRegistry;
+  },
 ): Promise<OrchestratorResult> {
   const {
     sandboxProfileId,
@@ -259,6 +265,14 @@ export async function runIterativeLoop(
     reviewerEnabled,
     codingEnvironment,
   } = opts;
+
+  const runStorage = opts.runStorage ?? null;
+  const runContext = opts.runContext;
+  const runId = sandbox.runId;
+
+  /** Last agent patch text after each extractPatch (used for run storage on success or failure). */
+  let lastAgentPatchForStorage = '';
+  let lastErrorFeedback = '';
 
   // Resolve the coder agent's LLM config once per loop.
   // The resolved config is injected into the Leash container as LLM_* env vars.
@@ -297,21 +311,29 @@ export async function runIterativeLoop(
   const cleanupAndSaveRun = async (input: { didSucceed: boolean }) => {
     const { didSucceed } = input;
 
-    if (runStorage && !didSucceed && runContext && lastRunPatchDiff.trim()) {
+    // Always persist a run artifact when storage is enabled (completed or failed) so `run ls`
+    // and downstream tooling see every run.
+    if (runStorage && runContext) {
       try {
         const { registry: _reg, runStorage: _rs, runContext: _rc, ...loopOpts } = opts;
         const artifact = buildRunArtifact({
           runId,
           baseCommitSha: runContext.baseCommitSha,
           basePatchDiff: runContext.basePatchDiff,
-          runPatchDiff: lastRunPatchDiff,
+          runPatchDiff: lastAgentPatchForStorage,
           specRef: feature.relativePath,
-          lastFeedback: lastErrorFeedback || undefined,
+          lastFeedback: didSucceed ? undefined : lastErrorFeedback || undefined,
           status: didSucceed ? 'completed' : 'failed',
           opts: loopOpts as BuildRunArtifactOpts,
         });
         await runStorage.saveRun(runId, artifact);
-        consola.log(`[orchestrator] Run state saved. Resume with: saifac run resume ${runId}`);
+        if (didSucceed) {
+          consola.log(`[orchestrator] Run artifact saved (completed).`);
+        } else {
+          consola.log(
+            `[orchestrator] Run artifact saved (failed). Resume with: saifac run resume ${runId}`,
+          );
+        }
       } catch (err) {
         consola.warn('[orchestrator] Failed to save run state:', err);
       }
@@ -386,11 +408,14 @@ export async function runIterativeLoop(
       const { patch: patchContent, patchPath } = await extractPatch(sandbox.codePath, {
         exclude: patchExclude,
       });
+      lastAgentPatchForStorage = patchContent;
 
       if (!patchContent.trim()) {
         consola.warn('[orchestrator] Agent produced no changes (empty patch). Skipping tests.');
         errorFeedback =
           'No changes were made. Please implement the feature as described in the plan.';
+        lastErrorFeedback = errorFeedback;
+        if (runContext) runContext.lastErrorFeedback = errorFeedback;
         continue;
       }
 
@@ -490,6 +515,7 @@ export async function runIterativeLoop(
           return {
             success: true,
             attempts,
+            runId,
             message: `Feature implemented successfully in ${attempts} attempt(s).`,
           };
         } else if (result.status === 'aborted') {
@@ -545,6 +571,9 @@ export async function runIterativeLoop(
         lastVagueSpecsCheckResult?.sanitizedHint ??
         'Re-read the plan and specification, and fix the implementation.';
       errorFeedback = base + hint;
+
+      lastErrorFeedback = errorFeedback;
+      if (runContext) runContext.lastErrorFeedback = errorFeedback;
 
       consola.log(
         `\n[orchestrator] Attempt ${attempts} FAILED (tests failed after ${testAttempts} run(s)).`,

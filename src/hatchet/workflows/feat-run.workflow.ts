@@ -32,7 +32,7 @@
  *   The staging step has '30m'. vague-specs-check uses '30m'. The parent convergence-loop step has '24h'.
  *
  * RunArtifact persistence (step 1.8):
- *   The on-failure handler saves a RunArtifact so `saifac run resume <runId>` works.
+ *   apply-patch saves a completed artifact; on-failure saves a failed artifact for `run resume`.
  */
 
 import { join } from 'node:path';
@@ -365,6 +365,8 @@ export function createFeatRunWorkflow() {
         if (!agentOut.patchContent.trim()) {
           errorFeedback =
             'No changes were made. Please implement the feature as described in the plan.';
+          lastErrorFeedback = errorFeedback;
+          lastPatchContent = '';
           continue;
         }
 
@@ -446,6 +448,28 @@ export function createFeatRunWorkflow() {
         verbose: !!opts.verbose,
       });
 
+      const runStorage = opts.runStorage;
+      if (runStorage) {
+        try {
+          const patchPath = join(sandboxRaw.sandboxBasePath, 'patch.diff');
+          const runPatchDiff = (await pathExists(patchPath)) ? await readUtf8(patchPath) : '';
+          const { runStorage: _rs, resume: _res, ...loopOpts } = opts;
+          const artifact = buildRunArtifact({
+            runId: sandboxRaw.runId,
+            baseCommitSha: input.runContext.baseCommitSha,
+            basePatchDiff: input.runContext.basePatchDiff,
+            runPatchDiff,
+            specRef: opts.feature.relativePath,
+            status: 'completed',
+            opts: loopOpts,
+          });
+          await runStorage.saveRun(sandboxRaw.runId, artifact);
+          consola.log('[hatchet] Run artifact saved (completed).');
+        } catch (err) {
+          consola.warn('[hatchet] Failed to save run artifact:', err);
+        }
+      }
+
       await destroySandbox(sandboxRaw.sandboxBasePath);
       return { applied: true };
     },
@@ -468,7 +492,6 @@ export function createFeatRunWorkflow() {
       try {
         const patchPath = join(sandboxRaw.sandboxBasePath, 'patch.diff');
         const runPatchDiff = (await pathExists(patchPath)) ? await readUtf8(patchPath) : '';
-        if (!runPatchDiff.trim()) return;
 
         let loopResult: ConvergenceOutput | null = null;
         try {
@@ -481,6 +504,9 @@ export function createFeatRunWorkflow() {
         const runStorage = opts.runStorage;
         if (!runStorage) return;
 
+        const lastFeedback =
+          loopResult?.lastErrorFeedback ?? input.runContext.lastErrorFeedback ?? '';
+
         try {
           const { runStorage: _rs, resume: _res, ...loopOpts } = opts;
           const artifact = buildRunArtifact({
@@ -489,13 +515,13 @@ export function createFeatRunWorkflow() {
             basePatchDiff: input.runContext.basePatchDiff,
             runPatchDiff,
             specRef: opts.feature.relativePath,
-            lastFeedback: loopResult?.lastErrorFeedback,
+            lastFeedback: lastFeedback || undefined,
             status: 'failed',
             opts: loopOpts,
           });
           await runStorage.saveRun(sandboxRaw.runId, artifact);
           consola.log(
-            `[hatchet] Run state saved. Resume with: saifac run resume ${sandboxRaw.runId}`,
+            `[hatchet] Run artifact saved (failed). Resume with: saifac run resume ${sandboxRaw.runId}`,
           );
         } catch (err) {
           consola.warn('[hatchet] Failed to save run state:', err);

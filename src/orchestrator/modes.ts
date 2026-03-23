@@ -438,9 +438,8 @@ async function runStartCore(
 
   registry.setEmergencySandboxPath(sandbox.sandboxBasePath);
 
-  // ─── Save run artifact (on Ctrl+C / failure) ───────────────────────────────
-  // This runs before teardown. If the agent produced any diff (patch.diff exists and is non-empty),
-  // we persist an artifact to runStorage so the user can resume later with `saifac run resume <runId>`.
+  // ─── Save run artifact on interrupt (Ctrl+C) ───────────────────────────────
+  // Normal exit (success or failure) is handled inside runIterativeLoop cleanup.
   if (runStorage) {
     registry.setBeforeCleanup(async () => {
       await saveRunOnError({
@@ -448,7 +447,6 @@ async function runStartCore(
         runContext,
         opts,
         runStorage,
-        saifDir,
       });
     });
   }
