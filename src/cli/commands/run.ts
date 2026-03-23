@@ -6,6 +6,7 @@
  *   ls, list      List stored runs
  *   rm, remove    Delete a run
  *   inspect       Print stored run as JSON
+ *   clear         Clear stored runs (optionally filtered)
  */
 
 import { defineCommand, runMain } from 'citty';
@@ -155,6 +156,37 @@ const inspectCommand = defineCommand({
   },
 });
 
+const clearCommand = defineCommand({
+  meta: {
+    name: 'clear',
+    description: 'Clear stored runs',
+  },
+  args: {
+    ...commonRunArgs,
+    failed: {
+      type: 'boolean' as const,
+      description: 'Clear only failed runs',
+    },
+  },
+  async run({ args }) {
+    const projectDir = parseProjectDir(args);
+    const saifDir = parseSaifDir(args);
+    const config = await loadSaifConfig(saifDir, projectDir);
+    const storage = parseRunStorage(args, projectDir, config);
+    if (!storage) {
+      consola.log('Run storage is disabled (--storage none).');
+      return;
+    }
+    const filter = args.failed ? { status: 'failed' as const } : undefined;
+    const runs = await storage.listRuns(filter);
+    for (const r of runs) {
+      await storage.deleteRun(r.runId);
+      consola.log(`  removed ${r.runId}`);
+    }
+    consola.log(`\nCleared ${runs.length} run(s).`);
+  },
+});
+
 const runCommand = defineCommand({
   meta: {
     name: 'run',
@@ -166,6 +198,7 @@ const runCommand = defineCommand({
     rm: rmCommand,
     remove: rmCommand,
     inspect: inspectCommand,
+    clear: clearCommand,
   },
 });
 
