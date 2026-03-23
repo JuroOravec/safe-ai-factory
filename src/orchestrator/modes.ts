@@ -19,7 +19,8 @@ import { consola } from '../logger.js';
 import { hasFeatureSuccessfullyFailed } from '../provisioners/docker/index.js';
 import { createProvisioner } from '../provisioners/index.js';
 import { type TestsResult } from '../provisioners/types.js';
-import { deserializeArtifactConfig, type RunStorage } from '../runs/index.js';
+import type { RunStorage } from '../runs/types.js';
+import { deserializeArtifactConfig } from '../runs/utils/serialize.js';
 import { type Feature, resolveFeature } from '../specs/discover.js';
 import { CleanupRegistry } from '../utils/cleanup.js';
 import { pathExists, writeUtf8 } from '../utils/io.js';
@@ -96,6 +97,16 @@ export interface OrchestratorOpts extends IterativeLoopOpts {
    * the profile's stage script is used.
    */
   stageScript: string;
+  /**
+   * Reporting-only paths for run artifacts (relative to projectDir when under the project,
+   * else absolute). Not read by the orchestrator for execution.
+   */
+  startupScriptFile: string;
+  gateScriptFile: string;
+  stageScriptFile: string;
+  testScriptFile: string;
+  agentInstallScriptFile: string;
+  agentScriptFile: string;
   /**
    * Run storage for persisting failed runs. Resolved by CLI via parseRunStorage.
    * Default: local (.saifac/runs/) when --storage is omitted. Set to null for --storage runs=none.
@@ -435,10 +446,7 @@ async function runStartCore(
       await saveRunOnError({
         sandbox,
         runContext,
-        opts: opts as IterativeLoopOpts & {
-          gitProvider: { id: string };
-          testProfile: { id: string };
-        },
+        opts,
         runStorage,
         saifDir,
       });
@@ -533,11 +541,17 @@ type SharedTestOpts = Pick<
   | 'stagingEnvironment'
   | 'resolveAmbiguity'
   | 'startupScript'
+  | 'startupScriptFile'
   | 'gateScript'
+  | 'gateScriptFile'
   | 'agentInstallScript'
+  | 'agentInstallScriptFile'
   | 'agentScript'
+  | 'agentScriptFile'
   | 'stageScript'
+  | 'stageScriptFile'
   | 'testScript'
+  | 'testScriptFile'
   | 'testProfile'
   | 'push'
   | 'pr'
@@ -836,6 +850,12 @@ export async function runDebug(
     | 'agentInstallScript'
     | 'agentScript'
     | 'stageScript'
+    | 'startupScriptFile'
+    | 'gateScriptFile'
+    | 'stageScriptFile'
+    | 'testScriptFile'
+    | 'agentInstallScriptFile'
+    | 'agentScriptFile'
   >,
 ): Promise<void> {
   const {

@@ -22,8 +22,8 @@ import { defineCommand, runMain } from 'citty';
 
 import {
   DEFAULT_AGENT_PROFILE,
-  resolveAgentScriptPath,
   resolveAgentInstallScriptPath,
+  resolveAgentScriptPath,
 } from '../../agent-profiles/index.js';
 import { loadSaifConfig } from '../../config/load.js';
 import { type SaifConfig } from '../../config/schema.js';
@@ -34,7 +34,10 @@ import { DEFAULT_DESIGNER_PROFILE } from '../../designer-profiles/index.js';
 import type { ModelOverrides } from '../../llm-config.js';
 import { consola, setVerboseLogging } from '../../logger.js';
 import { runDebug, runFail2Pass, runStart } from '../../orchestrator/modes.js';
-import { readSandboxGateScript } from '../../sandbox-profiles/index.js';
+import {
+  readSandboxGateScript,
+  resolveSandboxGateScriptPath,
+} from '../../sandbox-profiles/index.js';
 import type { Feature } from '../../specs/discover.js';
 import { pathExists, readUtf8, writeUtf8 } from '../../utils/io.js';
 import {
@@ -91,6 +94,7 @@ import {
   parseTestRetries,
   parseTestScript,
   resolveProjectName,
+  scriptSourcePathForReporting,
   shouldRunDiscovery,
 } from '../utils.js';
 
@@ -555,14 +559,18 @@ async function _runDesignFail2pass(opts: {
   const testProfile = parseTestProfile(args, config);
   const testImage = parseTestImage(args, testProfile.id, config);
 
-  const [gateScript, startupScript, stageScript, { agentInstallScript, agentScript }, testScript] =
-    await Promise.all([
-      parseGateScript({ args, projectDir, config }),
-      parseStartupScript({ args, projectDir, config }),
-      parseStageScript({ args, projectDir, config }),
-      parseAgentScripts({ args, projectDir, config }),
-      parseTestScript({ args, projectDir, profileId: testProfile.id, config }),
-    ]);
+  const [gateR, startupR, stageR, agentR, testR] = await Promise.all([
+    parseGateScript({ args, projectDir, config }),
+    parseStartupScript({ args, projectDir, config }),
+    parseStageScript({ args, projectDir, config }),
+    parseAgentScripts({ args, projectDir, config }),
+    parseTestScript({ args, projectDir, profileId: testProfile.id, config }),
+  ]);
+  const gateScript = gateR.gateScript;
+  const startupScript = startupR.startupScript;
+  const stageScript = stageR.stageScript;
+  const { agentInstallScript, agentScript } = agentR;
+  const testScript = testR.testScript;
 
   const stagingEnvironment = parseStagingEnvironment(config);
 
@@ -725,19 +733,27 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
   const sandboxProfile = parseSandboxProfile(runArgs, config);
   const agentProfile = parseAgentProfile(runArgs, config);
 
-  const [startupScript, gateScript, { agentInstallScript, agentScript }, stageScript, testScript] =
-    await Promise.all([
-      parseStartupScript({ args: runArgs, projectDir, config }),
-      parseGateScript({ args: runArgs, projectDir, config }),
-      parseAgentScripts({ args: runArgs, projectDir, config }),
-      parseStageScript({ args: runArgs, projectDir, config }),
-      parseTestScript({
-        args: runArgs,
-        projectDir,
-        profileId: testProfile.id,
-        config,
-      }),
-    ]);
+  const [startupR, gateR, agentR, stageR, testR] = await Promise.all([
+    parseStartupScript({ args: runArgs, projectDir, config }),
+    parseGateScript({ args: runArgs, projectDir, config }),
+    parseAgentScripts({ args: runArgs, projectDir, config }),
+    parseStageScript({ args: runArgs, projectDir, config }),
+    parseTestScript({
+      args: runArgs,
+      projectDir,
+      profileId: testProfile.id,
+      config,
+    }),
+  ]);
+  const startupScript = startupR.startupScript;
+  const startupScriptFile = startupR.startupScriptFile;
+  const gateScript = gateR.gateScript;
+  const gateScriptFile = gateR.gateScriptFile;
+  const stageScript = stageR.stageScript;
+  const stageScriptFile = stageR.stageScriptFile;
+  const { agentInstallScript, agentInstallScriptFile, agentScript, agentScriptFile } = agentR;
+  const testScript = testR.testScript;
+  const testScriptFile = testR.testScriptFile;
 
   const gateRetries = parseGateRetries(runArgs, config);
   const reviewerEnabled = parseReviewerEnabled(runArgs, config);
@@ -788,11 +804,17 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
     cedarPolicyPath,
     coderImage,
     startupScript,
+    startupScriptFile,
     gateScript,
+    gateScriptFile,
     agentInstallScript,
+    agentInstallScriptFile,
     agentScript,
+    agentScriptFile,
     stageScript,
+    stageScriptFile,
     testScript,
+    testScriptFile,
     testProfile,
     agentEnv,
     agentLogFormat,
@@ -829,16 +851,23 @@ const debugCommand = defineCommand({
     const projectName = await resolveProjectName(args, projectDir, config);
     const sandboxProfile = parseSandboxProfile(args, config);
 
-    const [startupScript, stageScript] = await Promise.all([
+    const [startupR, stageR] = await Promise.all([
       parseStartupScript({ args, projectDir, config }),
       parseStageScript({ args, projectDir, config }),
     ]);
+    const startupScript = startupR.startupScript;
+    const stageScript = stageR.stageScript;
 
+    const gateAbs = resolveSandboxGateScriptPath(sandboxProfile.id);
     const gateScript = await readSandboxGateScript(sandboxProfile.id);
-    const agentInstallScript = await readUtf8(
-      resolveAgentInstallScriptPath(DEFAULT_AGENT_PROFILE.id),
-    );
-    const agentScript = await readUtf8(resolveAgentScriptPath(DEFAULT_AGENT_PROFILE.id));
+    const gateScriptFile = scriptSourcePathForReporting(projectDir, gateAbs);
+
+    const agentInstallAbs = resolveAgentInstallScriptPath(DEFAULT_AGENT_PROFILE.id);
+    const agentScriptAbs = resolveAgentScriptPath(DEFAULT_AGENT_PROFILE.id);
+    const agentInstallScript = await readUtf8(agentInstallAbs);
+    const agentScript = await readUtf8(agentScriptAbs);
+    const agentInstallScriptFile = scriptSourcePathForReporting(projectDir, agentInstallAbs);
+    const agentScriptFile = scriptSourcePathForReporting(projectDir, agentScriptAbs);
 
     const stagingEnvironment = parseStagingEnvironment(config);
 
@@ -854,10 +883,16 @@ const debugCommand = defineCommand({
       projectName,
       stagingEnvironment,
       startupScript,
+      startupScriptFile: startupR.startupScriptFile,
       gateScript,
+      gateScriptFile,
       agentInstallScript,
+      agentInstallScriptFile,
       agentScript,
+      agentScriptFile,
       stageScript,
+      stageScriptFile: stageR.stageScriptFile,
+      testScriptFile: '',
     });
   },
 });

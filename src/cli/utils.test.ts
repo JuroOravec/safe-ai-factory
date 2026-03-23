@@ -2,10 +2,17 @@
  * Unit tests for CLI utility functions.
  */
 
+import { resolve } from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SaifConfig } from '../config/schema.js';
-import { parseModelOverrides, parseReviewerEnabled, parseStorageOverrides } from './utils.js';
+import {
+  parseModelOverrides,
+  parseReviewerEnabled,
+  parseStorageOverrides,
+  scriptSourcePathForReporting,
+} from './utils.js';
 
 describe('parseModelOverrides', () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
@@ -101,5 +108,19 @@ describe('parseStorageOverrides', () => {
       runs: 'local',
       tasks: 's3://bucket/tasks',
     });
+  });
+});
+
+describe('scriptSourcePathForReporting', () => {
+  it('returns a relative path when the script is under projectDir', () => {
+    const proj = resolve('/tmp/saifac-proj');
+    const script = resolve('/tmp/saifac-proj/scripts/hook.sh');
+    expect(scriptSourcePathForReporting(proj, script)).toMatch(/scripts[/\\]hook\.sh$/);
+  });
+
+  it('returns an absolute path when the script is outside projectDir', () => {
+    const proj = resolve('/tmp/saifac-proj');
+    const script = resolve('/opt/saifac/builtin.sh');
+    expect(scriptSourcePathForReporting(proj, script)).toBe(script);
   });
 });

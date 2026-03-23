@@ -24,7 +24,8 @@ import {
   type RunTestsOpts,
   type TestsResult,
 } from '../provisioners/types.js';
-import { buildRunArtifact, type RunStorage } from '../runs/index.js';
+import type { RunStorage } from '../runs/types.js';
+import { buildRunArtifact, type BuildRunArtifactOpts } from '../runs/utils/artifact.js';
 import type { SupportedSandboxProfileId } from '../sandbox-profiles/types.js';
 import type { Feature } from '../specs/discover.js';
 import type { TestProfile } from '../test-profiles/types.js';
@@ -307,7 +308,7 @@ export async function runIterativeLoop(
           specRef: feature.relativePath,
           lastFeedback: lastErrorFeedback || undefined,
           status: didSucceed ? 'completed' : 'failed',
-          opts: loopOpts,
+          opts: loopOpts as BuildRunArtifactOpts,
         });
         await runStorage.saveRun(runId, artifact);
         consola.log(`[orchestrator] Run state saved. Resume with: saifac run resume ${runId}`);

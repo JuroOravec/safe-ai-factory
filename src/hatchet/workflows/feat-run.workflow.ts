@@ -47,7 +47,7 @@ import { applyPatchToHost } from '../../orchestrator/phases/apply-patch.js';
 import { runAgentPhase } from '../../orchestrator/phases/run-agent-phase.js';
 import { runTestPhase } from '../../orchestrator/phases/run-test-phase.js';
 import { createSandbox, destroySandbox, type Sandbox } from '../../orchestrator/sandbox.js';
-import { buildRunArtifact } from '../../runs/index.js';
+import { buildRunArtifact } from '../../runs/utils/artifact.js';
 import { gitClean, gitResetHard } from '../../utils/git.js';
 import { pathExists, readUtf8 } from '../../utils/io.js';
 import { getHatchetClient } from '../client.js';

@@ -85,11 +85,26 @@ export function resolveSandboxCoderDockerfilePath(profileId: SupportedSandboxPro
   return join(_sandboxProfilesDir, profileId, 'Dockerfile.coder');
 }
 
+/** Absolute path to startup.sh for the given sandbox profile. */
+export function resolveSandboxStartupScriptPath(profileId: SupportedSandboxProfileId): string {
+  return join(_sandboxProfilesDir, profileId, 'startup.sh');
+}
+
+/** Absolute path to stage.sh for the given sandbox profile. */
+export function resolveSandboxStageScriptPath(profileId: SupportedSandboxProfileId): string {
+  return join(_sandboxProfilesDir, profileId, 'stage.sh');
+}
+
+/** Absolute path to gate.sh for the given sandbox profile. */
+export function resolveSandboxGateScriptPath(profileId: SupportedSandboxProfileId): string {
+  return join(_sandboxProfilesDir, profileId, 'gate.sh');
+}
+
 /** Reads and returns the content of startup.sh for the given profile id. */
 export async function readSandboxStartupScript(
   profileId: SupportedSandboxProfileId,
 ): Promise<string> {
-  const filepath = join(_sandboxProfilesDir, profileId, 'startup.sh');
+  const filepath = resolveSandboxStartupScriptPath(profileId);
   if (!(await pathExists(filepath))) {
     throw new Error(`Startup script not found for profile ${profileId}: ${filepath}`);
   }
@@ -100,7 +115,7 @@ export async function readSandboxStartupScript(
 export async function readSandboxStageScript(
   profileId: SupportedSandboxProfileId,
 ): Promise<string> {
-  const filepath = join(_sandboxProfilesDir, profileId, 'stage.sh');
+  const filepath = resolveSandboxStageScriptPath(profileId);
   if (!(await pathExists(filepath))) {
     throw new Error(`Stage script not found for profile ${profileId}: ${filepath}`);
   }
@@ -109,7 +124,7 @@ export async function readSandboxStageScript(
 
 /** Reads and returns the content of gate.sh for the given profile id. */
 export async function readSandboxGateScript(profileId: SupportedSandboxProfileId): Promise<string> {
-  const filepath = join(_sandboxProfilesDir, profileId, 'gate.sh');
+  const filepath = resolveSandboxGateScriptPath(profileId);
   if (!(await pathExists(filepath))) {
     throw new Error(`Gate script not found for profile ${profileId}: ${filepath}`);
   }

@@ -9,12 +9,9 @@ import { mkdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { consola } from '../logger.js';
-import {
-  buildRunArtifact,
-  deserializeArtifactConfig,
-  type RunArtifact,
-  type RunStorage,
-} from '../runs/index.js';
+import type { RunArtifact, RunStorage } from '../runs/types.js';
+import { buildRunArtifact, type BuildRunArtifactOpts } from '../runs/utils/artifact.js';
+import { deserializeArtifactConfig } from '../runs/utils/serialize.js';
 import { resolveFeature } from '../specs/discover.js';
 import {
   git,
@@ -25,7 +22,7 @@ import {
   gitWorktreeRemove,
 } from '../utils/git.js';
 import { pathExists, readUtf8, writeUtf8 } from '../utils/io.js';
-import { type IterativeLoopOpts, type RunStorageContext } from './loop.js';
+import { type RunStorageContext } from './loop.js';
 import type { OrchestratorOpts } from './modes.js';
 import type { Sandbox } from './sandbox.js';
 
@@ -177,7 +174,7 @@ export async function cleanupResumeWorkspace(
 export interface CreateSaveRunHandlerParams {
   sandbox: Sandbox;
   runContext: RunStorageContext;
-  opts: IterativeLoopOpts & { gitProvider: { id: string }; testProfile: { id: string } };
+  opts: BuildRunArtifactOpts;
   runStorage: RunStorage;
   saifDir: string;
 }

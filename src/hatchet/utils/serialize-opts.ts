@@ -13,7 +13,7 @@
 import { getGitProvider } from '../../git/index.js';
 import type { OrchestratorOpts } from '../../orchestrator/modes.js';
 import type { PatchExcludeRule } from '../../orchestrator/sandbox.js';
-import { createRunStorage } from '../../runs/index.js';
+import { createRunStorage } from '../../runs/storage.js';
 import type { SerializedPatchExcludeRule } from '../../runs/utils/serialize.js';
 import { resolveTestProfile } from '../../test-profiles/index.js';
 
@@ -52,6 +52,12 @@ export interface SerializedOrchestratorOpts extends Record<string, unknown> {
   agentInstallScript: string;
   agentScript: string;
   stageScript: string;
+  startupScriptFile: string;
+  gateScriptFile: string;
+  stageScriptFile: string;
+  testScriptFile: string;
+  agentInstallScriptFile: string;
+  agentScriptFile: string;
   resume: {
     sandboxSourceDir: string;
     initialErrorFeedback?: string;
@@ -153,6 +159,12 @@ export function deserializeOrchestratorOpts(serialized: Record<string, unknown>)
     agentInstallScript: s.agentInstallScript,
     agentScript: s.agentScript,
     stageScript: s.stageScript,
+    startupScriptFile: s.startupScriptFile,
+    gateScriptFile: s.gateScriptFile,
+    stageScriptFile: s.stageScriptFile,
+    testScriptFile: s.testScriptFile,
+    agentInstallScriptFile: s.agentInstallScriptFile,
+    agentScriptFile: s.agentScriptFile,
     resume: s.resume
       ? {
           sandboxSourceDir: s.resume.sandboxSourceDir,

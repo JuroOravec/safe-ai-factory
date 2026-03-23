@@ -2,7 +2,7 @@
  * Shared CLI helpers used across command implementations.
  */
 
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { cancel, intro, isCancel, outro, select } from '@clack/prompts';
 
@@ -35,21 +35,21 @@ import {
 import { isSupportedAgentName, type ModelOverrides, SUPPORTED_AGENT_NAMES } from '../llm-config.js';
 import { consola } from '../logger.js';
 import { DEFAULT_SANDBOX_BASE_DIR } from '../orchestrator/sandbox.js';
-import { createRunStorage } from '../run-storage/index.js';
-import {
-  type RunStorage,
-  type StorageOverrides,
-  SUPPORTED_STORAGE_KEYS,
-} from '../run-storage/types.js';
+import { createRunStorage } from '../runs/storage.js';
+import type { RunStorage } from '../runs/types.js';
 import {
   DEFAULT_SANDBOX_PROFILE,
   readSandboxGateScript,
   readSandboxStageScript,
   readSandboxStartupScript,
+  resolveSandboxGateScriptPath,
   resolveSandboxProfile,
+  resolveSandboxStageScriptPath,
+  resolveSandboxStartupScriptPath,
   type SandboxProfile,
 } from '../sandbox-profiles/index.js';
 import { discoverFeatures, type Feature, resolveFeature } from '../specs/discover.js';
+import { type StorageOverrides, SUPPORTED_STORAGE_KEYS } from '../storage/types.js';
 import {
   DEFAULT_PROFILE,
   resolveTestProfile,
@@ -58,6 +58,19 @@ import {
   type TestProfile,
 } from '../test-profiles/index.js';
 import { pathExists, readUtf8 } from '../utils/io.js';
+
+/**
+ * Path label for run artifact reporting: relative to projectDir when the script
+ * lives under the project, otherwise absolute (normalized).
+ */
+export function scriptSourcePathForReporting(projectDir: string, absolutePath: string): string {
+  const proj = resolve(projectDir);
+  const abs = resolve(absolutePath);
+  const rel = relative(proj, abs);
+  if (rel === '') return abs;
+  if (!rel.startsWith('..') && !isAbsolute(rel)) return rel;
+  return abs;
+}
 
 /**
  * Resolves the sandbox base directory from --sandbox-base-dir.
@@ -412,64 +425,85 @@ export function parseTestImage(
   return tag;
 }
 
-/** Reads startup script from --startup-script or profile default. */
+/** Reads startup script from --startup-script, config default, or profile default. */
 export async function parseStartupScript(opts: {
   args: OrchestratorArgs;
   projectDir: string;
   config?: SaifConfig;
-}): Promise<string> {
+}): Promise<{ startupScript: string; startupScriptFile: string }> {
   const { args, projectDir, config } = opts;
   const raw = args['startup-script'] || config?.defaults?.startupScript;
   if (typeof raw !== 'string' || !raw.trim()) {
     const profile = parseSandboxProfile(args, config);
-    return await readSandboxStartupScript(profile.id);
+    const abs = resolveSandboxStartupScriptPath(profile.id);
+    return {
+      startupScript: await readSandboxStartupScript(profile.id),
+      startupScriptFile: scriptSourcePathForReporting(projectDir, abs),
+    };
   }
   const scriptPath = resolve(projectDir, raw.trim());
   if (!(await pathExists(scriptPath))) {
     consola.error(`Error: --startup-script file not found: ${scriptPath}`);
     process.exit(1);
   }
-  return readUtf8(scriptPath);
+  return {
+    startupScript: await readUtf8(scriptPath),
+    startupScriptFile: scriptSourcePathForReporting(projectDir, scriptPath),
+  };
 }
 
-/** Reads gate script from --gate-script or profile default. */
+/** Reads gate script from --gate-script, config default, or profile default. */
 export async function parseGateScript(opts: {
   args: OrchestratorArgs;
   projectDir: string;
   config?: SaifConfig;
-}): Promise<string> {
+}): Promise<{ gateScript: string; gateScriptFile: string }> {
   const { args, projectDir, config } = opts;
   const raw = args['gate-script'] || config?.defaults?.gateScript;
   const profile = parseSandboxProfile(args, config);
   if (typeof raw !== 'string' || !raw.trim()) {
-    return await readSandboxGateScript(profile.id);
+    const abs = resolveSandboxGateScriptPath(profile.id);
+    return {
+      gateScript: await readSandboxGateScript(profile.id),
+      gateScriptFile: scriptSourcePathForReporting(projectDir, abs),
+    };
   }
   const scriptPath = resolve(projectDir, raw.trim());
   if (!(await pathExists(scriptPath))) {
     consola.error(`Error: --gate-script file not found: ${scriptPath}`);
     process.exit(1);
   }
-  return readUtf8(scriptPath);
+  return {
+    gateScript: await readUtf8(scriptPath),
+    gateScriptFile: scriptSourcePathForReporting(projectDir, scriptPath),
+  };
 }
 
-/** Reads stage script from --stage-script or profile default. */
+/** Reads stage script from --stage-script, config default, or profile default. */
 export async function parseStageScript(opts: {
   args: OrchestratorArgs;
   projectDir: string;
   config?: SaifConfig;
-}): Promise<string> {
+}): Promise<{ stageScript: string; stageScriptFile: string }> {
   const { args, projectDir, config } = opts;
   const raw = args['stage-script'] || config?.defaults?.stageScript;
   const profile = parseSandboxProfile(args, config);
   if (typeof raw !== 'string' || !raw.trim()) {
-    return await readSandboxStageScript(profile.id);
+    const abs = resolveSandboxStageScriptPath(profile.id);
+    return {
+      stageScript: await readSandboxStageScript(profile.id),
+      stageScriptFile: scriptSourcePathForReporting(projectDir, abs),
+    };
   }
   const scriptPath = resolve(projectDir, raw.trim());
   if (!(await pathExists(scriptPath))) {
     consola.error(`Error: --stage-script file not found: ${scriptPath}`);
     process.exit(1);
   }
-  return readUtf8(scriptPath);
+  return {
+    stageScript: await readUtf8(scriptPath),
+    stageScriptFile: scriptSourcePathForReporting(projectDir, scriptPath),
+  };
 }
 
 /** Reads agent scripts from --agent-script / --agent-install-script or profile defaults. */
@@ -477,12 +511,18 @@ export async function parseAgentScripts(opts: {
   args: OrchestratorArgs;
   projectDir: string;
   config?: SaifConfig;
-}): Promise<{ agentInstallScript: string; agentScript: string }> {
+}): Promise<{
+  agentInstallScript: string;
+  agentInstallScriptFile: string;
+  agentScript: string;
+  agentScriptFile: string;
+}> {
   const { args, projectDir, config } = opts;
   const agentProfile = parseAgentProfile(args, config);
 
   const rawStart = args['agent-install-script'];
   let agentInstallScript: string;
+  let agentInstallScriptFile: string;
   if (typeof rawStart === 'string' && rawStart.trim()) {
     const p = resolve(projectDir, rawStart.trim());
     if (!(await pathExists(p))) {
@@ -490,12 +530,16 @@ export async function parseAgentScripts(opts: {
       process.exit(1);
     }
     agentInstallScript = await readUtf8(p);
+    agentInstallScriptFile = scriptSourcePathForReporting(projectDir, p);
   } else {
-    agentInstallScript = await readUtf8(resolveAgentInstallScriptPath(agentProfile.id));
+    const abs = resolveAgentInstallScriptPath(agentProfile.id);
+    agentInstallScript = await readUtf8(abs);
+    agentInstallScriptFile = scriptSourcePathForReporting(projectDir, abs);
   }
 
   const rawScript = args['agent-script'];
   let agentScript: string;
+  let agentScriptFile: string;
   if (typeof rawScript === 'string' && rawScript.trim()) {
     const p = resolve(projectDir, rawScript.trim());
     if (!(await pathExists(p))) {
@@ -503,31 +547,41 @@ export async function parseAgentScripts(opts: {
       process.exit(1);
     }
     agentScript = await readUtf8(p);
+    agentScriptFile = scriptSourcePathForReporting(projectDir, p);
   } else {
-    agentScript = await readUtf8(resolveAgentScriptPath(agentProfile.id));
+    const abs = resolveAgentScriptPath(agentProfile.id);
+    agentScript = await readUtf8(abs);
+    agentScriptFile = scriptSourcePathForReporting(projectDir, abs);
   }
 
-  return { agentInstallScript, agentScript };
+  return { agentInstallScript, agentInstallScriptFile, agentScript, agentScriptFile };
 }
 
-/** Reads test script from --test-script or profile default. */
+/** Reads test script from --test-script, config default, or profile default. */
 export async function parseTestScript(opts: {
   args: OrchestratorArgs;
   projectDir: string;
   profileId: SupportedProfileId;
   config?: SaifConfig;
-}): Promise<string> {
+}): Promise<{ testScript: string; testScriptFile: string }> {
   const { args, projectDir, profileId, config } = opts;
   const raw = args['test-script'] || config?.defaults?.testScript;
   if (typeof raw !== 'string' || !raw.trim()) {
-    return readUtf8(resolveTestScriptPath(profileId));
+    const abs = resolveTestScriptPath(profileId);
+    return {
+      testScript: await readUtf8(abs),
+      testScriptFile: scriptSourcePathForReporting(projectDir, abs),
+    };
   }
   const scriptPath = resolve(projectDir, raw.trim());
   if (!(await pathExists(scriptPath))) {
     consola.error(`Error: --test-script file not found: ${scriptPath}`);
     process.exit(1);
   }
-  return readUtf8(scriptPath);
+  return {
+    testScript: await readUtf8(scriptPath),
+    testScriptFile: scriptSourcePathForReporting(projectDir, scriptPath),
+  };
 }
 
 /**
