@@ -1,31 +1,38 @@
-# saifac run ls
+# saifac run list
 
 List stored runs from run storage.
 
-Shows persisted run artifacts (e.g. in `.saifac/runs/`). Use filters to narrow by status or task. If storage is disabled (`--storage runs=none`), the command reports that and exits.
+**Alias:** `saifac run ls` (same command).
+
+Shows persisted run artifacts (e.g. in `.saifac/runs/`). Use `--status` and `--task` to narrow results.
 
 ## Usage
 
 ```bash
-saifac run ls [options]
+saifac run list [options]
+# or: saifac run ls [options]
 ```
 
 ## Arguments
 
-| Argument             | Alias | Type   | Description                                                                                   |
-| -------------------- | ----- | ------ | --------------------------------------------------------------------------------------------- |
-| `--status`           | —     | string | Filter by status (`failed`, `completed`, etc.)                                                |
-| `--task`             | —     | string | Filter by task ID                                                                             |
-| `--storage`          | —     | string | Run storage: `runs=local` \| `runs=none` \| `runs=file:///path` \| `runs=s3` (default: local) |
-| `--project-dir`      | —     | string | Project directory (default: current working directory)                                        |
-| `--sandbox-base-dir` | —     | string | Sandbox base directory (only used by other run subcommands)                                   |
+| Argument        | Alias | Type   | Description                                                                                      |
+| --------------- | ----- | ------ | ------------------------------------------------------------------------------------------------ |
+| `--status`      | —     | string | Filter by status (`failed`, `completed`, etc.)                                                   |
+| `--task`        | —     | string | Filter by task ID                                                                                |
+| `--project-dir` | —     | string | Project directory (default: current working directory)                                         |
+| `--saifac-dir`  | —     | string | Saifac config directory relative to project (default: `saifac`)                                  |
+| `--storage`     | —     | string | Run storage: `local` / `none` / `runs=…` (see [Runs](../runs.md)); default is local under project |
+
+`--sandbox-base-dir` and other orchestration-only flags are not read by this subcommand; they have no effect here.
+
+If run storage is disabled (e.g. `--storage none` or `runs=none`), the command prints `Run storage is disabled (--storage none).` and **returns with exit code 0** — it does not treat that as an error (same behavior as [`run clear`](run-clear.md)).
 
 ## Examples
 
 List all stored runs:
 
 ```bash
-saifac run ls
+saifac run list
 ```
 
 List only failed runs:
@@ -37,13 +44,13 @@ saifac run ls --status failed
 List runs for a specific task:
 
 ```bash
-saifac run ls --task abc-123
+saifac run list --task abc-123
 ```
 
 Use custom storage location:
 
 ```bash
-saifac run ls --storage runs=file:///tmp/my-runs
+saifac run list --storage runs=file:///tmp/my-runs
 ```
 
 ## Output
@@ -72,6 +79,8 @@ No stored runs found.
 ```text
 Run storage is disabled (--storage none).
 ```
+
+(Exit code **0**.)
 
 ## See also
 

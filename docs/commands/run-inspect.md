@@ -16,7 +16,11 @@ saifac run inspect <runId> [options]
 | `--pretty`      | —     | boolean | Pretty-print JSON (default: true). Citty maps `--no-pretty` to `pretty: false` (single line). |
 | `--project-dir` | —     | string  | Project directory (default: current working directory)                                      |
 | `--saifac-dir`  | —     | string  | Saifac config directory relative to project (default: `saifac`)                             |
-| `--storage`     | —     | string  | Run storage: `runs=local` \| `runs=none` \| `runs=file:///path` \| `runs=s3` (default: local) |
+| `--storage`     | —     | string  | Run storage: `local` / `none` / `runs=…` (see [Runs](../runs.md)); default is local under project |
+
+`--sandbox-base-dir` and other orchestration-only flags are not read by this subcommand; they have no effect here.
+
+If run storage is disabled (e.g. `--storage none` or `runs=none`), or the run ID is not found, the command **errors** and exits non-zero (same class of behavior as [`run remove`](run-remove.md), unlike [`run list`](run-list.md) / [`run clear`](run-clear.md)).
 
 ## Examples
 
@@ -84,5 +88,7 @@ Example of the default **pretty-printed** output:
 ## See also
 
 - [Runs](../runs.md) — Run storage overview
-- [saifac run list](run-list.md) — List run IDs
-- [saifac run resume](run-resume.md) — Resume a failed run
+- [`run list`](run-list.md) — List run IDs
+- [`run remove`](run-remove.md) — Delete a stored run
+- [`run clear`](run-clear.md) — Bulk delete runs
+- [`run resume`](run-resume.md) — Resume a failed run

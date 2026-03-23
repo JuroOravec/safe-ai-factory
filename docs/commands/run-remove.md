@@ -2,22 +2,30 @@
 
 Delete a single stored run from run storage.
 
-Removes the run artifact for the given run ID. Exits with an error if the run is not found or storage is disabled.
+**Alias:** `saifac run remove` (same command).
+
+Removes the run artifact for the given run ID.
 
 ## Usage
 
 ```bash
 saifac run rm <runId> [options]
+# or: saifac run remove <runId> [options]
 ```
 
 ## Arguments
 
-| Argument             | Alias | Type   | Description                                                                                   |
-| -------------------- | ----- | ------ | --------------------------------------------------------------------------------------------- |
-| `runId`              | —     | string | Run ID to delete (positional, required)                                                       |
-| `--project-dir`      | —     | string | Project directory (default: current working directory)                                        |
-| `--storage`          | —     | string | Run storage: `runs=local` \| `runs=none` \| `runs=file:///path` \| `runs=s3` (default: local) |
-| `--sandbox-base-dir` | —     | string | Sandbox base directory (only used by other run subcommands)                                   |
+| Argument        | Alias | Type   | Description                                                                                      |
+| --------------- | ----- | ------ | ------------------------------------------------------------------------------------------------ |
+| `runId`         | —     | string | Run ID to delete (positional, required)                                                          |
+| `--project-dir` | —     | string | Project directory (default: current working directory)                                         |
+| `--saifac-dir`  | —     | string | Saifac config directory relative to project (default: `saifac`)                                  |
+| `--storage`     | —     | string | Run storage: `local` / `none` / `runs=…` (see [Runs](../runs.md)); default is local under project |
+
+`--sandbox-base-dir` and other orchestration-only flags are not read by this subcommand; they have no effect here.
+
+- If the run ID is **missing** from storage → **error** and non-zero exit.
+- If run storage is **disabled** (e.g. `--storage none` or `runs=none`) → **error** and non-zero exit (unlike [`run list`](run-list.md) / [`run clear`](run-clear.md), which only log and exit 0).
 
 ## Examples
 
@@ -27,11 +35,11 @@ Delete a run by ID:
 saifac run rm add-login-r1
 ```
 
-Get run IDs from `saifac run ls`:
+Get run IDs from `saifac run list`:
 
 ```bash
-saifac run ls
-saifac run rm add-login-r1
+saifac run list
+saifac run remove add-login-r1
 ```
 
 Use custom storage location:
@@ -44,4 +52,5 @@ saifac run rm add-login-r1 --storage runs=file:///tmp/my-runs
 
 - [Runs](../runs.md) — Run storage, resumption, and overview
 - [`run list`](run-list.md) — List stored runs (get run IDs)
+- [`run inspect`](run-inspect.md) — View a run artifact
 - [`run clear`](run-clear.md) — Bulk delete runs
