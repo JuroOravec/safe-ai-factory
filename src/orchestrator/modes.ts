@@ -25,7 +25,7 @@ import type { RunStorage } from '../runs/types.js';
 import { deserializeArtifactConfig } from '../runs/utils/serialize.js';
 import { type Feature, resolveFeature } from '../specs/discover.js';
 import { CleanupRegistry } from '../utils/cleanup.js';
-import { pathExists, writeUtf8 } from '../utils/io.js';
+import { pathExists, readUtf8, writeUtf8 } from '../utils/io.js';
 import { omit } from '../utils/omit.js';
 import {
   type IterativeLoopOpts,
@@ -44,7 +44,7 @@ import {
   createResumeWorktree,
   saveRunOnError,
 } from './resume.js';
-import { applyPatch, createSandbox, destroySandbox } from './sandbox.js';
+import { createSandbox, destroySandbox } from './sandbox.js';
 
 export interface OrchestratorOpts extends IterativeLoopOpts {
   /**
@@ -516,7 +516,6 @@ async function runResumeCore(
   });
 
   const mergedOpts = await resolveOrchestratorOpts({
-    mode: 'resume',
     projectDir,
     saifDir,
     config,
@@ -556,6 +555,7 @@ const TEST_FROM_RUN_OMIT_KEYS = [
   'feature',
   'maxRuns',
   'dangerousDebug',
+  'dangerousNoLeash',
   'cedarPolicyPath',
   'coderImage',
   'gateRetries',
@@ -584,8 +584,8 @@ export interface TestFromRunOpts {
  *
  * 1. Fetches the run artifact from storage.
  * 2. Reconstructs the workspace (base commit + basePatchDiff + runPatchDiff) via a git worktree.
- * 3. Writes the agent patch to a temp file.
- * 4. Delegates to runTestsCore (staging → tests → optional downstream push/PR).
+ * 3. Writes the agent patch to `.saifac-run-test.patch`.
+ * 4. Delegates to runTestsCore (sandbox copy → staging → tests → optional downstream push/PR).
  *
  * Useful after a run completes/fails/pauses to re-run just the test phase with
  * updated tests, a different test profile, or to promote a passing patch to a PR.
@@ -605,6 +605,8 @@ async function runTestsFromRunCore(
     `\n[orchestrator] MODE: test-from-run — ${artifact.config.featureName} (run ${runId})`,
   );
 
+  // Same worktree reconstruction as `run resume` (base + run patches). Sandbox rsync + initial
+  // commit already contain agent output
   const { worktreePath, branchName } = await createResumeWorktree({
     projectDir,
     runId,
@@ -622,7 +624,6 @@ async function runTestsFromRunCore(
     });
 
     const merged = await resolveOrchestratorOpts({
-      mode: 'test-from-run',
       projectDir,
       saifDir,
       config,
@@ -634,9 +635,7 @@ async function runTestsFromRunCore(
 
     const shared = omit(merged, TEST_FROM_RUN_OMIT_KEYS);
 
-    // Write the agent's patch diff to a temp file so runTestsCore can apply it.
-    // The worktree is already at baseCommit+basePatch state; runPatchDiff is the
-    // delta the coding agent produced. runTestsCore will apply it on top.
+    // Write the agent's patch diff to a temp file so runTestsCore can apply it on success..
     const patchPath = join(worktreePath, '.saifac-run-test.patch');
     await writeUtf8(patchPath, artifact.runPatchDiff);
 
@@ -660,14 +659,14 @@ async function runTestsFromRunCore(
 type TestOpts = SharedTestOpts & {
   feature: Feature;
   /**
-   * Required for mode='test': path to a patch file to apply before tests.
-   * (e.g. /path/to/patch.diff)
+   * Path to the stored run patch on disk (e.g. `.saifac-run-test.patch` inside the resume worktree).
+   * Used for logging and result metadata.
    */
   patchPath: string | null;
 };
 
 /**
- * Applies a candidate patch to a fresh sandbox and runs tests.
+ * Builds a sandbox from `projectDir` (resume worktree for `run test`) and runs tests.
  *
  * If tests fail, retries up to testRetries (useful for flaky environments).
  * If tests pass, applies the patch to the host repo and opens a PR.
@@ -726,14 +725,16 @@ async function runTestsCore(
     verbose,
   });
   registry.setEmergencySandboxPath(sandbox.sandboxBasePath);
+
+  // applyPatchToHost reads sandboxBasePath/patch.diff; the agent loop normally writes it via extractPatch.
+  // test-from-run already has the patch at patchPath — copy so host apply / push / PR work.
+  await writeUtf8(join(sandbox.sandboxBasePath, 'patch.diff'), await readUtf8(patchPath));
+
   const testRunnerOpts = await prepareTestRunnerOpts({
     feature,
     sandboxBasePath: sandbox.sandboxBasePath,
     testScript,
   });
-
-  // Apply the candidate patch
-  await applyPatch(sandbox.codePath, patchPath);
 
   let lastStderr = '';
   let attempts = 0;

@@ -288,20 +288,29 @@ To securely restrict what the agents can do during their convergence loop, we us
 Just putting the agent in Docker is not enough; we need programmable rules to govern the agent's behavior.
 
 - Leash integrates the **Cedar** policy language (originally developed by AWS).
-- We define explicit policies before the loop starts. For example:
+- We define explicit policies before the loop starts. For example (Leash Cedar — `FileOpen*` + `Dir::`, not `WriteFile` / `Directory::`):
   ```cedar
-  // Policy: The agent is ONLY allowed to modify files inside /src/
   permit (
-      principal == User::"coder-agent",
-      action == Action::"WriteFile",
-      resource == Directory::"/src/"
-  );
-  // Policy: The agent is forbidden from modifying /specs/ or the feature tests dir
+      principal,
+      action in [Action::"FileOpen", Action::"FileOpenReadOnly"],
+      resource
+  ) when {
+      resource in [ Dir::"/" ]
+  };
+  permit (
+      principal,
+      action == Action::"FileOpenReadWrite",
+      resource
+  ) when {
+      resource in [ Dir::"/workspace/src/", Dir::"/tmp/" ]
+  };
   forbid (
-      principal == User::"coder-agent",
-      action == Action::"WriteFile",
-      resource in [Directory::"/specs/", Directory::"/openspec/features/"]
-  );
+      principal,
+      action == Action::"FileOpenReadWrite",
+      resource
+  ) when {
+      resource in [ Dir::"/workspace/specs/", Dir::"/workspace/openspec/features/" ]
+  };
   ```
 - **The Result:** If the agent hallucinates and tries to "cheat" by modifying the Black Box Testing Agent's test harness, Leash intercepts the syscall, blocks the file write, logs a violation, and the loop registers a failure.
 

@@ -25,20 +25,20 @@ set -eu
 cd /workspace
 
 if [ -z "${SAIFAC_STARTUP_SCRIPT:-}" ]; then
-  echo "[app] ERROR: SAIFAC_STARTUP_SCRIPT is not set." >&2
+  echo "[staging-start] ERROR: SAIFAC_STARTUP_SCRIPT is not set." >&2
   exit 1
 fi
 
 if [ ! -f "$SAIFAC_STARTUP_SCRIPT" ]; then
-  echo "[app] ERROR: startup script not found: $SAIFAC_STARTUP_SCRIPT" >&2
+  echo "[staging-start] ERROR: startup script not found: $SAIFAC_STARTUP_SCRIPT" >&2
   exit 1
 fi
 
-echo "[app] Running startup script: $SAIFAC_STARTUP_SCRIPT"
+echo "[staging-start] Running startup script: $SAIFAC_STARTUP_SCRIPT"
 sh "$SAIFAC_STARTUP_SCRIPT"
-echo "[app] Startup script completed."
+echo "[staging-start] Startup script completed."
 
-echo "[app] Starting sidecar server in background..."
+echo "[staging-start] Starting sidecar server in background..."
 PORT="${SAIFAC_SIDECAR_PORT}" \
   SIDECAR_PATH="${SAIFAC_SIDECAR_PATH}" \
   WORKSPACE=/workspace \
@@ -46,21 +46,21 @@ PORT="${SAIFAC_SIDECAR_PORT}" \
 SIDECAR_PID=$!
 
 if [ -z "${SAIFAC_STAGE_SCRIPT:-}" ]; then
-  echo "[app] ERROR: SAIFAC_STAGE_SCRIPT is not set." >&2
+  echo "[staging-start] ERROR: SAIFAC_STAGE_SCRIPT is not set." >&2
   exit 1
 fi
 
 if [ ! -f "$SAIFAC_STAGE_SCRIPT" ]; then
-  echo "[app] ERROR: stage script not found: $SAIFAC_STAGE_SCRIPT" >&2
+  echo "[staging-start] ERROR: stage script not found: $SAIFAC_STAGE_SCRIPT" >&2
   exit 1
 fi
 
-echo "[app] Running stage script: $SAIFAC_STAGE_SCRIPT"
+echo "[staging-start] Running stage script: $SAIFAC_STAGE_SCRIPT"
 sh "$SAIFAC_STAGE_SCRIPT"
 
 # Stage script returned (CLI-only projects use `wait` or exit immediately).
 # Keep the container alive by waiting on the sidecar process, which is the
 # only remaining long-lived process. This replaces the previous `exec` which
 # handed control to the stage script and lost track of the sidecar PID.
-echo "[app] Stage script returned — waiting on sidecar (pid $SIDECAR_PID)..."
+echo "[staging-start] Stage script returned — waiting on sidecar (pid $SIDECAR_PID)..."
 wait "$SIDECAR_PID"

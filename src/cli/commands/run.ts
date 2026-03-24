@@ -7,7 +7,8 @@
  *   rm, remove    Delete a run
  *   inspect       Print stored run as JSON
  *   clear         Clear stored runs (optionally filtered)
- *   resume        Resume a failed run from storage
+ *   resume        Resume a stored run from storage
+ *   test          Re-test a stored run's patch (no coding agent)
  */
 
 import { defineCommand, runMain } from 'citty';
@@ -16,13 +17,13 @@ import { loadSaifacConfig } from '../../config/load.js';
 import { type SaifacConfig } from '../../config/schema.js';
 import type { ModelOverrides } from '../../llm-config.js';
 import { consola, outputCliData, setVerboseLogging } from '../../logger.js';
-import { runResume } from '../../orchestrator/modes.js';
+import { runResume, runTestsFromRun } from '../../orchestrator/modes.js';
 import {
   type OrchestratorCliInput,
   parseModelOverridesCliDelta,
 } from '../../orchestrator/options.js';
 import { toRunInspectJson } from '../../runs/utils/run-inspect.js';
-import { featRunArgs, projectDirArg, saifDirArg, storageArg } from '../args.js';
+import { featResumeArgs, projectDirArg, runTestArgs, saifDirArg, storageArg } from '../args.js';
 import {
   buildOrchestratorCliInputFromFeatArgs,
   type FeatRunArgs,
@@ -84,9 +85,17 @@ const lsCommand = defineCommand({
       return;
     }
 
-    const runs = await storage.listRuns({
-      taskId: typeof args.task === 'string' ? args.task : undefined,
-      status: typeof args.status === 'string' ? (args.status as 'failed' | 'completed') : undefined,
+    const runs = (
+      await storage.listRuns({
+        taskId: typeof args.task === 'string' ? args.task : undefined,
+        status:
+          typeof args.status === 'string' ? (args.status as 'failed' | 'completed') : undefined,
+      })
+    ).slice();
+    runs.sort((a, b) => {
+      const byUpdated = b.updatedAt.localeCompare(a.updatedAt);
+      if (byUpdated !== 0) return byUpdated;
+      return a.runId.localeCompare(b.runId);
     });
     if (runs.length === 0) {
       outputCliData('No stored runs found.');
@@ -232,7 +241,7 @@ const resumeCommand = defineCommand({
   },
   args: {
     ...commonRunArgs,
-    ...featRunArgs,
+    ...featResumeArgs,
     runId: {
       type: 'positional' as const,
       description: 'Run ID to resume',
@@ -268,6 +277,58 @@ const resumeCommand = defineCommand({
   },
 });
 
+const testCommand = defineCommand({
+  meta: {
+    name: 'test',
+    description: "Re-test a stored run's patch (no coding agent). Optionally push/PR on success.",
+  },
+  args: {
+    ...runTestArgs,
+    runId: {
+      type: 'positional' as const,
+      description: "Run ID to test (from 'run list')",
+      required: true,
+    },
+  },
+  async run({ args }) {
+    const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
+    const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
+    const config = await loadSaifacConfig(saifDir, projectDir);
+
+    const runArgs = args as FeatRunArgs;
+    setVerboseLogging(runArgs.verbose === true);
+
+    const runStorage = resolveRunStorage(readStorageStringFromCli(runArgs), projectDir, config);
+    if (!runStorage) {
+      consola.error('Run storage is disabled (--storage none). Cannot test a stored run.');
+      process.exit(1);
+    }
+
+    const runId = parseRunId(args);
+    const cli = await buildOrchestratorCliInputFromFeatArgs(runArgs, {
+      projectDir,
+      saifDir,
+      config,
+    });
+    const cliModelDelta = parseModelOverridesCliDelta(runArgs);
+
+    consola.log(`\nRe-testing stored run: ${runId}`);
+
+    const result = await runTestsFromRun({
+      runId,
+      runStorage,
+      projectDir,
+      saifDir,
+      config,
+      cli,
+      cliModelDelta,
+    });
+
+    consola.log(`\n${result.message}`);
+    if (!result.success) process.exit(1);
+  },
+});
+
 const runCommand = defineCommand({
   meta: {
     name: 'run',
@@ -281,6 +342,7 @@ const runCommand = defineCommand({
     inspect: inspectCommand,
     clear: clearCommand,
     resume: resumeCommand,
+    test: testCommand,
   },
 });
 

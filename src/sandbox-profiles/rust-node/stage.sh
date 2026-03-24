@@ -16,12 +16,12 @@ set -eu
 cd /workspace
 
 if [ -f Procfile ] && grep -q '^web:' Procfile; then
-  echo "[app] Starting web server (Procfile web)..."
+  echo "[sandbox/rust-node/stage] Starting web server (Procfile web)..."
   exec sh -c "$(grep '^web:' Procfile | sed 's/^web: //')"
 elif [ -f Cargo.toml ]; then
-  echo "[app] Building and starting app (cargo run --release)..."
+  echo "[sandbox/rust-node/stage] Building and starting app (cargo run --release)..."
   exec cargo run --release
 else
-  echo "[app] No entrypoint found — sidecar is the only process."
+  echo "[sandbox/rust-node/stage] No entrypoint found — sidecar is the only process."
   wait
 fi

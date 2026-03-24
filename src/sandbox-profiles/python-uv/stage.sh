@@ -17,15 +17,15 @@ set -eu
 cd /workspace
 
 if [ -f Procfile ] && grep -q '^web:' Procfile; then
-  echo "[app] Starting web server (Procfile web)..."
+  echo "[sandbox/python-uv/stage] Starting web server (Procfile web)..."
   exec sh -c "$(grep '^web:' Procfile | sed 's/^web: //')"
 elif [ -f app.py ]; then
-  echo "[app] Starting web server (app.py)..."
+  echo "[sandbox/python-uv/stage] Starting web server (app.py)..."
   if [ -f pyproject.toml ]; then exec uv run python app.py; else exec python app.py; fi
 elif [ -f main.py ]; then
-  echo "[app] Starting web server (main.py)..."
+  echo "[sandbox/python-uv/stage] Starting web server (main.py)..."
   if [ -f pyproject.toml ]; then exec uv run python main.py; else exec python main.py; fi
 else
-  echo "[app] No entrypoint found — sidecar is the only process."
+  echo "[sandbox/python-uv/stage] No entrypoint found — sidecar is the only process."
   wait
 fi

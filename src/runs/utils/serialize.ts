@@ -57,6 +57,7 @@ export type SerializedLoopOpts = {
   testImage: string;
   resolveAmbiguity: 'off' | 'prompt' | 'ai';
   dangerousDebug: boolean;
+  dangerousNoLeash: boolean;
   cedarPolicyPath: string;
   coderImage: string;
   push: string | null;

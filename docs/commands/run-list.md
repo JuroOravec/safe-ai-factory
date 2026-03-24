@@ -55,7 +55,7 @@ saifac run list --storage runs=file:///tmp/my-runs
 
 ## Output
 
-Runs are printed as a table: a header row (`RUN_ID`, `FEATURE`, `STATUS`, `STARTED`, `UPDATED`) plus one aligned row per run. Column widths grow with the longest value in each column.
+Rows are sorted by **UPDATED** (newest first); ties break on `RUN_ID`. Column widths grow with the longest value in each column.
 
 ### Example: several runs
 

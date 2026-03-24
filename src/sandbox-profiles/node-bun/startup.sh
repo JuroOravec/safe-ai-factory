@@ -5,6 +5,6 @@
 # (before the app starts). Set via --profile (default) or --startup-script.
 set -eu
 cd /workspace
-echo "[factory-startup] Installing dependencies (bun)..."
+echo "[sandbox/node-bun/startup] Installing dependencies (bun)..."
 bun install --frozen 2>/dev/null || bun install
-echo "[factory-startup] Done."
+echo "[sandbox/node-bun/startup] Done."

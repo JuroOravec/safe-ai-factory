@@ -56,6 +56,9 @@ export const DEFAULT_RESOLVE_AMBIGUITY: 'off' | 'prompt' | 'ai' = 'ai';
 /** Host-side dangerous debug when not set via CLI or config. */
 export const DEFAULT_DANGEROUS_DEBUG = false;
 
+/** Run the coder container with plain `docker run` (no Leash) when not set via CLI or config. */
+export const DEFAULT_DANGEROUS_NO_LEASH = false;
+
 /** Semantic reviewer enabled when not set via CLI or config. */
 export const DEFAULT_REVIEWER_ENABLED = true;
 

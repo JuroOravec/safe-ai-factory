@@ -5,10 +5,10 @@
 # (before the app starts). Set via --profile (default) or --startup-script.
 set -eu
 cd /workspace
-echo "[factory-startup] Installing dependencies (cargo fetch)..."
+echo "[sandbox/rust-python/startup] Installing dependencies (cargo fetch)..."
 if [ -f Cargo.toml ]; then
   cargo fetch
 else
-  echo "[factory-startup] No Cargo.toml found — skipping."
+  echo "[sandbox/rust-python/startup] No Cargo.toml found — skipping."
 fi
-echo "[factory-startup] Done."
+echo "[sandbox/rust-python/startup] Done."

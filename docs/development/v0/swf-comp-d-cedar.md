@@ -27,25 +27,31 @@ Instead of hardcoding security rules in TypeScript or using complex JSON configu
 
 Cedar policies are built around three core concepts: **Principal** (Who), **Action** (What they are doing), and **Resource** (What they are doing it to).
 
-When using Leash to wrap our Coder Agent, we can configure rules around:
+When using **Leash** to wrap our Coder Agent, author policies against the [Leash Cedar reference](https://github.com/strongdm/leash/blob/main/docs/design/CEDAR.md) (Leash transpiles Cedar to eBPF + HTTP proxy rules; not every generic Cedar tutorial applies).
 
 ### 1. File System Operations
 
-- **Actions:** `Action::"ReadFile"`, `Action::"WriteFile"`, `Action::"DeleteFile"`
-- **Resources:** Specific files (`File::"/workspace/package.json"`) or entire directories (`Directory::"/workspace/src/"`).
-- **Configuration Power:** You can allow an agent to read the whole repo to gain context, but strictly restrict its write access to only the folder containing the feature it is building.
+- **Actions:** `Action::"FileOpen"`, `Action::"FileOpenReadOnly"`, `Action::"FileOpenReadWrite"` (Leash maps these to file open / read-only / read-write semantics).
+- **Resources:** `File::"/path"` or directories `Dir::"/path/"` (trailing `/` means directory coverage; the transpiler normalizes paths).
+- **Configuration Power:** You can permit read-only opens broadly and `FileOpenReadWrite` only under specific `Dir::` trees, with `forbid` on sensitive subtrees.
 
 ### 2. Network Traffic
 
 - **Actions:** `Action::"NetworkConnect"`
-- **Resources:** IP addresses (`IP::"192.168.1.0/24"`) or Hostnames (`Host::"registry.npmjs.org"`).
-- **Configuration Power:** You can block the agent from scanning your internal VPC or exfiltrating data to unknown servers, while still allowing it to hit npm to install dependencies.
+- **Resources:** `Host::"hostname"` or `Host::"host:port"`; wildcard apex `Host::"*.example.com"`; allow-all bootstrap uses `Host::"*"`. (Leash v1: hostname enforcement goes through the MITM proxy; the kernel path is IP-oriented — see upstream docs.)
+- **Configuration Power:** Allowlist registries and LLM API hosts, or use `Host::"*" ` when the filesystem sandbox is the main boundary.
 
-### 3. Tool Usage (MCP - Model Context Protocol)
+### 3. Process Execution
 
-- **Actions:** `Action::"ExecuteTool"`
-- **Resources:** Specific tool names (`Tool::"github_pr_create"`, `Tool::"execute_sql"`).
-- **Configuration Power:** You can give an agent an MCP server with 50 tools, but use Cedar to restrict a specific agent to only use the 2 tools relevant to its current task.
+- **Actions:** `Action::"ProcessExec"`
+- **Resources:** `Dir::"/path/"` or `File::"/path"` to executables.
+- **Configuration Power:** Our default permits `ProcessExec` under `Dir::"/"` so shells and tools in `/usr/bin` work.
+
+### 4. Tool Usage (MCP - Model Context Protocol)
+
+- **Actions:** `Action::"McpCall"`
+- **Resources:** `MCP::Server::"host"`, `MCP::Tool::"tool-name"` (see Leash docs; v1 deny enforcement details differ from permits).
+- **Configuration Power:** Restrict which MCP servers/tools the agent may call when Leash observes MCP traffic.
 
 ---
 
@@ -105,62 +111,61 @@ We use explicit `forbid` statements to create impenetrable boundaries. In Cedar,
 3. **CI/CD Injection:** The agent must not be able to write to `.github/workflows/` to spawn malicious GitHub Actions on the host.
 4. **Internal Network Scanning:** The agent must be blocked from accessing localhost or private IP ranges (e.g., AWS Metadata endpoints `169.254.169.254`) to prevent Server-Side Request Forgery (SSRF) during the loop.
 
-### Example: The Ideal Factory Policy (`agent-sandbox.cedar`)
+### Example: Stricter factory-style policy (`agent-sandbox.cedar`)
+
+Illustrative only — validate against your Leash version (`/api/policies/validate` or Control UI). Leash v1 does not support arbitrary `IP::`/CIDR resources the same way; use `Host::` rules and upstream guidance for metadata / SSRF-style denies.
 
 ```cedar
-// --------------------------------------------------------
-// PERMISSIONS (What the agent needs to do its job)
-// --------------------------------------------------------
-
-// Allow reading any file in the workspace
+// Read-oriented opens on the whole container (bootstrap, libs, /etc)
 permit (
-    principal == User::"coder-agent",
-    action == Action::"ReadFile",
-    resource in Directory::"/workspace/"
-);
+    principal,
+    action in [Action::"FileOpen", Action::"FileOpenReadOnly"],
+    resource
+) when {
+    resource in [ Dir::"/" ]
+};
 
-// Allow writing to the source code and config files
+// Write opens only under src/ and selected files (tighten/expand for your layout)
 permit (
-    principal == User::"coder-agent",
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/src/"
-);
+    principal,
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/src/", File::"/workspace/package.json" ]
+};
 
-permit (
-    principal == User::"coder-agent",
-    action == Action::"WriteFile",
-    resource == File::"/workspace/package.json"
-);
-
-// Allow network connections to standard package registries
-permit (
-    principal == User::"coder-agent",
-    action == Action::"NetworkConnect",
-    resource in [Host::"registry.npmjs.org", Host::"github.com"]
-);
-
-// --------------------------------------------------------
-// FORBIDDEN (Absolute boundaries that override any permits)
-// --------------------------------------------------------
-
-// PREVENT REWARD HACKING: Do not let the agent modify tests
+// Belt-and-suspenders: deny writes even if permits are extended later
 forbid (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/openspec/"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/openspec/" ]
+};
 
-// PREVENT INFRASTRUCTURE CORRUPTION: Protect Git and CI/CD
 forbid (
     principal,
-    action in [Action::"WriteFile", Action::"DeleteFile"],
-    resource in [Directory::"/workspace/.git/", Directory::"/workspace/.github/"]
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/.git/", Dir::"/workspace/.github/" ]
+};
 
-// PREVENT SSRF / CLOUD METADATA EXFILTRATION
-forbid (
+permit (
+    principal,
+    action == Action::"ProcessExec",
+    resource
+) when {
+    resource in [ Dir::"/" ]
+};
+
+permit (
     principal,
     action == Action::"NetworkConnect",
-    resource in [IP::"169.254.169.254", IP::"127.0.0.1", IP::"10.0.0.0/8"]
-);
+    resource
+) when {
+    resource in [ Host::"registry.npmjs.org", Host::"github.com" ]
+};
 ```
+
+**Note:** The shipped `default.cedar` uses read-only opens on `Dir::"/"`, `FileOpenReadWrite` on `Dir::"/workspace/"` and `Dir::"/tmp/"`, and `forbid`s `FileOpenReadWrite` under `saifac/` and `.git/`. Start from that file when you want parity with `saifac feat run` defaults.

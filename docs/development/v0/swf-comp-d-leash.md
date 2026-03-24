@@ -91,7 +91,7 @@ Leash enforces outbound connectivity using its MITM proxy and Cedar `NetworkConn
 ### What We Rely On
 
 - **Pure file copy sandbox** — `rsync` copies the repo to `/tmp/saifac/sandboxes/.../code`; agent only sees that copy.
-- **Cedar policy** — `src/orchestrator/policies/default.cedar` permits read/write in `/workspace`, forbids writes to `/workspace/saifac/`, and (by default) permits outbound `NetworkConnect` broadly; use a stricter policy when you want hostname allowlists.
+- **Cedar policy** — `src/orchestrator/policies/default.cedar` uses [Leash’s Cedar schema](https://github.com/strongdm/leash/blob/main/docs/design/CEDAR.md): `FileOpen` / `FileOpenReadOnly` under `Dir::"/"` (read whole container for bootstrap and tooling); `FileOpenReadWrite` under `Dir::"/workspace/"` and `Dir::"/tmp/"`; `forbid` `FileOpenReadWrite` under `/workspace/saifac/` and `.git/`; `ProcessExec` under `Dir::"/"`; `NetworkConnect` via `Host::"*"`. Use `--cedar` for hostname-scoped network rules.
 - **Patch filtering** — any `saifac/` changes are dropped before the patch is applied to the host.
 
 ---
@@ -100,9 +100,9 @@ Leash enforces outbound connectivity using its MITM proxy and Cedar `NetworkConn
 
 We ship default policies under `src/orchestrator/policies/` (`default.cedar`, `deny-network.cedar`):
 
-- **Read/write** — allowed anywhere in `/workspace`
-- **Forbid** — writes to `/workspace/saifac/`
-- **Network** — default policy permits broad outbound access; override with `--cedar` for hostname-scoped rules
+- **Filesystem** — read opens (`FileOpen`, `FileOpenReadOnly`) under `Dir::"/"`; `FileOpenReadWrite` under `Dir::"/workspace/"` and `Dir::"/tmp/"`; `FileOpenReadWrite` forbidden under `Dir::"/workspace/saifac/"` and `Dir::"/workspace/.git/"`
+- **ProcessExec** — permitted under `Dir::"/"` (system binaries on `PATH`)
+- **Network** — `NetworkConnect` allowed for `Host::"*"`; override with `--cedar` for hostname allowlists (`deny-network.cedar` is one example)
 
 Override with `--cedar <path>` when running `saifac feat run` or `saifac run resume`.
 
@@ -110,11 +110,30 @@ Override with `--cedar <path>` when running `saifac feat run` or `saifac run res
 
 ## CLI Options
 
-| Option                | Purpose                                                                                                  |
-| --------------------- | -------------------------------------------------------------------------------------------------------- |
-| `--dangerous-debug`   | Skip Leash; run OpenHands directly on the host (filesystem sandbox only). Use for debugging.             |
-| `--cedar <path>`      | Custom Cedar policy file (default: `src/orchestrator/policies/default.cedar`).                        |
-| `--coder-image <tag>` | Custom target container image (default: from `--profile`, e.g. `saifac-coder-node-pnpm-python:latest`). |
+| Option                    | Purpose                                                                                                                                 |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `--dangerous-debug`       | Skip Leash; run OpenHands **on the host** (filesystem sandbox only). Mutually exclusive with `--dangerous-no-leash`.                    |
+| `--dangerous-no-leash`    | Skip Leash and Cedar; run the **same coder image** with **`docker run`** (bind mounts, env, working dir, and container name match Leash). No policy proxy or Control UI. Mutually exclusive with `--dangerous-debug`. |
+| `--cedar <path>`          | Custom Cedar policy file (default: `src/orchestrator/policies/default.cedar`). Ignored when Leash is not used (`--dangerous-debug` or `--dangerous-no-leash`). |
+| `--coder-image <tag>`     | Custom target container image (default: from `--profile`, e.g. `saifac-coder-node-pnpm-python:latest`).                                 |
+
+### `--dangerous-no-leash` (Docker without Leash)
+
+Use this when you need to debug or compare behavior **inside the coder container** but **without** Leash’s Cedar enforcement, MITM proxy, or manager sidecar (`agents-leash`). The factory still uses the normal sandbox copy and the same **target** image and mount layout as a Leash run.
+
+**Behavior (summary):**
+
+- **Invocation:** `docker run` (interactive, `--rm`) instead of the Leash CLI. There is **no** `agents-leash` container and **no** Cedar evaluation for filesystem or network.
+- **Parity with Leash target:** Same **container name** as Leash’s workload container (`leash-target-<workspaceId>`), **`-w /workspace`**, coder image (`--coder-image` / profile default), and **volume mounts** for the workspace, bundled `saifac/` assets, and (when reviewer mode is on) the same Argus/reviewer mounts and env as the Leash path. LLM and forwarded API keys (e.g. `LLM_*`, `DASHSCOPE_API_KEY`, reviewer keys) are passed through **`-e`** like the Leash integration.
+- **Network:** If the factory’s Docker bridge network for SAIFAC exists, the container is attached to it (same idea as normal runs); Leash-specific **network attach** steps are skipped.
+- **Hardening:** The direct run uses **`--cap-drop=ALL`** and **`--security-opt=no-new-privileges`** (defense in depth without replacing Leash policy).
+- **Cleanup:** On failure, timeout, or abort, the orchestrator best-effort removes the named target container (`docker rm -f`).
+
+**Config default:** You can set `defaults.dangerousNoLeash` in the factory config schema; CLI still wins when you pass the flag explicitly where supported.
+
+**Resume / Hatchet:** The flag is stored in run metadata and propagated through distributed (`feat-run`) workflows so resume and workers behave consistently.
+
+**Do not use in production** for untrusted workloads: there is no Cedar or Leash proxy—outbound access is whatever the container and host Docker networking allow.
 
 ---
 
@@ -126,7 +145,7 @@ Leash is an npm **dependency** of safe-ai-factory (`@strongdm/leash`). The orche
 
 ### OpenHands
 
-OpenHands must be on PATH for the target container. It is pre-installed in `saifac-coder`. For `--dangerous-debug` mode, install on the host:
+OpenHands must be on PATH for the target container. It is pre-installed in `saifac-coder`. For `--dangerous-no-leash`, behavior matches a normal container run (image + `agent-install.sh` as usual). For `--dangerous-debug` mode, install on the host:
 
 ```bash
 uv tool install openhands --python 3.12
@@ -141,13 +160,13 @@ uv tool install openhands --python 3.12
 
 ## Telemetry & Debugging
 
-- **Control UI:** `http://localhost:18080` when Leash is running.
-- **Target logs:** `docker logs -f agents`
+- **Control UI:** `http://localhost:18080` when Leash is running (not available with `--dangerous-no-leash`).
+- **Target logs:** `docker logs -f agents` (Leash default target name) or `docker logs -f leash-target-<workspaceId>` when correlating with factory runs (including `--dangerous-no-leash`).
 - **Leash logs:** `docker logs -f agents-leash`
-- **Stop:** `docker rm -f agents agents-leash`
+- **Stop:** `docker rm -f agents agents-leash` (Leash); for `--dangerous-no-leash`, the factory removes the named `leash-target-*` container on exit or you can `docker rm -f` it manually.
 
 ---
 
 ## Reference: Cedar Rules
 
-See [Leash Cedar design](https://github.com/strongdm/leash/blob/main/docs/design/CEDAR.md) for action types (`ReadFile`, `WriteFile`, `NetworkConnect`, `ProcessExec`, etc.) and entity types (`Directory::"/path"`, `Host::"example.com"`, etc.).
+See [Leash Cedar design](https://github.com/strongdm/leash/blob/main/docs/design/CEDAR.md) for action types (`FileOpen`, `FileOpenReadOnly`, `FileOpenReadWrite`, `ProcessExec`, `NetworkConnect`, `HttpRewrite`, `McpCall`) and resource types (`Dir::"/path/"`, `File::"/path"`, `Host::"example.com"`, etc.). Leash does **not** use `ReadFile` / `WriteFile` or `Directory::` — those map to the `FileOpen*` family and `Dir::`.

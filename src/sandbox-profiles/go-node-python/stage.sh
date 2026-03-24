@@ -16,15 +16,15 @@ set -eu
 cd /workspace
 
 if [ -f Procfile ] && grep -q '^web:' Procfile; then
-  echo "[app] Starting web server (Procfile web)..."
+  echo "[sandbox/go-node-python/stage] Starting web server (Procfile web)..."
   exec sh -c "$(grep '^web:' Procfile | sed 's/^web: //')"
 elif [ -f main.go ]; then
-  echo "[app] Building and starting app (main.go)..."
+  echo "[sandbox/go-node-python/stage] Building and starting app (main.go)..."
   go build -o /tmp/app . && exec /tmp/app
 elif [ -d cmd ]; then
-  echo "[app] Building and starting app (cmd/)..."
+  echo "[sandbox/go-node-python/stage] Building and starting app (cmd/)..."
   go build -o /tmp/app ./cmd/... && exec /tmp/app
 else
-  echo "[app] No entrypoint found — sidecar is the only process."
+  echo "[sandbox/go-node-python/stage] No entrypoint found — sidecar is the only process."
   wait
 fi

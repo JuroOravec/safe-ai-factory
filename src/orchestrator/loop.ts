@@ -107,10 +107,17 @@ export interface IterativeLoopOpts {
    */
   dangerousDebug: boolean;
   /**
+   * When true, skip Leash and run the coder container with `docker run` instead of the Leash CLI.
+   * Uses the same image, bind mounts, env vars, and container name as Leash (`leash-target-…`),
+   * but no Cedar policy or Leash network proxy — useful to isolate Leash-related failures.
+   * Mutually exclusive with {@link dangerousDebug}.
+   */
+  dangerousNoLeash: boolean;
+  /**
    * Absolute path to a Cedar policy file for Leash.
    *
    * Defaults to default.cedar in src/orchestrator/policies/.
-   * Ignored when dangerousDebug=true.
+   * Ignored when dangerousDebug=true or dangerousNoLeash=true.
    */
   cedarPolicyPath: string;
   /**
@@ -259,6 +266,7 @@ export async function runIterativeLoop(
     testImage,
     resolveAmbiguity,
     dangerousDebug,
+    dangerousNoLeash,
     cedarPolicyPath,
     coderImage,
     push,
@@ -336,7 +344,7 @@ export async function runIterativeLoop(
         });
         await runStorage.saveRun(runId, artifact);
         if (didSucceed) {
-          consola.log(`[orchestrator] Run artifact saved (completed).`);
+          consola.log(`[orchestrator] Run artifact saved (completed). Run ID: ${runId}`);
         } else {
           consola.log(
             `[orchestrator] Run artifact saved (failed). Resume with: saifac run resume ${runId}`,
@@ -397,6 +405,7 @@ export async function runIterativeLoop(
           saifDir,
           feature,
           dangerousDebug,
+          dangerousNoLeash,
           cedarPolicyPath,
           coderImage,
           gateRetries,
@@ -862,6 +871,8 @@ export function logIterativeLoopSettings(opts: OrchestratorOpts): void {
   consola.log(`  Test image: ${opts.testImage}`);
   if (opts.dangerousDebug) {
     consola.log('  Leash: disabled (host execution)');
+  } else if (opts.dangerousNoLeash) {
+    consola.log(`  Leash: disabled (direct docker run; image: ${opts.coderImage})`);
   } else {
     consola.log(`  Leash: enabled (image: ${opts.coderImage})`);
     consola.log(`  Cedar policy: ${opts.cedarPolicyPath}`);

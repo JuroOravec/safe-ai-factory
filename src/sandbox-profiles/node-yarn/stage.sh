@@ -17,9 +17,9 @@ set -eu
 cd /workspace
 
 if node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts.start ? 0 : 1)" 2>/dev/null; then
-  echo "[app] Starting web server..."
+  echo "[sandbox/node-yarn/stage] Starting web server..."
   exec yarn run start
 else
-  echo "[app] No 'start' script — sidecar is the only process."
+  echo "[sandbox/node-yarn/stage] No 'start' script — sidecar is the only process."
   wait
 fi

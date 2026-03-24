@@ -45,6 +45,7 @@ export interface RunAgentPhaseInput {
     | 'projectName'
     | 'feature'
     | 'dangerousDebug'
+    | 'dangerousNoLeash'
     | 'cedarPolicyPath'
     | 'coderImage'
     | 'gateRetries'
@@ -74,6 +75,7 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
     projectName,
     feature,
     dangerousDebug,
+    dangerousNoLeash,
     cedarPolicyPath,
     coderImage,
     gateRetries,
@@ -115,6 +117,7 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
       saifDir,
       feature,
       dangerousDebug,
+      dangerousNoLeash,
       cedarPolicyPath,
       coderImage,
       gateRetries,

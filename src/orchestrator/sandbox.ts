@@ -29,16 +29,7 @@ import { minimatch } from 'minimatch';
 import type { TestCatalog } from '../design-tests/schema.js';
 import { consola } from '../logger.js';
 import type { Feature } from '../specs/discover.js';
-import {
-  git,
-  gitAdd,
-  gitApply,
-  gitClean,
-  gitCommit,
-  gitDiff,
-  gitInit,
-  gitResetHard,
-} from '../utils/git.js';
+import { git, gitAdd, gitClean, gitCommit, gitDiff, gitInit, gitResetHard } from '../utils/git.js';
 import { pathExists, readUtf8, spawnAsync, writeUtf8 } from '../utils/io.js';
 
 /** Recursively removes all directories named "hidden" under baseDir. Exported for testing. */
@@ -516,16 +507,4 @@ function isExcluded(filePath: string, rules: PatchExcludeRule[]): boolean {
       ? minimatch(filePath, rule.pattern, { matchBase: false })
       : rule.pattern.test(filePath),
   );
-}
-
-/**
- * Applies a patch file to the code directory.
- * Used by 'test' mode to inject a candidate implementation.
- */
-export async function applyPatch(codePath: string, patchPath: string): Promise<void> {
-  if (!(await pathExists(patchPath))) {
-    throw new Error(`Patch file not found: ${patchPath}`);
-  }
-  consola.log(`[sandbox] Applying patch from ${patchPath}`);
-  await gitApply({ cwd: codePath, patchFile: patchPath, stdio: 'inherit' });
 }

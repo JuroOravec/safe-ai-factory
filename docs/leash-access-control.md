@@ -11,32 +11,48 @@ An agent that can read and write the whole workspace and reach any host on the i
 Save as `saifac/policies/allowlist.cedar` (paths and hostnames are yours to tune):
 
 ```cedar
-// Filesystem: same as default.cedar
+// Filesystem + ProcessExec: same shape as src/orchestrator/policies/default.cedar (Leash schema).
 permit (
     principal,
-    action == Action::"ReadFile",
-    resource in Directory::"/workspace"
-);
+    action in [Action::"FileOpen", Action::"FileOpenReadOnly"],
+    resource
+) when {
+    resource in [ Dir::"/" ]
+};
 
 permit (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/", Dir::"/tmp/" ]
+};
 
 forbid (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/saifac"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/saifac/" ]
+};
 
 forbid (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/.git"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/.git/" ]
+};
 
-// Network: allowlist of hostnames
+permit (
+    principal,
+    action == Action::"ProcessExec",
+    resource
+) when {
+    resource in [ Dir::"/" ]
+};
+
+// Network: hostname allowlist (not Host::"*" )
 permit (
     principal,
     action == Action::"NetworkConnect",
@@ -69,8 +85,9 @@ In this repository the bundled file is `src/orchestrator/policies/default.cedar`
 
 Default policy:
 
-- Network: Everything is allowed
-- Filesystem: Deny writes to `${workspace}/saifac` and `${workspace}/.git` directories
+- **Network:** `NetworkConnect` for `Host::"*"`
+- **Filesystem:** `FileOpen` / `FileOpenReadOnly` under `Dir::"/"`; `FileOpenReadWrite` under `Dir::"/workspace/"` and `Dir::"/tmp/"`; `FileOpenReadWrite` forbidden under `Dir::"/workspace/saifac/"` and `Dir::"/workspace/.git/"`
+- **ProcessExec:** permitted under `Dir::"/"` (shell and tools on `PATH`)
 
 ---
 
@@ -87,27 +104,43 @@ No `NetworkConnect` `permit` → everything outbound is denied. Good for checkin
 ```cedar
 permit (
     principal,
-    action == Action::"ReadFile",
-    resource in Directory::"/workspace"
-);
+    action in [Action::"FileOpen", Action::"FileOpenReadOnly"],
+    resource
+) when {
+    resource in [ Dir::"/" ]
+};
 
 permit (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/", Dir::"/tmp/" ]
+};
 
 forbid (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/saifac"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/saifac/" ]
+};
 
 forbid (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/.git"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/.git/" ]
+};
+
+permit (
+    principal,
+    action == Action::"ProcessExec",
+    resource
+) when {
+    resource in [ Dir::"/" ]
+};
 ```
 
 ```bash
@@ -131,51 +164,68 @@ permit (
     resource
 ) when {
     resource in [
-      Host::"registry.npmjs.org",
-      Host::"example.com",
-      // Host::"api.anthropic.com",
-      // Host::"github.com",
+        Host::"registry.npmjs.org",
+        Host::"example.com",
+        // Host::"api.anthropic.com",
+        // Host::"github.com",
     ]
 };
 ```
 
 ### 3. Filesystem: writes only under `src/`
 
-Reads all of `/workspace`; writes only `/workspace/src` (change path for your layout). Add more `WriteFile` permits if the agent must touch repo-root files.
+Read opens on `Dir::"/"` (bootstrap and system libs); `FileOpenReadWrite` only under `/workspace/src/` and `/tmp/` (change paths for your layout). Add more `FileOpenReadWrite` permits or `File::` entries if the agent must edit repo-root files.
 
 `policies/fs-writes-src-only.cedar`:
 
 ```cedar
 permit (
     principal,
-    action == Action::"ReadFile",
-    resource in Directory::"/workspace"
-);
+    action in [Action::"FileOpen", Action::"FileOpenReadOnly"],
+    resource
+) when {
+    resource in [ Dir::"/" ]
+};
 
-// Writes only under src/ (adjust path to your project)
 permit (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/src"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/src/", Dir::"/tmp/" ]
+};
 
 forbid (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/saifac"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/saifac/" ]
+};
 
 forbid (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/.git"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/.git/" ]
+};
+
+permit (
+    principal,
+    action == Action::"ProcessExec",
+    resource
+) when {
+    resource in [ Dir::"/" ]
+};
 
 permit (
     principal,
     action == Action::"NetworkConnect",
     resource
-);
+) when {
+    resource in [ Host::"*" ]
+};
 ```
 
 ```bash
@@ -194,58 +244,57 @@ The authoritative list of actions and resource types for Leash is the [Leash Ced
 
 ### Filesystem
 
-Actions: `ReadFile`, `WriteFile`, `DeleteFile`  
-Resources: `File::"/path/to/file"` or `Directory::"/path/to/dir"`
+Under Leash: **`FileOpen`**, **`FileOpenReadOnly`**, **`FileOpenReadWrite`** — not `ReadFile` / `WriteFile`.  
+Resources: **`File::"/path"`** or **`Dir::"/path/"`** (trailing slash for directory trees).
 
 ```cedar
-// Allow reading the whole workspace
 permit (
     principal,
-    action == Action::"ReadFile",
-    resource in Directory::"/workspace"
-);
+    action in [Action::"FileOpen", Action::"FileOpenReadOnly"],
+    resource
+) when {
+    resource in [ Dir::"/" ]
+};
 
-// Restrict writes to source code only
 permit (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/src"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/src/", Dir::"/tmp/" ]
+};
 ```
 
 ### Network
 
-Actions: `NetworkConnect`  
-Resources: `Host::"hostname"`
+Actions: **`NetworkConnect`**  
+Resources: **`Host::"hostname"`**, **`Host::"host:port"`**, or **`Host::"*"`** for allow-all.
 
 ```cedar
-// Allow only npm and GitHub
 permit (
     principal,
     action == Action::"NetworkConnect",
-    resource in [Host::"registry.npmjs.org", Host::"github.com"]
-);
-
-// Block cloud metadata endpoints (SSRF prevention)
-forbid (
-    principal,
-    action == Action::"NetworkConnect",
-    resource in [IP::"169.254.169.254", IP::"127.0.0.1"]
-);
+    resource
+) when {
+    resource in [ Host::"registry.npmjs.org", Host::"github.com" ]
+};
 ```
+
+SSRF / metadata blocking may require **`Host::`-style rules** and proxy behavior; Leash v1 has limited **`IP::`/CIDR** support — see the [Leash Cedar reference](https://github.com/strongdm/leash/blob/main/docs/design/CEDAR.md).
 
 ### MCP tools
 
-Actions: `ExecuteTool`  
-Resources: `Tool::"tool-name"`
+Actions: **`McpCall`**  
+Resources: **`MCP::Server::"..."`**, **`MCP::Tool::"..."`** (enforcement semantics are version-specific; see Leash docs).
 
 ```cedar
-// Restrict a 50-tool MCP server to the 2 tools this agent actually needs
-permit (
+forbid (
     principal,
-    action == Action::"ExecuteTool",
-    resource in [Tool::"read_file", Tool::"write_file"]
-);
+    action == Action::"McpCall",
+    resource == MCP::Tool::"risky-tool"
+) when {
+    resource in [ MCP::Server::"mcp.example.com" ]
+};
 ```
 
 See the [Leash Cedar reference](https://github.com/strongdm/leash/blob/main/docs/design/CEDAR.md) for the full list of available action and resource types.

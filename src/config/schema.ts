@@ -106,7 +106,10 @@ export const saifacConfigDefaultsSchema = z.object({
   maxRuns: z.number().int().positive().optional(),
   testRetries: z.number().int().positive().optional(),
   resolveAmbiguity: z.enum(['off', 'prompt', 'ai']).optional(),
+  /** Run the coder on the host instead of inside a Leash container. */
   dangerousDebug: z.boolean().optional(),
+  /** Skip Leash; run the coder image with `docker run` (same mounts/env as Leash, no Cedar/eBPF). */
+  dangerousNoLeash: z.boolean().optional(),
   cedarPolicyPath: z.string().optional(),
   coderImage: z.string().optional(),
   gateRetries: z.number().int().positive().optional(),

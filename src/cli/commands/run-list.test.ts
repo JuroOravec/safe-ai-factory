@@ -63,6 +63,28 @@ async function runRunSubcommand(rawArgs: string[]): Promise<string[]> {
 }
 
 describe('saifac run ls', () => {
+  it('sorts rows by updatedAt descending (newest first), then runId', async () => {
+    await withTempProject(async (projectDir) => {
+      await writeRunJson(projectDir, 'older', {
+        featureName: 'a',
+        status: 'failed',
+        updatedAt: '2026-03-10T10:00:00.000Z',
+      });
+      await writeRunJson(projectDir, 'newer', {
+        featureName: 'b',
+        status: 'failed',
+        updatedAt: '2026-03-20T10:00:00.000Z',
+      });
+
+      const text = (await runRunSubcommand(['ls', '--project-dir', projectDir])).join('\n');
+      const iNewer = text.indexOf('newer');
+      const iOlder = text.indexOf('older');
+      expect(iNewer).toBeGreaterThan(-1);
+      expect(iOlder).toBeGreaterThan(-1);
+      expect(iNewer).toBeLessThan(iOlder);
+    });
+  });
+
   it('prints table headers and one row per run under .saifac/runs', async () => {
     await withTempProject(async (projectDir) => {
       await writeRunJson(projectDir, 'aaa111', {

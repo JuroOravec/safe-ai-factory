@@ -25,7 +25,7 @@ The Software Factory uses Git in three distinct phases:
 | Phase       | Where                                                     | Purpose                                                                                                                                                                |
 | ----------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Sandbox** | Isolated `code/` directory inside `/tmp/saifac/sandboxes/` | A _fresh_ Git repo (not a clone) used solely for diffing agent changes against a baseline. The host's `.git` is never mounted or copied, to avoid exposing git history |
-| **Tests**   | Same sandbox                                              | The extracted patch is applied to the sandbox with `git apply` so the staging containers can verify the implementation.                                                |
+| **Tests**   | Same sandbox                                              | **`feat run` / `run resume`:** after `extractPatch`, the patch is re-applied with `git apply` so staging sees the candidate tree. **`run test`:** the patch is applied to the sandbox with `git apply`.                                                |
 | **Success** | Host repository                                           | A Git worktree is used to create a feature branch, apply the patch, commit, and optionally push/PR—_without ever changing the main working tree's checked-out branch_. |
 
 The host repository's working directory is **never** modified during the loop. All agent edits happen in the sandbox. Only after tests pass does the orchestrator create a separate worktree, apply the patch there, commit it, and optionally push. The user's current branch and uncommitted work remain untouched—enabling safe parallel runs of multiple agents.
@@ -154,15 +154,11 @@ git clean -fd
 
 ## 6. Patch Application for Tests
 
-**Location:** `sandbox.ts` → `applyPatch()`, `modes.ts` → test mode
+**`saifac feat run` / `run resume` (inner loop):** **Location:** `sandbox.ts` → `applyPatch()`, `loop.ts` — after `extractPatch()` resets `code/`, the orchestrator runs `git apply` on `sandboxBasePath/patch.diff` so the Staging container sees the candidate implementation before tests.
 
-In **saifac run test** mode, the user supplies a patch file (e.g. from a previous run or a manual edit). Before running the staging containers, we inject that patch into the sandbox:
+**`saifac run test`:** **Location:** `resume.ts` → `createResumeWorktree()`, `sandbox.ts` → `createSandbox()`, `modes.ts` → `runTestsCore()`.
 
-```bash
-git apply "${patchPath}"
-```
-
-**Context:** `codePath` is the sandbox's `code/` directory. The patch is applied there so the Staging container (which uses `code/` as its build context or mount) sees the patched implementation. The Test Runner then runs the Black-Box tests against it.
+The stored `basePatchDiff` and `runPatchDiff` are applied in the **temporary resume worktree** (same reconstruction as `run resume`). The sandbox is built by rsyncing that directory into `code/` and committing it. **There is no second `git apply` of `runPatchDiff` inside `runTestsCore`** — the patched files are already present. A `.saifac-run-test.patch` file may still be written under the worktree for bookkeeping; host apply after success still relies on `patch.diff` beside `code/` when using `applyPatchToHost` (see [§8](#8-success-path-apply-patch-to-host-via-worktree)).
 
 ---
 

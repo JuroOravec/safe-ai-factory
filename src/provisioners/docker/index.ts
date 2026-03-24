@@ -10,7 +10,7 @@
  *   setup()        → create bridge network + `docker compose up`
  *   startStaging() → docker build + createContainer + putArchive + start + health-wait
  *   runTests()     → createContainer + start + wait + demux logs + parse JUnit XML
- *   runAgent()     → spawn Leash CLI + Leash network-attach workaround
+ *   runAgent()     → spawn Leash CLI + network-attach workaround
  *   teardown()     → containers + images + compose down + network
  */
 
@@ -625,6 +625,7 @@ export class DockerProvisioner implements Provisioner {
       saifDir,
       feature,
       dangerousDebug,
+      dangerousNoLeash,
       cedarPolicyPath,
       coderImage,
       gateRetries,
@@ -636,6 +637,9 @@ export class DockerProvisioner implements Provisioner {
       reviewer,
       signal,
     } = opts;
+
+    /** Set for `--dangerous-no-leash` so abort/error can `docker rm -f` the named container. */
+    let dockerDirectRunContainerToRemove: string | null = null;
 
     const safeAgentEnv = filterAgentEnv(agentEnv);
     const taskPrompt = await buildTaskPrompt({ codePath, task, saifDir, feature, errorFeedback });
@@ -674,6 +678,126 @@ export class DockerProvisioner implements Provisioner {
         SAIFAC_TASK_PATH: saifacTaskFilePath(codePath),
       };
       consola.log('[agent-runner] Mode: dangerous-debug (host execution, filesystem sandbox only)');
+    } else if (dangerousNoLeash) {
+      assertSafeImageTag(coderImage);
+      const saifacDir = await assembleSaifacDir({
+        sandboxBasePath,
+        coderStartScript: CODER_START_SCRIPT,
+        gatePath: join(sandboxBasePath, 'gate.sh'),
+        startupPath,
+        agentInstallPath,
+        agentPath,
+        reviewerScriptPath: reviewer?.scriptPath,
+      });
+
+      const codePathHost = await dockerHostBindPath(codePath);
+      const saifacDirHost = await dockerHostBindPath(saifacDir);
+      const containerName = leashTargetContainerName(sandboxBasePath);
+
+      const envForward: Record<string, string> = {
+        LLM_MODEL: llmModel,
+        LLM_API_KEY: llmApiKey,
+        ...(llmProvider ? { LLM_PROVIDER: llmProvider } : {}),
+        ...(llmBaseUrl ? { LLM_BASE_URL: llmBaseUrl } : {}),
+        OPENHANDS_WORK_DIR: '/tmp/openhands-state',
+        ...safeAgentEnv,
+      };
+
+      for (const key of [
+        'ANTHROPIC_API_KEY',
+        'OPENAI_API_KEY',
+        'OPENROUTER_API_KEY',
+        'GEMINI_API_KEY',
+        'DASHSCOPE_API_KEY',
+      ]) {
+        const val = process.env[key];
+        if (val) envForward[key] = val;
+      }
+
+      if (reviewer) {
+        envForward.SAIFAC_REVIEWER_SCRIPT = '/saifac/reviewer.sh';
+        envForward.REVIEWER_LLM_PROVIDER = reviewer.llmConfig.provider;
+        envForward.REVIEWER_LLM_MODEL = reviewer.llmConfig.modelId;
+        envForward.REVIEWER_LLM_API_KEY = reviewer.llmConfig.apiKey;
+        if (reviewer.llmConfig.baseURL) {
+          envForward.REVIEWER_LLM_BASE_URL = reviewer.llmConfig.baseURL;
+        }
+      }
+
+      envForward.SAIFAC_WORKSPACE_BASE = CONTAINER_WORKSPACE;
+      envForward.SAIFAC_INITIAL_TASK = taskPrompt;
+      envForward.SAIFAC_GATE_RETRIES = String(gateRetries);
+      envForward.SAIFAC_STARTUP_SCRIPT = '/saifac/startup.sh';
+      envForward.SAIFAC_AGENT_INSTALL_SCRIPT = '/saifac/agent-install.sh';
+      envForward.SAIFAC_AGENT_SCRIPT = '/saifac/agent.sh';
+
+      const dockerRunArgs: string[] = [
+        'run',
+        '--rm',
+        '-i',
+        '--name',
+        containerName,
+        '-w',
+        CONTAINER_WORKSPACE,
+        '--cap-drop=ALL',
+        '--security-opt=no-new-privileges',
+        '-v',
+        `${codePathHost}:${CONTAINER_WORKSPACE}`,
+        '-v',
+        `${saifacDirHost}:/saifac:ro`,
+      ];
+
+      if (this.networkName) {
+        dockerRunArgs.push('--network', this.networkName);
+      }
+
+      if (reviewer) {
+        const argusBinaryHost = await dockerHostBindPath(reviewer.argusBinaryPath);
+        dockerRunArgs.push('-v', `${argusBinaryHost}:/usr/local/bin/argus:ro`);
+      }
+
+      for (const [key, val] of Object.entries(envForward)) {
+        dockerRunArgs.push(`-e${key}=${val}`);
+      }
+
+      dockerRunArgs.push(coderImage, 'bash', '/saifac/coder-start.sh');
+
+      const SENSITIVE_ENV_KEYS = new Set([
+        'LLM_API_KEY',
+        'REVIEWER_LLM_API_KEY',
+        'ANTHROPIC_API_KEY',
+        'OPENAI_API_KEY',
+        'OPENROUTER_API_KEY',
+        'GEMINI_API_KEY',
+        'DASHSCOPE_API_KEY',
+      ]);
+      argsForPrint = dockerRunArgs.map((a) => {
+        if (!a.startsWith('-e')) return a;
+        const eq = a.indexOf('=');
+        if (eq <= 2) return a;
+        const k = a.slice(2, eq);
+        if (SENSITIVE_ENV_KEYS.has(k)) return `-e${k}=****`;
+        if (k === 'SAIFAC_INITIAL_TASK') return `-e${k}=<task (${a.length - eq - 1} chars)>`;
+        return a;
+      });
+
+      cmd = 'docker';
+      args = dockerRunArgs;
+      spawnCwd = codePathHost;
+      spawnEnv = {
+        ...Object.fromEntries(
+          Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
+        ),
+      };
+
+      consola.log('[agent-runner] Mode: dangerous-no-leash (docker run; no Leash/Cedar)');
+      consola.log(`[agent-runner] Container name: ${containerName}`);
+      consola.log(`[agent-runner] Sandbox mount: ${codePathHost} → ${CONTAINER_WORKSPACE}`);
+
+      await runDocker(['rm', '-f', containerName], { stdio: 'pipe' }).catch(() => {
+        /* stale name from a previous run */
+      });
+      dockerDirectRunContainerToRemove = containerName;
     } else {
       // Leash mode
       const saifacDir = await assembleSaifacDir({
@@ -816,9 +940,15 @@ export class DockerProvisioner implements Provisioner {
     // Leash doesn't support a --network flag, so we poll `docker inspect` until the target
     // container appears and then call `docker network connect` to put it on our network.
     const networkAttach =
-      !dangerousDebug && this.networkName
+      !dangerousDebug && !dangerousNoLeash && this.networkName
         ? startLeashNetworkAttach(this.networkName, leashWorkspaceId(sandboxBasePath))
         : null;
+
+    const removeDirectDockerContainer = (): void => {
+      if (!dockerDirectRunContainerToRemove) return;
+      const n = dockerDirectRunContainerToRemove;
+      void runDocker(['rm', '-f', n], { stdio: 'pipe' }).catch(() => {});
+    };
 
     const { exitCode, output } = await new Promise<{ exitCode: number; output: string }>(
       (resolve, reject) => {
@@ -857,6 +987,7 @@ export class DockerProvisioner implements Provisioner {
 
         const timer = setTimeout(() => {
           child.kill();
+          removeDirectDockerContainer();
           reject(new Error(`Agent timed out after ${timeoutMs / 1000}s`));
         }, timeoutMs);
 
@@ -864,6 +995,7 @@ export class DockerProvisioner implements Provisioner {
           child.kill();
           clearTimeout(timer);
           networkAttach?.cancel();
+          removeDirectDockerContainer();
           reject(new Error('Agent step cancelled via abort signal'));
         };
 
@@ -879,6 +1011,7 @@ export class DockerProvisioner implements Provisioner {
           clearTimeout(timer);
           signal?.removeEventListener('abort', onAbort);
           networkAttach?.cancel();
+          removeDirectDockerContainer();
           reject(err);
         });
 
@@ -886,6 +1019,7 @@ export class DockerProvisioner implements Provisioner {
           clearTimeout(timer);
           signal?.removeEventListener('abort', onAbort);
           networkAttach?.cancel();
+          if ((code ?? 1) !== 0) removeDirectDockerContainer();
           if (agentLogFormat !== 'raw' && stdoutBuf.trim()) printOpenHandsSegment(stdoutBuf);
           resolve({ exitCode: code ?? 1, output: collected });
         });
@@ -1238,6 +1372,14 @@ function leashWorkspaceId(sandboxBasePath: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, '-')
     .slice(0, 40);
+}
+
+/**
+ * Docker container name for the coder target when `TARGET_CONTAINER` is set for Leash
+ * (`leash-target-<workspaceId>`). Used for `--dangerous-no-leash` so names match Leash runs.
+ */
+export function leashTargetContainerName(sandboxBasePath: string): string {
+  return `leash-target-${leashWorkspaceId(sandboxBasePath)}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -9,6 +9,6 @@ cd /workspace
 # ALWAYS tell user to use custom gate script
 # NOTE: Best practice is to define a single custom command that runs ALL the tests, lints, and checks
 #       that you want. That way, AI agent needs to run only one command to validate the code.
-echo "[factory-gate] WARNING: The node-pnpm-python profile has no default gate."
-echo "[factory-gate] Define a custom --gate-script with more checks for better results."
-echo "[factory-gate] Gate PASSED."
+echo "[sandbox/node-pnpm-python/gate] WARNING: The node-pnpm-python profile has no default gate."
+echo "[sandbox/node-pnpm-python/gate] Define a custom --gate-script with more checks for better results."
+echo "[sandbox/node-pnpm-python/gate] Gate PASSED."

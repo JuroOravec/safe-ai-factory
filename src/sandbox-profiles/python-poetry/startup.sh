@@ -5,10 +5,10 @@
 # (before the app starts). Set via --profile (default) or --startup-script.
 set -eu
 cd /workspace
-echo "[factory-startup] Installing Python dependencies (poetry)..."
+echo "[sandbox/python-poetry/startup] Installing Python dependencies (poetry)..."
 if [ -f pyproject.toml ]; then
   poetry install
 else
-  echo "[factory-startup] No pyproject.toml found — skipping."
+  echo "[sandbox/python-poetry/startup] No pyproject.toml found — skipping."
 fi
-echo "[factory-startup] Done."
+echo "[sandbox/python-poetry/startup] Done."

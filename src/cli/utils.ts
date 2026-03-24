@@ -165,6 +165,7 @@ export interface FeatRunArgs extends OrchestratorArgs {
   project?: string;
   'resolve-ambiguity'?: string;
   'dangerous-debug'?: boolean;
+  'dangerous-no-leash'?: boolean;
   cedar?: string;
   'coder-image'?: string;
   'gate-retries'?: string;
@@ -1076,6 +1077,12 @@ export async function buildOrchestratorCliInputFromFeatArgs(
   }
 
   const dangerousDebug = runArgs['dangerous-debug'] === true ? true : undefined;
+  const dangerousNoLeash = runArgs['dangerous-no-leash'] === true ? true : undefined;
+
+  if (dangerousDebug && dangerousNoLeash) {
+    consola.error('Error: --dangerous-debug and --dangerous-no-leash cannot be used together.');
+    process.exit(1);
+  }
 
   const cedarPolicyPath =
     typeof runArgs.cedar === 'string' && runArgs.cedar.trim() ? runArgs.cedar.trim() : undefined;
@@ -1275,6 +1282,7 @@ export async function buildOrchestratorCliInputFromFeatArgs(
     resolveAmbiguity,
     testRetries,
     dangerousDebug,
+    dangerousNoLeash,
     cedarPolicyPath,
     coderImage,
     startupScript,

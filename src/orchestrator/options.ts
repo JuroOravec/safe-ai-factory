@@ -24,8 +24,10 @@ import {
 } from '../config/schema.js';
 import {
   DEFAULT_DANGEROUS_DEBUG,
+  DEFAULT_DANGEROUS_NO_LEASH,
   DEFAULT_ORCHESTRATOR_GATE_RETRIES,
   DEFAULT_ORCHESTRATOR_MAX_RUNS,
+  DEFAULT_ORCHESTRATOR_TEST_RETRIES,
   DEFAULT_RESOLVE_AMBIGUITY,
   DEFAULT_REVIEWER_ENABLED,
   defaultCedarPolicyPath,
@@ -180,6 +182,7 @@ const ORCHESTRATOR_MERGE_KEYS = [
   'resolveAmbiguity',
   'testRetries',
   'dangerousDebug',
+  'dangerousNoLeash',
   'cedarPolicyPath',
   'coderImage',
   'startupScript',
@@ -265,8 +268,9 @@ async function applyOrchestratorBaseline(
   const testProfile = pickTestProfile(noCli, config);
   const testImage = resolveTestImageTag(noCli, testProfile.id, config);
   const resolveAmbiguity = config?.defaults?.resolveAmbiguity ?? DEFAULT_RESOLVE_AMBIGUITY;
-  const testRetries = config?.defaults?.maxRuns ?? DEFAULT_ORCHESTRATOR_MAX_RUNS;
+  const testRetries = config?.defaults?.testRetries ?? DEFAULT_ORCHESTRATOR_TEST_RETRIES;
   const dangerousDebug = config?.defaults?.dangerousDebug ?? DEFAULT_DANGEROUS_DEBUG;
+  const dangerousNoLeash = config?.defaults?.dangerousNoLeash ?? DEFAULT_DANGEROUS_NO_LEASH;
   const cedarPolicyPath = config?.defaults?.cedarPolicyPath ?? defaultCedarPolicyPath();
   const sandboxProfile = pickSandboxProfile(noCli, config);
   const agentProfile = pickAgentProfile(noCli, config);
@@ -330,6 +334,7 @@ async function applyOrchestratorBaseline(
     resolveAmbiguity,
     testRetries,
     dangerousDebug,
+    dangerousNoLeash,
     cedarPolicyPath,
     coderImage,
     startupScript: startupR.startupScript,
@@ -365,7 +370,6 @@ async function applyOrchestratorBaseline(
 // ---------------------------------------------------------------------------
 
 export interface ResolveOrchestratorOptsParams {
-  mode: 'start' | 'resume' | 'test-from-run';
   projectDir: string;
   saifDir: string;
   config: SaifacConfig;
@@ -417,6 +421,11 @@ export async function resolveOrchestratorOpts(
 
   if (merged.pr && !merged.push) {
     consola.error('Error: --pr requires --push <target>.');
+    process.exit(1);
+  }
+
+  if (merged.dangerousDebug && merged.dangerousNoLeash) {
+    consola.error('Error: --dangerous-debug and --dangerous-no-leash cannot be used together.');
     process.exit(1);
   }
 

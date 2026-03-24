@@ -115,9 +115,11 @@ A `forbid` rule was added to `src/orchestrator/policies/default.cedar` denying w
 ```
 forbid (
     principal,
-    action == Action::"WriteFile",
-    resource in Directory::"/workspace/.git"
-);
+    action == Action::"FileOpenReadWrite",
+    resource
+) when {
+    resource in [ Dir::"/workspace/.git/" ]
+};
 ```
 
 This is belt-and-suspenders: the sandbox's `.git` directory is owned by the orchestrator and must not be writable by the agent code regardless of what git commands the agent tries to run.

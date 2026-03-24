@@ -172,7 +172,12 @@ export interface RunAgentOpts {
   feature?: Feature;
   /** When true, run the agent on the host instead of inside a Leash container. */
   dangerousDebug: boolean;
-  /** Absolute path to the Cedar policy file. Ignored when dangerousDebug=true. */
+  /**
+   * When true, run the coder container via `docker run` (no Leash CLI). Same mounts/env/name as Leash.
+   * Ignored when dangerousDebug=true.
+   */
+  dangerousNoLeash: boolean;
+  /** Absolute path to the Cedar policy file. Ignored when dangerousDebug=true or dangerousNoLeash=true. */
   cedarPolicyPath: string;
   /** Docker image for the coder container. Ignored when dangerousDebug=true. */
   coderImage: string;

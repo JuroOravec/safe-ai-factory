@@ -5,6 +5,6 @@
 # (before the app starts). Set via --profile (default) or --startup-script.
 set -eu
 cd /workspace
-echo "[factory-startup] Installing Node.js dependencies (pnpm)..."
+echo "[sandbox/node-pnpm-python/startup] Installing Node.js dependencies (pnpm)..."
 pnpm install --frozen-lockfile 2>/dev/null || pnpm install
-echo "[factory-startup] Done."
+echo "[sandbox/node-pnpm-python/startup] Done."

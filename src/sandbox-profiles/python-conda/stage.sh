@@ -17,15 +17,15 @@ set -eu
 cd /workspace
 
 if [ -f Procfile ] && grep -q '^web:' Procfile; then
-  echo "[app] Starting web server (Procfile web)..."
+  echo "[sandbox/python-conda/stage] Starting web server (Procfile web)..."
   exec sh -c "$(grep '^web:' Procfile | sed 's/^web: //')"
 elif [ -f app.py ]; then
-  echo "[app] Starting web server (app.py)..."
+  echo "[sandbox/python-conda/stage] Starting web server (app.py)..."
   exec python app.py
 elif [ -f main.py ]; then
-  echo "[app] Starting web server (main.py)..."
+  echo "[sandbox/python-conda/stage] Starting web server (main.py)..."
   exec python main.py
 else
-  echo "[app] No entrypoint found — sidecar is the only process."
+  echo "[sandbox/python-conda/stage] No entrypoint found — sidecar is the only process."
   wait
 fi

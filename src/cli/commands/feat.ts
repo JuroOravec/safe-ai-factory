@@ -774,7 +774,6 @@ export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand
   const cliModelDelta = parseModelOverridesCliDelta(runArgs);
 
   const orchestratorOpts = await resolveOrchestratorOpts({
-    mode: 'start',
     projectDir,
     saifDir,
     config,

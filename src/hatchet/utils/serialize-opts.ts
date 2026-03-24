@@ -31,6 +31,7 @@ export interface SerializedOrchestratorOpts extends Record<string, unknown> {
   testImage: string;
   resolveAmbiguity: 'off' | 'prompt' | 'ai';
   dangerousDebug: boolean;
+  dangerousNoLeash?: boolean;
   cedarPolicyPath: string;
   coderImage: string;
   push: string | null;
@@ -140,6 +141,7 @@ export function deserializeOrchestratorOpts(serialized: Record<string, unknown>)
     testImage: s.testImage,
     resolveAmbiguity: s.resolveAmbiguity,
     dangerousDebug: s.dangerousDebug,
+    dangerousNoLeash: s.dangerousNoLeash ?? false,
     cedarPolicyPath: s.cedarPolicyPath,
     coderImage: s.coderImage,
     push: s.push,

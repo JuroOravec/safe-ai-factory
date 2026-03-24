@@ -180,6 +180,11 @@ const featRunCoreArgs = {
     description:
       'Skip Leash; run OpenHands directly on the host. Use only for development/debugging.',
   },
+  'dangerous-no-leash': {
+    type: 'boolean' as const,
+    description:
+      'Skip Leash; run the coder container with plain docker run (same image, mounts, env, and container name as Leash — no Cedar / Leash proxy). Mutually exclusive with --dangerous-debug.',
+  },
   cedar: {
     type: 'string' as const,
     description:

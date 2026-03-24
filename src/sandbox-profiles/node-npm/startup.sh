@@ -5,6 +5,6 @@
 # (before the app starts). Set via --profile (default) or --startup-script.
 set -eu
 cd /workspace
-echo "[factory-startup] Installing Node.js dependencies (npm)..."
+echo "[sandbox/node-npm/startup] Installing Node.js dependencies (npm)..."
 npm ci 2>/dev/null || npm install
-echo "[factory-startup] Done."
+echo "[sandbox/node-npm/startup] Done."
