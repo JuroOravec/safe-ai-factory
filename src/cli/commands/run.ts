@@ -7,15 +7,25 @@
  *   rm, remove    Delete a run
  *   inspect       Print stored run as JSON
  *   clear         Clear stored runs (optionally filtered)
+ *   resume        Resume a failed run from storage
  */
 
 import { defineCommand, runMain } from 'citty';
 
 import { loadSaifacConfig } from '../../config/load.js';
-import { consola } from '../../logger.js';
-import { toRunInspectJson } from '../../runs/utils/run-inspect.js';
-import { projectDirArg, saifDirArg, storageArg } from '../args.js';
+import { type SaifacConfig } from '../../config/schema.js';
+import type { ModelOverrides } from '../../llm-config.js';
+import { consola, outputCliData, setVerboseLogging } from '../../logger.js';
+import { runResume } from '../../orchestrator/modes.js';
 import {
+  type OrchestratorCliInput,
+  parseModelOverridesCliDelta,
+} from '../../orchestrator/options.js';
+import { toRunInspectJson } from '../../runs/utils/run-inspect.js';
+import { featRunArgs, projectDirArg, saifDirArg, storageArg } from '../args.js';
+import {
+  buildOrchestratorCliInputFromFeatArgs,
+  type FeatRunArgs,
   parseRunId,
   readProjectDirFromCli,
   readSaifDirFromCli,
@@ -24,6 +34,23 @@ import {
   resolveRunStorage,
   resolveSaifDirRelative,
 } from '../utils.js';
+
+/** CLI parsing for `saifac run resume` */
+async function parseResumeOrchestratorCli(args: FeatRunArgs): Promise<{
+  projectDir: string;
+  saifDir: string;
+  config: SaifacConfig;
+  cli: OrchestratorCliInput;
+  cliModelDelta: ModelOverrides | undefined;
+}> {
+  const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
+  const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
+  const config = await loadSaifacConfig(saifDir, projectDir);
+  setVerboseLogging(args.verbose === true);
+  const cli = await buildOrchestratorCliInputFromFeatArgs(args, { projectDir, saifDir, config });
+  const cliModelDelta = parseModelOverridesCliDelta(args);
+  return { projectDir, saifDir, config, cli, cliModelDelta };
+}
 
 const commonRunArgs = {
   'project-dir': projectDirArg,
@@ -53,7 +80,7 @@ const lsCommand = defineCommand({
     const config = await loadSaifacConfig(saifDir, projectDir);
     const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!storage) {
-      consola.log('Run storage is disabled (--storage none).');
+      outputCliData('Run storage is disabled (--storage none).');
       return;
     }
 
@@ -62,29 +89,32 @@ const lsCommand = defineCommand({
       status: typeof args.status === 'string' ? (args.status as 'failed' | 'completed') : undefined,
     });
     if (runs.length === 0) {
-      consola.log('No stored runs found.');
+      outputCliData('No stored runs found.');
       return;
     }
 
     // Table headers
-    const hRunId = 'RUN ID';
+    const hRunId = 'RUN_ID';
     const hFeature = 'FEATURE';
     const hStatus = 'STATUS';
+    const hStarted = 'STARTED';
     const hUpdated = 'UPDATED';
 
     const wRunId = Math.max(hRunId.length, ...runs.map((r) => r.runId.length));
     const wFeature = Math.max(hFeature.length, ...runs.map((r) => r.config.featureName.length));
     const wStatus = Math.max(hStatus.length, ...runs.map((r) => r.status.length));
+    const startedStr = (r: (typeof runs)[number]) => r.startedAt ?? '';
+    const wStarted = Math.max(hStarted.length, ...runs.map((r) => startedStr(r).length));
     const wUpdated = Math.max(hUpdated.length, ...runs.map((r) => r.updatedAt.length));
 
     /* eslint-disable-next-line max-params */
-    const row = (a: string, b: string, c: string, d: string) =>
-      `  ${a.padEnd(wRunId)}  ${b.padEnd(wFeature)}  ${c.padEnd(wStatus)}  ${d.padEnd(wUpdated)}`;
+    const row = (a: string, b: string, c: string, d: string, e: string) =>
+      `  ${a.padEnd(wRunId)}  ${b.padEnd(wFeature)}  ${c.padEnd(wStatus)}  ${d.padEnd(wStarted)}  ${e.padEnd(wUpdated)}`;
 
-    consola.log(`${runs.length} run(s):\n`);
-    consola.log(row(hRunId, hFeature, hStatus, hUpdated));
+    outputCliData(`${runs.length} run(s):\n`);
+    outputCliData(row(hRunId, hFeature, hStatus, hStarted, hUpdated));
     for (const r of runs) {
-      consola.log(row(r.runId, r.config.featureName, r.status, r.updatedAt));
+      outputCliData(row(r.runId, r.config.featureName, r.status, startedStr(r), r.updatedAt));
     }
   },
 });
@@ -160,7 +190,7 @@ const inspectCommand = defineCommand({
 
     const view = toRunInspectJson(artifact);
     const pretty = args.pretty !== false;
-    consola.log(JSON.stringify(view, null, pretty ? 2 : undefined));
+    outputCliData(JSON.stringify(view, null, pretty ? 2 : undefined));
   },
 });
 
@@ -182,16 +212,59 @@ const clearCommand = defineCommand({
     const config = await loadSaifacConfig(saifDir, projectDir);
     const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!storage) {
-      consola.log('Run storage is disabled (--storage none).');
+      outputCliData('Run storage is disabled (--storage none).');
       return;
     }
     const filter = args.failed ? { status: 'failed' as const } : undefined;
     const runs = await storage.listRuns(filter);
     for (const r of runs) {
       await storage.deleteRun(r.runId);
-      consola.log(`  removed ${r.runId}`);
+      outputCliData(`  removed ${r.runId}`);
     }
-    consola.log(`\nCleared ${runs.length} run(s).`);
+    outputCliData(`\nCleared ${runs.length} run(s).`);
+  },
+});
+
+const resumeCommand = defineCommand({
+  meta: {
+    name: 'resume',
+    description: 'Resume a stored run from storage (failed or interrupted)',
+  },
+  args: {
+    ...commonRunArgs,
+    ...featRunArgs,
+    runId: {
+      type: 'positional' as const,
+      description: 'Run ID to resume',
+      required: true,
+    },
+  },
+  async run({ args }) {
+    const runArgs = args as FeatRunArgs;
+    const ctx = await parseResumeOrchestratorCli(runArgs);
+    const runStorage = resolveRunStorage(
+      readStorageStringFromCli(runArgs),
+      ctx.projectDir,
+      ctx.config,
+    );
+    if (!runStorage) {
+      consola.error('Run storage is disabled (--storage none). Cannot resume.');
+      process.exit(1);
+    }
+    const runId = parseRunId(args);
+
+    const result = await runResume({
+      ...ctx,
+      runId,
+      runStorage,
+    });
+
+    consola.log(`\n${result.message}`);
+    if (result.runId) {
+      consola.log(`\nResume again with:`);
+      consola.log(`  saifac run resume ${result.runId}`);
+    }
+    if (!result.success) process.exit(1);
   },
 });
 
@@ -207,6 +280,7 @@ const runCommand = defineCommand({
     remove: rmCommand,
     inspect: inspectCommand,
     clear: clearCommand,
+    resume: resumeCommand,
   },
 });
 

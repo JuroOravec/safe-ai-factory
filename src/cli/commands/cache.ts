@@ -12,7 +12,7 @@ import { normalize, resolve } from 'node:path';
 
 import { defineCommand, runMain } from 'citty';
 
-import { consola } from '../../logger.js';
+import { outputCliData } from '../../logger.js';
 import { resolveSandboxBaseDir } from '../../orchestrator/options.js';
 import { DEFAULT_SANDBOX_BASE_DIR, SAIFAC_TEMP_ROOT } from '../../orchestrator/sandbox.js';
 import { pathExists } from '../../utils/io.js';
@@ -44,7 +44,7 @@ const listCommand = defineCommand({
     const listAll = args.all === true;
 
     if (!(await pathExists(sandboxBase))) {
-      consola.log(`${sandboxBase} does not exist — no entries found.`);
+      outputCliData(`${sandboxBase} does not exist — no entries found.`);
       return;
     }
 
@@ -52,12 +52,14 @@ const listCommand = defineCommand({
 
     if (listAll) {
       if (entries.length === 0) {
-        consola.log(`No entries found in ${sandboxBase}.`);
+        outputCliData(`No entries found in ${sandboxBase}.`);
         return;
       }
-      consola.log(`${sandboxBase} (${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}):`);
+      outputCliData(
+        `${sandboxBase} (${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}):`,
+      );
       for (const entry of entries) {
-        consola.log(`${sandboxBase}/${entry}`);
+        outputCliData(`${sandboxBase}/${entry}`);
       }
       return;
     }
@@ -68,15 +70,15 @@ const listCommand = defineCommand({
     const matching = entries.filter((e) => e.startsWith(prefix));
 
     if (matching.length === 0) {
-      consola.log(`No entries matching "${prefix}*" found in ${sandboxBase}.`);
+      outputCliData(`No entries matching "${prefix}*" found in ${sandboxBase}.`);
       return;
     }
 
-    consola.log(
+    outputCliData(
       `${sandboxBase} — ${matching.length} entr${matching.length === 1 ? 'y' : 'ies'} for project "${projName}":`,
     );
     for (const entry of matching) {
-      consola.log(`${sandboxBase}/${entry}`);
+      outputCliData(`${sandboxBase}/${entry}`);
     }
   },
 });
@@ -110,7 +112,7 @@ const clearCommand = defineCommand({
     }
 
     if (!(await pathExists(sandboxBase))) {
-      consola.log(`${sandboxBase} does not exist — nothing to clear.`);
+      outputCliData(`${sandboxBase} does not exist — nothing to clear.`);
       return;
     }
 
@@ -121,14 +123,14 @@ const clearCommand = defineCommand({
         toRemove.map(async (entry) => {
           // E.g. `/tmp/saifac/crawlee-one-feat-abc1234`
           await rmAsync(`${sandboxBase}/${entry}`, { recursive: true, force: true });
-          consola.log(`  removed ${entry}`);
+          outputCliData(`  removed ${entry}`);
         }),
       );
     };
 
     if (clearAll) {
       await removeEntries(entries);
-      consola.log(
+      outputCliData(
         `\nCleared ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} from ${sandboxBase}.`,
       );
       return;
@@ -140,12 +142,12 @@ const clearCommand = defineCommand({
     const matching = entries.filter((e) => e.startsWith(prefix));
 
     if (matching.length === 0) {
-      consola.log(`No entries matching "${prefix}*" found in ${sandboxBase}.`);
+      outputCliData(`No entries matching "${prefix}*" found in ${sandboxBase}.`);
       return;
     }
 
     await removeEntries(matching);
-    consola.log(
+    outputCliData(
       `\nCleared ${matching.length} entr${matching.length === 1 ? 'y' : 'ies'} for project "${projName}" from ${sandboxBase}.`,
     );
   },

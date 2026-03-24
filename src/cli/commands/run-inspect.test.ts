@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { runCommand as cittyRunCommand } from 'citty';
 import { describe, expect, it, vi } from 'vitest';
 
-import { consola } from '../../logger.js';
+import * as loggerModule from '../../logger.js';
 import runCommand from './run.js';
 
 const EXIT_SENTINEL = '__PROCESS_EXIT__';
@@ -92,10 +92,10 @@ interface RunCapture {
 async function runRunSubcommand(rawArgs: string[]): Promise<RunCapture> {
   const logs: string[] = [];
   const errors: string[] = [];
-  const logSpy = vi.spyOn(consola, 'log').mockImplementation((msg?: unknown) => {
-    logs.push(msg == null ? '' : String(msg));
+  const logSpy = vi.spyOn(loggerModule, 'outputCliData').mockImplementation((msg: string) => {
+    logs.push(msg);
   });
-  const errSpy = vi.spyOn(consola, 'error').mockImplementation((msg?: unknown) => {
+  const errSpy = vi.spyOn(loggerModule.consola, 'error').mockImplementation((msg?: unknown) => {
     errors.push(msg == null ? '' : String(msg));
   });
   const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {

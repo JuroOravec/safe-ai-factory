@@ -30,7 +30,7 @@ import { SAIFAC_TEMP_ROOT, type Sandbox } from './sandbox.js';
 
 /**
  * Captures the current git state so we can reconstruct it when resuming.
- * Returns baseCommitSha and basePatchDiff (unstaged + staged) for RunStorageContext.
+ * Returns baseCommitSha and basePatchDiff (`git diff HEAD`: staged + unstaged in one patch).
  */
 export async function captureBaseGitState(projectDir: string): Promise<RunStorageContext> {
   let baseCommitSha: string;
@@ -40,10 +40,9 @@ export async function captureBaseGitState(projectDir: string): Promise<RunStorag
     baseCommitSha = (await git({ cwd: projectDir, args: ['rev-parse', 'HEAD'] })).trim();
     const status = (await git({ cwd: projectDir, args: ['status', '--porcelain'] })).trim();
     if (status) {
-      const unstaged = await gitDiff({ cwd: projectDir });
-      const staged = await gitDiff({ cwd: projectDir, staged: true });
-      // Filter out entirely empty output, but do not trim valid diffs so trailing newlines are preserved
-      basePatchDiff = [unstaged, staged].filter((s) => s.trim()).join('') || undefined;
+      const combined = await gitDiff({ cwd: projectDir, args: ['HEAD'] });
+      // Empty check only — do not trim the diff body (trailing newline matters for git apply).
+      basePatchDiff = combined.trim() === '' ? undefined : combined;
     }
   } catch (err) {
     consola.warn('[orchestrator] Could not capture base git state for run storage:', err);

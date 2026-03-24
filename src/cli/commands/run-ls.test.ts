@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { runCommand as cittyRunCommand } from 'citty';
 import { describe, expect, it, vi } from 'vitest';
 
-import { consola } from '../../logger.js';
+import * as loggerModule from '../../logger.js';
 import runCommand from './run.js';
 
 async function withTempProject(fn: (projectDir: string) => Promise<void>): Promise<void> {
@@ -21,11 +21,17 @@ async function withTempProject(fn: (projectDir: string) => Promise<void>): Promi
   }
 }
 
-/** Minimal on-disk shape; `run ls` only reads runId, config.featureName, status, updatedAt. */
+/** Minimal on-disk shape; `run ls` reads runId, config.featureName, status, startedAt, updatedAt. */
 async function writeRunJson(
   projectDir: string,
   runId: string,
-  row: { featureName: string; status: 'failed' | 'completed'; updatedAt: string; taskId?: string },
+  row: {
+    featureName: string;
+    status: 'failed' | 'completed';
+    startedAt?: string;
+    updatedAt: string;
+    taskId?: string;
+  },
 ): Promise<void> {
   const dir = join(projectDir, '.saifac', 'runs');
   await mkdir(dir, { recursive: true });
@@ -37,7 +43,7 @@ async function writeRunJson(
     specRef: 'saifac/features/x',
     config: { featureName: row.featureName },
     status: row.status,
-    startedAt: '2026-01-01T00:00:00.000Z',
+    startedAt: row.startedAt ?? '2026-01-01T00:00:00.000Z',
     updatedAt: row.updatedAt,
   };
   await writeFile(join(dir, `${runId}.json`), JSON.stringify(doc), 'utf8');
@@ -45,8 +51,8 @@ async function writeRunJson(
 
 async function runRunSubcommand(rawArgs: string[]): Promise<string[]> {
   const lines: string[] = [];
-  const spy = vi.spyOn(consola, 'log').mockImplementation((msg?: unknown) => {
-    lines.push(msg == null ? '' : String(msg));
+  const spy = vi.spyOn(loggerModule, 'outputCliData').mockImplementation((msg: string) => {
+    lines.push(msg);
   });
   try {
     await cittyRunCommand(runCommand, { rawArgs });
@@ -62,11 +68,13 @@ describe('saifac run ls', () => {
       await writeRunJson(projectDir, 'aaa111', {
         featureName: 'feat-a',
         status: 'failed',
+        startedAt: '2026-03-19T08:00:00.000Z',
         updatedAt: '2026-03-20T10:00:00.000Z',
       });
       await writeRunJson(projectDir, 'bbb222', {
         featureName: 'feat-b',
         status: 'completed',
+        startedAt: '2026-03-21T09:30:00.000Z',
         updatedAt: '2026-03-21T11:00:00.000Z',
       });
 
@@ -74,16 +82,19 @@ describe('saifac run ls', () => {
       const text = lines.join('\n');
 
       expect(text).toContain('2 run(s):');
-      expect(text).toContain('RUN ID');
+      expect(text).toContain('RUN_ID');
       expect(text).toContain('FEATURE');
       expect(text).toContain('STATUS');
+      expect(text).toContain('STARTED');
       expect(text).toContain('UPDATED');
       expect(text).toContain('aaa111');
       expect(text).toContain('feat-a');
       expect(text).toContain('failed');
+      expect(text).toContain('2026-03-19T08:00:00.000Z');
       expect(text).toContain('bbb222');
       expect(text).toContain('feat-b');
       expect(text).toContain('completed');
+      expect(text).toContain('2026-03-21T09:30:00.000Z');
     });
   });
 

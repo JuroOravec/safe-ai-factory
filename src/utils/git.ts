@@ -33,7 +33,13 @@ export interface GitAddOpts {
  */
 export async function gitAdd(opts: GitAddOpts): Promise<void> {
   const paths = opts.paths?.length ? opts.paths : ['.'];
-  await spawnAsync({ command: GIT, ...opts, args: ['add', '--', ...paths] });
+  await spawnAsync({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: opts.stdio ?? 'inherit',
+    args: ['add', '--', ...paths],
+  });
 }
 
 export interface GitApplyOpts {
@@ -46,7 +52,13 @@ export interface GitApplyOpts {
 
 /** Run `git apply` for a patch file. Uses `--` so the path is never parsed as a flag. */
 export async function gitApply(opts: GitApplyOpts): Promise<void> {
-  await spawnAsync({ command: GIT, ...opts, args: ['apply', '--', opts.patchFile] });
+  await spawnAsync({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: opts.stdio ?? 'inherit',
+    args: ['apply', '--', opts.patchFile],
+  });
 }
 
 export interface GitBranchDeleteOpts {
@@ -68,7 +80,7 @@ export async function gitBranchDelete(opts: GitBranchDeleteOpts): Promise<void> 
     command: GIT,
     cwd: opts.cwd,
     env: opts.env,
-    stdio: opts.stdio,
+    stdio: opts.stdio ?? 'inherit',
     args: ['branch', flag, opts.branch],
   });
 }
@@ -91,7 +103,13 @@ export interface GitCleanOpts {
 
 /** Run `git clean -fd` (untracked files and directories). */
 export async function gitClean(opts: GitCleanOpts): Promise<void> {
-  await spawnAsync({ command: GIT, ...opts, args: ['clean', '-fd'] });
+  await spawnAsync({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: opts.stdio ?? 'inherit',
+    args: ['clean', '-fd'],
+  });
 }
 
 export interface GitCommitOpts {
@@ -115,7 +133,13 @@ export async function gitCommit(opts: GitCommitOpts): Promise<void> {
     args.push('-q');
   }
   args.push('-m', opts.message);
-  await spawnAsync({ command: GIT, ...opts, args });
+  await spawnAsync({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: opts.stdio ?? 'inherit',
+    args,
+  });
 }
 
 export interface GitDiffOpts {
@@ -148,7 +172,13 @@ export interface GitInitOpts {
 
 /** Run `git init` in `cwd`. */
 export async function gitInit(opts: GitInitOpts): Promise<void> {
-  await spawnAsync({ command: GIT, ...opts, args: ['init'] });
+  await spawnAsync({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: opts.stdio ?? 'inherit',
+    args: ['init'],
+  });
 }
 
 export interface GitPushOpts {
@@ -163,7 +193,13 @@ export interface GitPushOpts {
 
 /** Run `git push <remote> <branch>`. */
 export async function gitPush(opts: GitPushOpts): Promise<void> {
-  await spawnAsync({ command: GIT, ...opts, args: ['push', opts.remote, opts.branch] });
+  await spawnAsync({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: opts.stdio ?? 'inherit',
+    args: ['push', opts.remote, opts.branch],
+  });
 }
 
 export interface GitRemoteGetUrlOpts {
@@ -195,7 +231,13 @@ export interface GitResetHardOpts {
 /** Run `git reset --hard <ref>` (default ref: `HEAD`). */
 export async function gitResetHard(opts: GitResetHardOpts): Promise<void> {
   const ref = opts.ref ?? 'HEAD';
-  await spawnAsync({ command: GIT, ...opts, args: ['reset', '--hard', ref] });
+  await spawnAsync({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: opts.stdio ?? 'inherit',
+    args: ['reset', '--hard', ref],
+  });
 }
 
 export interface GitWorktreeAddOpts {
@@ -207,7 +249,7 @@ export interface GitWorktreeAddOpts {
   branch: string;
   /**
    * Start the new branch at this commit/ref. When omitted, Git uses the current `HEAD`
-   * of `cwd` (same as `git worktree add <path> -b <branch>` with no extra arg).
+   * of `cwd` (same as `git worktree add -b <branch> <path>` with no extra arg).
    */
   startCommit?: string;
   env?: NodeJS.ProcessEnv;
@@ -216,11 +258,18 @@ export interface GitWorktreeAddOpts {
 
 /** Run `git worktree add` with `-b` for a new branch. */
 export async function gitWorktreeAdd(opts: GitWorktreeAddOpts): Promise<void> {
-  const args = ['worktree', 'add', opts.path, '-b', opts.branch];
+  // Synopsis: git worktree add [(-b | -B) <new-branch>] <path> [<commit-ish>]
+  const args = ['worktree', 'add', '-b', opts.branch, opts.path];
   if (opts.startCommit) {
     args.push(opts.startCommit);
   }
-  await spawnAsync({ command: GIT, ...opts, args });
+  await spawnAsync({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: opts.stdio ?? 'inherit',
+    args,
+  });
 }
 
 export interface GitWorktreeRemoveOpts {
@@ -233,7 +282,13 @@ export interface GitWorktreeRemoveOpts {
 
 /** Run `git worktree remove --force` for `path`. */
 export async function gitWorktreeRemove(opts: GitWorktreeRemoveOpts): Promise<void> {
-  await spawnAsync({ command: GIT, ...opts, args: ['worktree', 'remove', '--force', opts.path] });
+  await spawnAsync({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: opts.stdio ?? 'inherit',
+    args: ['worktree', 'remove', '--force', opts.path],
+  });
 }
 
 export interface GitWorktreePruneOpts {
@@ -244,5 +299,11 @@ export interface GitWorktreePruneOpts {
 
 /** Run `git worktree prune`. */
 export async function gitWorktreePrune(opts: GitWorktreePruneOpts): Promise<void> {
-  await spawnAsync({ command: GIT, ...opts, args: ['worktree', 'prune'] });
+  await spawnAsync({
+    command: GIT,
+    cwd: opts.cwd,
+    env: opts.env,
+    stdio: opts.stdio ?? 'inherit',
+    args: ['worktree', 'prune'],
+  });
 }

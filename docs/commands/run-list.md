@@ -55,17 +55,17 @@ saifac run list --storage runs=file:///tmp/my-runs
 
 ## Output
 
-Runs are printed as a table: a header row (`RUN ID`, `FEATURE`, `STATUS`, `UPDATED`) plus one aligned row per run. Column widths grow with the longest value in each column.
+Runs are printed as a table: a header row (`RUN_ID`, `FEATURE`, `STATUS`, `STARTED`, `UPDATED`) plus one aligned row per run. Column widths grow with the longest value in each column.
 
 ### Example: several runs
 
 ```text
 3 run(s):
 
-  RUN ID   FEATURE        STATUS     UPDATED
-  abc12x   feat-checkout  failed     2026-03-21T14:02:00.000Z
-  def45y   feat-api       completed  2026-03-20T09:15:30.000Z
-  ghi78z   feat-api       failed     2026-03-19T18:00:00.000Z
+  RUN_ID   FEATURE        STATUS     STARTED                    UPDATED
+  abc12x   feat-checkout  failed     2026-03-21T12:00:00.000Z   2026-03-21T14:02:00.000Z
+  def45y   feat-api       completed  2026-03-20T08:00:00.000Z   2026-03-20T09:15:30.000Z
+  ghi78z   feat-api       failed     2026-03-19T17:00:00.000Z   2026-03-19T18:00:00.000Z
 ```
 
 ### Example: no runs (or empty storage)

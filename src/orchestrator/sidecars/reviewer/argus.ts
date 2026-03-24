@@ -118,7 +118,12 @@ export async function ensureArgusBinary(hostArch: 'arm64' | 'x64'): Promise<stri
       throw new Error(`Could not find 'argus' binary in archive from ${url}`);
     }
 
-    await spawnAsync({ command: 'mv', args: [extracted, binaryPath], cwd: process.cwd() });
+    await spawnAsync({
+      command: 'mv',
+      args: [extracted, binaryPath],
+      cwd: process.cwd(),
+      stdio: 'inherit',
+    });
     await chmod(binaryPath, 0o755);
     await pruneStaleArgusBinaries();
   } finally {

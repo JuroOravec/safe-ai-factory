@@ -166,9 +166,8 @@ export const runTestArgs = {
   },
 };
 
-// Run-specific args (feat run, run resume). Builds on runTestArgs + agent flags + coder-only options.
-export const featRunArgs = {
-  name: nameArg,
+// Shared body for feat run and run resume (feature name is feat-run only; resume uses the stored artifact).
+const featRunCoreArgs = {
   ...runTestArgs,
   ...featAgentArgs,
 
@@ -208,4 +207,15 @@ export const featRunArgs = {
     type: 'string' as const,
     description: 'How to parse agent stdout. openhands | raw (default: from agent profile).',
   },
+};
+
+// Run-specific args (feat run, run resume). Builds on runTestArgs + agent flags + coder-only options.
+export const featRunArgs = {
+  name: nameArg,
+  ...featRunCoreArgs,
+};
+
+/** Same options as `feat run` except `--name` / `-n` (feature comes from the stored run only). */
+export const featResumeArgs = {
+  ...featRunCoreArgs,
 };

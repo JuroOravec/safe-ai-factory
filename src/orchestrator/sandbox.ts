@@ -244,6 +244,13 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   // Capture any uncommitted host changes (staged + unstaged) before rsync so that
   // applyPatchToHost can reconstruct the exact host state the sandbox was based on,
   // regardless of branch switches or working-tree edits made while the agent runs.
+  if (!(await pathExists(projectDir))) {
+    throw new Error(
+      `[sandbox] Source directory does not exist (cannot run git here). ` +
+        `Resume: the worktree path may be stale — try resume again. Path: ${projectDir}`,
+    );
+  }
+
   const hostBasePatch = await gitDiff({ cwd: projectDir, args: ['HEAD'] });
   await writeUtf8(hostBasePatchPath, hostBasePatch);
   if (hostBasePatch.trim()) {

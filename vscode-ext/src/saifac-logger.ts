@@ -22,5 +22,11 @@ export function setVerboseLogging(verbose: boolean): void {
   logger.level = verbose ? LogLevels.debug : baselineLogLevel;
 }
 
+/** Mirrors `safe-ai-factory/src/logger.ts` — plain stdout for pipe/copy-friendly CLI output. */
+export function outputCliData(message: string): void {
+  process.stdout.write(message);
+  process.stdout.write('\n');
+}
+
 export { LogLevels };
 export type { ConsolaInstance };
