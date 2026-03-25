@@ -6,7 +6,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdir, realpath, rm, stat, unlink } from 'node:fs/promises';
+import { mkdir, realpath, rm, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { consola } from '../logger.js';
@@ -27,68 +27,14 @@ import {
   gitWorktreeAdd,
   gitWorktreeRemove,
 } from '../utils/git.js';
-import { pathExists, readUtf8, spawnAsync, spawnWait, writeUtf8 } from '../utils/io.js';
+import { pathExists, readUtf8, spawnAsync, writeUtf8 } from '../utils/io.js';
 import { type RunStorageContext } from './loop.js';
 import { applyRunPatchStepInRepo } from './patch.js';
-import { SAIFAC_TEMP_ROOT, type Sandbox } from './sandbox.js';
+import { diffUntrackedFilesVersusDevNull, SAIFAC_TEMP_ROOT, type Sandbox } from './sandbox.js';
 
 // ---------------------------------------------------------------------------
 // Base git state capture (for run storage on start)
 // ---------------------------------------------------------------------------
-
-/**
- * Builds one combined patch for **untracked** files so resume can recreate the working tree
- * faithfully.
- *
- * Git does not include untracked paths in `git diff HEAD`, so we list them with
- * `ls-files --others --exclude-standard`, skip directories, and turn each file (or symlink)
- * into a normal "new file" unified diff via `git diff --no-index /dev/null <path>` (with
- * `--binary` where needed). Concatenated result is meant for `git apply` alongside tracked diffs.
- */
-async function diffUntrackedFilesVersusDevNull(projectDir: string): Promise<string> {
-  // Untracked paths only (honors .gitignore via --exclude-standard), NUL-separated for odd filenames.
-  const lsRaw = await git({
-    cwd: projectDir,
-    args: ['ls-files', '-z', '--others', '--exclude-standard'],
-  });
-  const listOut = lsRaw
-    .split('\0')
-    .map((p) => p.trim())
-    .filter(Boolean);
-
-  const chunks: string[] = [];
-  for (const rel of listOut) {
-    const abs = join(projectDir, rel);
-    let st;
-    try {
-      st = await stat(abs);
-    } catch {
-      continue;
-    }
-    // Skip directories — only files and symlinks become valid "add file" hunks for `git apply`.
-    if (!st.isFile() && !st.isSymbolicLink()) {
-      continue;
-    }
-
-    // Same shape as "new file" in a normal commit diff; exit 1 with stdout means "there is a diff" (git convention).
-    const r = await spawnWait({
-      command: 'git',
-      cwd: projectDir,
-      args: ['diff', '--no-index', '--binary', '--', '/dev/null', rel],
-    });
-    if (r.code !== 0 && r.code !== 1) {
-      consola.warn(
-        `[orchestrator] git diff --no-index for untracked ${rel} exited ${r.code}: ${r.stderr.trim()}`,
-      );
-      continue;
-    }
-    if (r.code === 1 && r.stdout.trim()) {
-      chunks.push(r.stdout.endsWith('\n') ? r.stdout : `${r.stdout}\n`);
-    }
-  }
-
-  return chunks.join('');
-}
 
 /**
  * Captures the current git state so we can reconstruct it when resuming.

@@ -21,7 +21,7 @@
  *       ...rest of repo...
  */
 
-import { chmod, mkdir, readdir, rm } from 'node:fs/promises';
+import { chmod, mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { minimatch } from 'minimatch';
@@ -31,7 +31,7 @@ import { consola } from '../logger.js';
 import type { RunPatchStep } from '../runs/types.js';
 import type { Feature } from '../specs/discover.js';
 import { git, gitAdd, gitCommit, gitDiff, gitInit } from '../utils/git.js';
-import { pathExists, readUtf8, spawnAsync, writeUtf8 } from '../utils/io.js';
+import { pathExists, readUtf8, spawnAsync, spawnWait, writeUtf8 } from '../utils/io.js';
 import { replayRunPatchSteps, SAIFAC_DEFAULT_AUTHOR } from './patch.js';
 
 /** Recursively removes all directories named "hidden" under baseDir. Exported for testing. */
@@ -202,6 +202,55 @@ export interface CreateSandboxOpts {
 }
 
 /**
+ * Builds one combined patch for **untracked** files so host-base.patch (and resume) can
+ * recreate the working tree faithfully.
+ *
+ * Git does not include untracked paths in `git diff HEAD`, so we list them with
+ * `ls-files --others --exclude-standard`, skip directories, and turn each file (or symlink)
+ * into a normal "new file" unified diff via `git diff --no-index /dev/null <path>` (with
+ * `--binary` where needed). Concatenated result is meant for `git apply` alongside tracked diffs.
+ */
+export async function diffUntrackedFilesVersusDevNull(projectDir: string): Promise<string> {
+  const lsRaw = await git({
+    cwd: projectDir,
+    args: ['ls-files', '-z', '--others', '--exclude-standard'],
+  });
+  const listOut = lsRaw
+    .split('\0')
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const chunks: string[] = [];
+  for (const rel of listOut) {
+    const abs = join(projectDir, rel);
+    let st;
+    try {
+      st = await stat(abs);
+    } catch {
+      continue;
+    }
+    if (!st.isFile() && !st.isSymbolicLink()) continue;
+
+    const r = await spawnWait({
+      command: 'git',
+      cwd: projectDir,
+      args: ['diff', '--no-index', '--binary', '--', '/dev/null', rel],
+    });
+    if (r.code !== 0 && r.code !== 1) {
+      consola.warn(
+        `[sandbox] git diff --no-index for untracked ${rel} exited ${r.code}: ${r.stderr.trim()}`,
+      );
+      continue;
+    }
+    if (r.code === 1 && r.stdout.trim()) {
+      chunks.push(r.stdout.endsWith('\n') ? r.stdout : `${r.stdout}\n`);
+    }
+  }
+
+  return chunks.join('');
+}
+
+/**
  * Creates an isolated sandbox for the feature.
  *
  * 1. rsync repo → sandboxBasePath/code/ (honoring .gitignore)
@@ -267,12 +316,27 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
     );
   }
 
-  const hostBasePatch = await gitDiff({ cwd: projectDir, args: ['--binary', 'HEAD'] });
+  // Capture tracked + untracked changes so applyPatchToHost can faithfully reconstruct the
+  // host's working tree in the worktree before applying the agent's patch.
+  // `git diff HEAD` only covers tracked files; untracked files (e.g. a new CHANGELOG.md that
+  // exists on the host but is not committed) must be included separately, otherwise the agent's
+  // modification diff will fail with "No such file or directory" in the worktree.
+  // Always use projectDir here — resume sets codeSourceDir to a base snapshot dir with no .git.
+  const trackedPatch = await gitDiff({ cwd: projectDir, args: ['--binary', 'HEAD'] });
+  const untrackedPatch = await diffUntrackedFilesVersusDevNull(projectDir);
+  const parts: string[] = [];
+  if (trackedPatch.trim()) {
+    parts.push(trackedPatch.endsWith('\n') ? trackedPatch : `${trackedPatch}\n`);
+  }
+  if (untrackedPatch.trim()) {
+    parts.push(untrackedPatch.endsWith('\n') ? untrackedPatch : `${untrackedPatch}\n`);
+  }
+  const hostBasePatch = parts.join('');
   await writeUtf8(hostBasePatchPath, hostBasePatch);
   if (hostBasePatch.trim()) {
     const lineCount = hostBasePatch.split('\n').length;
     consola.log(
-      `[sandbox] Captured ${lineCount} lines of host uncommitted changes to host-base.patch`,
+      `[sandbox] Captured ${lineCount} lines of host uncommitted + untracked changes to host-base.patch`,
     );
   } else {
     consola.log('[sandbox] Host working tree is clean — host-base.patch is empty');
