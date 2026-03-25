@@ -81,6 +81,7 @@
     "saifac:feat:run": "tsx src/cli/commands/feat.ts run",
     "saifac:run:list": "tsx src/cli/commands/run.ts list",
     "saifac:run:resume": "tsx src/cli/commands/run.ts resume",
+    "saifac:run:fork": "tsx src/cli/commands/run.ts fork",
     "saifac:run:inspect": "tsx src/cli/commands/run.ts inspect",
     "saifac:run:test": "tsx src/cli/commands/run.ts test",
     "saifac:run:remove": "tsx src/cli/commands/run.ts remove",

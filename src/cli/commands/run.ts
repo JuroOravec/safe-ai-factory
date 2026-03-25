@@ -7,6 +7,7 @@
  *   rm, remove    Delete a run
  *   info          Print stored run as JSON
  *   clear         Clear stored runs (optionally filtered)
+ *   fork          Clone a stored run to a new ID
  *   resume        Resume a stored run from storage
  *   test          Re-test a stored run's patch (no coding agent)
  *   inspect       Open an idle coding container for a stored run
@@ -23,12 +24,21 @@ import {
   type OrchestratorCliInput,
   parseModelOverridesCliDelta,
 } from '../../orchestrator/options.js';
+import { forkStoredRun } from '../../runs/fork.js';
 import { toRunInfoJson } from '../../runs/utils/run-info.js';
 import { omit } from '../../utils/omit.js';
-import { featResumeArgs, projectDirArg, runTestArgs, saifDirArg, storageArg } from '../args.js';
+import {
+  featResumeArgs,
+  featRunArgs,
+  projectDirArg,
+  runTestArgs,
+  saifDirArg,
+  storageArg,
+} from '../args.js';
 import {
   buildOrchestratorCliInputFromFeatArgs,
   type FeatRunArgs,
+  getFeatNameFromArgs,
   parseRunId,
   readProjectDirFromCli,
   readSaifDirFromCli,
@@ -280,6 +290,60 @@ const inspectCommand = defineCommand({
   },
 });
 
+const forkCommand = defineCommand({
+  meta: {
+    name: 'fork',
+    description: 'Clone a stored run to a new run ID.',
+  },
+  args: {
+    ...commonRunArgs,
+    ...featRunArgs,
+    runId: {
+      type: 'positional' as const,
+      description: 'Source run ID to fork',
+      required: true,
+    },
+  },
+  async run({ args }) {
+    const runArgs = args as FeatRunArgs;
+    const ctx = await parseResumeOrchestratorCli(runArgs);
+    const runStorage = resolveRunStorage(
+      readStorageStringFromCli(runArgs),
+      ctx.projectDir,
+      ctx.config,
+    );
+    if (!runStorage) {
+      consola.error('Run storage is disabled (--storage none). Cannot fork a stored run.');
+      process.exit(1);
+    }
+    const sourceRunId = parseRunId(args);
+
+    const sourceArtifact = await runStorage.getRun(sourceRunId);
+    if (!sourceArtifact) {
+      consola.error(`Run not found: ${sourceRunId}`);
+      process.exit(1);
+    }
+
+    const nameFromCli = getFeatNameFromArgs(runArgs);
+    if (nameFromCli && nameFromCli !== sourceArtifact.config.featureName) {
+      consola.error(
+        `Source run is for feature "${sourceArtifact.config.featureName}"; omit --name or use -n ${sourceArtifact.config.featureName}.`,
+      );
+      process.exit(1);
+    }
+
+    const { newRunId } = await forkStoredRun({
+      ...ctx,
+      runId: sourceRunId,
+      runStorage,
+    });
+
+    consola.log(`\nForked run ${sourceRunId} → ${newRunId}`);
+    consola.log(`\nStart the agent with:`);
+    consola.log(`  saifac run resume ${newRunId}`);
+  },
+});
+
 const resumeCommand = defineCommand({
   meta: {
     name: 'resume',
@@ -387,6 +451,7 @@ const runCommand = defineCommand({
     remove: rmCommand,
     info: infoCommand,
     clear: clearCommand,
+    fork: forkCommand,
     resume: resumeCommand,
     inspect: inspectCommand,
     test: testCommand,

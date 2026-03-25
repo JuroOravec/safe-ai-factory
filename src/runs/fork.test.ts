@@ -1,0 +1,116 @@
+/**
+ * {@link forkStoredRun} — clone stored run artifact with merged CLI defaults.
+ */
+
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+import { buildOrchestratorCliInputFromFeatArgs, type FeatRunArgs } from '../cli/utils.js';
+import { loadSaifacConfig } from '../config/load.js';
+import { forkStoredRun } from './fork.js';
+import { createRunStorage } from './storage.js';
+import type { RunArtifact } from './types.js';
+
+function makeSourceArtifact(runId: string): RunArtifact {
+  return {
+    runId,
+    baseCommitSha: 'abc123dead',
+    basePatchDiff: 'diff --git a/x b/x\n',
+    runPatchSteps: [{ message: 'step1', diff: 'patch hunk\n' }],
+    specRef: 'saifac/features/my-feat',
+    lastFeedback: 'try again',
+    config: {
+      featureName: 'my-feat',
+      gitProviderId: 'github',
+      testProfileId: 'node-vitest',
+      sandboxProfileId: 'node-pnpm-python',
+      agentProfileId: 'openhands',
+      projectDir: '/ignored-on-merge',
+      maxRuns: 5,
+      overrides: {},
+      saifDir: 'saifac',
+      projectName: 'proj',
+      testImage: 'test:latest',
+      resolveAmbiguity: 'ai',
+      dangerousDebug: false,
+      dangerousNoLeash: false,
+      cedarPolicyPath: '',
+      coderImage: '',
+      push: null,
+      pr: false,
+      gateRetries: 10,
+      reviewerEnabled: true,
+      agentEnv: {},
+      agentLogFormat: 'openhands',
+      testScript: 'test',
+      gateScript: '#',
+      startupScript: '#',
+      agentInstallScript: '#',
+      agentScript: '#',
+      stageScript: '#',
+      startupScriptFile: 's/startup.sh',
+      gateScriptFile: 's/gate.sh',
+      stageScriptFile: 's/stage.sh',
+      testScriptFile: 's/test.sh',
+      agentInstallScriptFile: 's/agent-install.sh',
+      agentScriptFile: 's/agent.sh',
+      testRetries: 1,
+      stagingEnvironment: {
+        provisioner: 'docker',
+        app: { sidecarPort: 8080, sidecarPath: '/exec' },
+        appEnvironment: {},
+      },
+      codingEnvironment: { provisioner: 'docker' },
+    },
+    status: 'failed',
+    startedAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-02T00:00:00.000Z',
+  };
+}
+
+describe('forkStoredRun', () => {
+  it('writes a new run id, copies git/patch state, and merges CLI into stored config', async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), 'saifac-fork-'));
+    try {
+      await writeFile(join(projectDir, 'package.json'), JSON.stringify({ name: 'proj' }), 'utf8');
+      await mkdir(join(projectDir, 'saifac', 'features', 'my-feat'), { recursive: true });
+
+      const storage = createRunStorage('local', projectDir)!;
+      const source = makeSourceArtifact('srcrun9');
+      await storage.saveRun('srcrun9', source);
+
+      const config = await loadSaifacConfig('saifac', projectDir);
+      const cli = await buildOrchestratorCliInputFromFeatArgs({ 'max-runs': '17' } as FeatRunArgs, {
+        projectDir,
+        saifDir: 'saifac',
+        config,
+      });
+
+      const { newRunId } = await forkStoredRun({
+        runId: 'srcrun9',
+        projectDir,
+        saifDir: 'saifac',
+        config,
+        runStorage: storage,
+        cli,
+        cliModelDelta: undefined,
+      });
+
+      expect(newRunId).not.toBe('srcrun9');
+      const forked = await storage.getRun(newRunId);
+      expect(forked).not.toBeNull();
+      expect(forked!.baseCommitSha).toBe(source.baseCommitSha);
+      expect(forked!.basePatchDiff).toBe(source.basePatchDiff);
+      expect(forked!.runPatchSteps).toEqual(source.runPatchSteps);
+      expect(forked!.lastFeedback).toBe(source.lastFeedback);
+      expect(forked!.status).toBe('failed');
+      expect(forked!.config.maxRuns).toBe(17);
+      expect(forked!.config.featureName).toBe('my-feat');
+    } finally {
+      await rm(projectDir, { recursive: true, force: true });
+    }
+  });
+});
