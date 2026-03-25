@@ -76,7 +76,7 @@ export async function captureBaseGitState(projectDir: string): Promise<RunStorag
     consola.warn('[orchestrator] Could not capture base git state for run storage:', err);
     baseCommitSha = '';
   }
-  return { baseCommitSha, basePatchDiff };
+  return { baseCommitSha, basePatchDiff, rules: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -342,6 +342,7 @@ export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promis
     runPatchSteps,
     specRef: opts.feature.relativePath,
     lastFeedback: runContext.lastErrorFeedback,
+    rules: runContext.rules,
     status: 'failed',
     opts,
   });

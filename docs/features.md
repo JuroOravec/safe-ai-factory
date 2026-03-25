@@ -133,7 +133,7 @@ saifac feat run --profile python-uv
 
 ## Agent feedback
 
-When something is wrong, the factory does not only fail the run — it **returns actionable output to the coding agent** so it can fix and retry. There are three layers, from fastest/cheapest to the full validation pass:
+When something is wrong, the factory does not only fail the run — it **returns actionable output to the coding agent** so it can fix and retry. **Automated** feedback happens in three layers, from fastest/cheapest to the full validation pass:
 
 1. **Gate (inner loop)** — After each agent round, your [gate script](./gate.md) runs inside the coder environment (e.g. lint, format, typecheck, or a quick test command). Failures append captured stdout/stderr to the task; the agent retries inside the same container session, up to `--gate-retries`. See [Gate script](./gate.md).
 
@@ -141,7 +141,9 @@ When something is wrong, the factory does not only fail the run — it **returns
 
 3. **Tests (outer loop)** — After the inner loop succeeds, the orchestrator runs your tests in the **Test Runner** container (separate from the sandbox). Failures become **outer-loop** feedback: the pipeline can restart another full run (subject to `--max-runs` and `--test-retries`). Test language and framework are chosen with `--test-profile`. See [Test profiles](./test-profiles.md).
 
-Together, the gate and reviewer catch most mistakes early; the test runner remains the authoritative check against your real test suite.
+**Direct human feedback** — Attach feedback to a failed or stopped agent, and resume the run. Your feedback will be merged into the agent **task prompt**. See [Run rules](./runs.md#run-rules-user-feedback) and [Provide user feedback to the agent](./guides/providing-user-feedback.md).
+
+Together, the gate and reviewer catch most mistakes early; the test runner remains the authoritative check against your real test suite. Run rules complement that stack when you want to steer the next coding rounds explicitly.
 
 ## Test profiles: Configure testing containers
 

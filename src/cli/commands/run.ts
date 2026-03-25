@@ -11,6 +11,7 @@
  *   resume        Resume a stored run from storage
  *   test          Re-test a stored run's patch (no coding agent)
  *   inspect       Open an idle coding container for a stored run
+ *   rules         Manage user feedback rules on a stored run (create, list, get, update, remove)
  */
 
 import { defineCommand, runMain } from 'citty';
@@ -47,6 +48,7 @@ import {
   resolveRunStorage,
   resolveSaifDirRelative,
 } from '../utils.js';
+import { runRulesCommand } from './run-rules.js';
 
 /** CLI parsing for `saifac run resume` */
 async function parseResumeOrchestratorCli(args: FeatRunArgs): Promise<{
@@ -455,6 +457,7 @@ const runCommand = defineCommand({
     resume: resumeCommand,
     inspect: inspectCommand,
     test: testCommand,
+    rules: runRulesCommand,
   },
 });
 

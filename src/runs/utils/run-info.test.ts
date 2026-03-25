@@ -9,6 +9,7 @@ const minimalArtifact: RunArtifact = {
   basePatchDiff: 'base-diff-content',
   runPatchSteps: [{ message: 'm', diff: 'run-diff-content' }],
   specRef: 'saifac/features/x',
+  rules: [],
   lastFeedback: 'feedback line',
   config: {
     featureName: 'feat',

@@ -174,4 +174,5 @@ Resume again with:
 ## See also
 
 - [`run inspect`](../commands/run-inspect.md) · [`run resume`](../commands/run-resume.md) · [`run test`](../commands/run-test.md)  
+- [Provide user feedback to the agent](providing-user-feedback.md) — steer via `run rules` instead of hand-editing the sandbox  
 - [Runs](../runs.md) · [Usage](../usage.md) · [Troubleshooting](../troubleshooting.md)

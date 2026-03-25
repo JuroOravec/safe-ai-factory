@@ -26,7 +26,8 @@ import {
   type RunTestsOpts,
   type TestsResult,
 } from '../provisioners/types.js';
-import { type RunPatchStep, StaleArtifactError } from '../runs/types.js';
+import { activeOnceRuleIds, markOnceRulesConsumed, rulesForPrompt } from '../runs/rules.js';
+import { type RunPatchStep, type RunRule, StaleArtifactError } from '../runs/types.js';
 import { buildRunArtifact, type BuildRunArtifactOpts } from '../runs/utils/artifact.js';
 import type { SupportedSandboxProfileId } from '../sandbox-profiles/types.js';
 import type { Feature } from '../specs/discover.js';
@@ -436,6 +437,11 @@ export interface RunStorageContext {
   basePatchDiff?: string;
   /** Mutable: set by loop for save-on-Ctrl+C */
   lastErrorFeedback?: string;
+  /**
+   * User rules for this run (from artifact on resume; empty on fresh start).
+   * Mutated when `once` rules are consumed after each coding round.
+   */
+  rules: RunRule[];
 }
 
 export async function runIterativeLoop(
@@ -497,8 +503,6 @@ export async function runIterativeLoop(
     testScript,
   });
 
-  const task = await buildInitialTask({ feature, saifDir });
-
   const cleanupAndSaveRun = async (input: { didSucceed: boolean }) => {
     const { didSucceed } = input;
 
@@ -520,6 +524,7 @@ export async function runIterativeLoop(
           runPatchSteps: runPatchStepsAccum,
           specRef: feature.relativePath,
           lastFeedback: didSucceed ? undefined : lastErrorFeedback || undefined,
+          rules: runContext.rules,
           status: didSucceed ? 'completed' : 'failed',
           opts: loopOpts as BuildRunArtifactOpts,
         });
@@ -647,6 +652,15 @@ export async function runIterativeLoop(
         await git({ cwd: sandbox.codePath, args: ['rev-parse', 'HEAD'] })
       ).trim();
 
+      // Some rules are marked as "once" and should be consumed after the coding round.
+      // Thus these rules are included in the task prompt only on the first round.
+      const onceIdsThisRound = runContext ? activeOnceRuleIds(runContext.rules) : [];
+      const task = await buildInitialTask({
+        feature,
+        saifDir,
+        rules: runContext ? rulesForPrompt(runContext.rules) : [],
+      });
+
       // 1. Run agent (fresh context every iteration — Ralph Wiggum)
       //    The coding provisioner sets up its network + compose services, runs the agent,
       //    then tears itself down, regardless of outcome.
@@ -685,6 +699,11 @@ export async function runIterativeLoop(
       } finally {
         registry?.deregisterProvisioner(codingProvisioner);
         await codingProvisioner.teardown({ runId: codingRunId });
+      }
+
+      // Mark once rules as consumed if they were used this round.
+      if (runContext && onceIdsThisRound.length > 0) {
+        markOnceRulesConsumed(runContext.rules, onceIdsThisRound);
       }
 
       // 2. Extract incremental patch(es) for this round (one RunPatchStep per agent commit + optional WIP).
@@ -1008,10 +1027,12 @@ export async function runVagueSpecsCheckerForFailure(
 interface BuildInitialTaskOpts {
   feature: Feature;
   saifDir: string;
+  /** User rules to inject (already filtered and orderedempty to skip section. */
+  rules: readonly RunRule[];
 }
 
 export async function buildInitialTask(opts: BuildInitialTaskOpts): Promise<string> {
-  const { feature, saifDir } = opts;
+  const { feature, saifDir, rules } = opts;
   const planPath = join(feature.absolutePath, 'plan.md');
   const specPath = join(feature.absolutePath, 'specification.md');
 
@@ -1027,6 +1048,14 @@ export async function buildInitialTask(opts: BuildInitialTaskOpts): Promise<stri
 
   if (await pathExists(specPath)) {
     parts.push('', '## Specification', '', await readUtf8(specPath));
+  }
+
+  if (rules.length > 0) {
+    parts.push('', '## User feedback', '');
+    for (const r of rules) {
+      const label = r.scope === 'once' ? '(this round only)' : '(always)';
+      parts.push(`- [${label}] ${r.content}`);
+    }
   }
 
   return parts.join('\n');

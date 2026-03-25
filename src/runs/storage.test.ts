@@ -12,6 +12,7 @@ const dummyArtifact: RunArtifact = {
   baseCommitSha: 'abc123',
   runPatchSteps: [{ message: 'm', diff: 'diff' }],
   specRef: 'saifac/features/x',
+  rules: [],
   config: {
     featureName: 'x',
     gitProviderId: 'github',

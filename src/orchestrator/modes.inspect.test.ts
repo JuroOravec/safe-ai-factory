@@ -81,6 +81,7 @@ const baseArtifact: RunArtifact = {
   baseCommitSha: 'abc123',
   runPatchSteps: [{ message: 'saifac: coding attempt 1', diff: 'original patch\n' }],
   specRef: 'saifac/features/my-feat',
+  rules: [],
   config: {
     featureName: 'my-feat',
     gitProviderId: 'github',

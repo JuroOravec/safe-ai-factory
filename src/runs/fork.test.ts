@@ -21,6 +21,7 @@ function makeSourceArtifact(runId: string): RunArtifact {
     basePatchDiff: 'diff --git a/x b/x\n',
     runPatchSteps: [{ message: 'step1', diff: 'patch hunk\n' }],
     specRef: 'saifac/features/my-feat',
+    rules: [],
     lastFeedback: 'try again',
     config: {
       featureName: 'my-feat',

@@ -14,7 +14,7 @@ import { getGitProvider } from '../../git/index.js';
 import type { OrchestratorOpts } from '../../orchestrator/modes.js';
 import type { PatchExcludeRule } from '../../orchestrator/sandbox.js';
 import { createRunStorage } from '../../runs/storage.js';
-import type { RunPatchStep } from '../../runs/types.js';
+import type { RunPatchStep, RunRule } from '../../runs/types.js';
 import type { SerializedPatchExcludeRule } from '../../runs/utils/serialize.js';
 import { resolveTestProfile } from '../../test-profiles/index.js';
 
@@ -72,6 +72,7 @@ export interface SerializedOrchestratorOpts extends Record<string, unknown> {
       baseCommitSha: string;
       basePatchDiff?: string;
       lastErrorFeedback?: string;
+      rules?: RunRule[];
     };
   } | null;
   /** URI passed to createRunStorage, or null when storage is disabled. */
@@ -113,6 +114,7 @@ export function serializeOrchestratorOpts(opts: OrchestratorOpts): SerializedOrc
             baseCommitSha: resume.runContext.baseCommitSha,
             basePatchDiff: resume.runContext.basePatchDiff,
             lastErrorFeedback: resume.runContext.lastErrorFeedback,
+            rules: resume.runContext.rules,
           },
         }
       : null,
@@ -186,7 +188,10 @@ export function deserializeOrchestratorOpts(serialized: Record<string, unknown>)
           initialErrorFeedback: s.resume.initialErrorFeedback,
           persistedRunId: s.resume.persistedRunId,
           artifactRevisionAtResume: s.resume.artifactRevisionAtResume,
-          runContext: s.resume.runContext,
+          runContext: {
+            ...s.resume.runContext,
+            rules: s.resume.runContext.rules ?? [],
+          },
         }
       : null,
     runStorage: s.runStorageUri ? createRunStorage(s.runStorageUri, s.projectDir) : null,

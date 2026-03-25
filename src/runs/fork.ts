@@ -5,6 +5,7 @@
 import type { ResumeOpts } from '../orchestrator/modes.js';
 import { resolveOrchestratorOpts } from '../orchestrator/options.js';
 import { resolveFeature } from '../specs/discover.js';
+import { cloneRunRules } from './rules.js';
 import type { RunStorage } from './types.js';
 import { buildRunArtifact, type BuildRunArtifactOpts } from './utils/artifact.js';
 import { deserializeArtifactConfig } from './utils/serialize.js';
@@ -61,6 +62,7 @@ export async function forkStoredRun(opts: ForkStoredRunOpts): Promise<{ newRunId
     runPatchSteps: source.runPatchSteps.map((s) => ({ ...s })),
     specRef: feature.relativePath,
     lastFeedback: source.lastFeedback,
+    rules: cloneRunRules(source.rules),
     status: 'failed',
     opts: artifactLoopOpts as BuildRunArtifactOpts,
   });

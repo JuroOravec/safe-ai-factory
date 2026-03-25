@@ -9,6 +9,27 @@ import type { SerializedLoopOpts } from './utils/serialize.js';
 export type RunStatus = 'failed' | 'completed';
 
 /**
+ * One-off rules apply only until the coding round finishes;
+ * `always` rules repeat every round.
+ */
+export type RunRuleScope = 'once' | 'always';
+
+/**
+ * User feedback injected into the agent task (see {@link RunArtifact#rules}).
+ * `once` rules get {@link RunRule#consumedAt} set after the coding phase of
+ * the round that included them.
+ */
+export interface RunRule {
+  id: string;
+  content: string;
+  scope: RunRuleScope;
+  createdAt: string;
+  updatedAt: string;
+  /** When set, a `once` rule is no longer included in the task prompt. */
+  consumedAt?: string;
+}
+
+/**
  * One incremental commit in the sandbox / resume worktree (message + unified diff + optional author).
  * Diffs apply in order on top of `baseCommitSha` + optional `basePatchDiff` + prior steps.
  */
@@ -66,6 +87,9 @@ export interface RunArtifact {
   specRef: string;
   /** Sanitized test failure summary for Ralph Wiggum feedback */
   lastFeedback?: string;
+
+  /** User rules appended via `saifac run rules create` and merged into the agent task. */
+  rules: RunRule[];
 
   /** Serialized CLI config used for this run */
   config: SerializedLoopOpts;

@@ -54,7 +54,8 @@ import { applyPatchToHost } from '../../orchestrator/phases/apply-patch.js';
 import { runAgentPhase } from '../../orchestrator/phases/run-agent-phase.js';
 import { runTestPhase } from '../../orchestrator/phases/run-test-phase.js';
 import { createSandbox, destroySandbox, type Sandbox } from '../../orchestrator/sandbox.js';
-import { type RunPatchStep, StaleArtifactError } from '../../runs/types.js';
+import { activeOnceRuleIds, markOnceRulesConsumed, rulesForPrompt } from '../../runs/rules.js';
+import { type RunPatchStep, type RunRule, StaleArtifactError } from '../../runs/types.js';
 import { buildRunArtifact } from '../../runs/utils/artifact.js';
 import { gitClean, gitResetHard } from '../../utils/git.js';
 import { pathExists, readUtf8, writeUtf8 } from '../../utils/io.js';
@@ -108,6 +109,15 @@ export const vagueSpecsStepOutputSchema = z.object({
 });
 export type VagueSpecsStepOutput = z.infer<typeof vagueSpecsStepOutputSchema>;
 
+const runRuleSchema = z.object({
+  id: z.string(),
+  content: z.string(),
+  scope: z.enum(['once', 'always']),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  consumedAt: z.string().optional(),
+});
+
 export const convergenceOutputSchema = z.object({
   success: z.boolean(),
   attempt: z.number(),
@@ -115,6 +125,7 @@ export const convergenceOutputSchema = z.object({
   lastRunId: z.string(),
   lastPatchContent: z.string().optional(),
   lastErrorFeedback: z.string().optional(),
+  rules: z.array(runRuleSchema),
 });
 export type ConvergenceOutput = z.infer<typeof convergenceOutputSchema>;
 
@@ -130,7 +141,12 @@ export type FeatRunSerializedInput = HatchetInput & {
   /** JSON-serialized OrchestratorOpts (see serializeOrchestratorOpts) */
   serializedOpts: Record<string, unknown>;
   /** JSON-serialized RunStorageContext */
-  runContext: { baseCommitSha: string; basePatchDiff?: string; lastErrorFeedback?: string };
+  runContext: {
+    baseCommitSha: string;
+    basePatchDiff?: string;
+    lastErrorFeedback?: string;
+    rules: RunRule[];
+  };
 };
 
 export type FeatRunIterationSerializedInput = HatchetInput & {
@@ -341,6 +357,8 @@ export function createFeatRunWorkflow() {
       const opts = deserializeOrchestratorOpts(input.serializedOpts);
       const { maxRuns, feature, saifDir, resume, testOnly } = opts;
 
+      const rulesFromWire = (): RunRule[] => structuredClone(input.runContext.rules);
+
       if (testOnly) {
         consola.log('[hatchet] test-only — skipping agent iterations; running verification tests.');
         const runPatchStepsAccum = [...(resume?.seedRunPatchSteps ?? [])];
@@ -366,6 +384,7 @@ export function createFeatRunWorkflow() {
             attempt: 1,
             patchPath: null,
             lastRunId: verify.lastRunId,
+            rules: rulesFromWire(),
           };
         }
         if (verify.kind === 'aborted') {
@@ -375,6 +394,7 @@ export function createFeatRunWorkflow() {
             patchPath: null,
             lastRunId: `${sandboxRaw.runId}-1-1`,
             lastErrorFeedback: 'Test run was cancelled.',
+            rules: rulesFromWire(),
           };
         }
         const base = 'An external service attempted to use this project and failed. ';
@@ -387,10 +407,11 @@ export function createFeatRunWorkflow() {
           patchPath: null,
           lastRunId: `${sandboxRaw.runId}-1-1`,
           lastErrorFeedback: base + hint,
+          rules: rulesFromWire(),
         };
       }
 
-      const task = await buildInitialTask({ feature, saifDir });
+      const rulesState: RunRule[] = rulesFromWire();
 
       let errorFeedback = resume?.initialErrorFeedback ?? '';
       let lastPatchContent = '';
@@ -400,6 +421,15 @@ export function createFeatRunWorkflow() {
 
       for (let attempt = 1; attempt <= maxRuns; attempt++) {
         consola.log(`\n[hatchet] ===== ATTEMPT ${attempt}/${maxRuns} =====`);
+
+        // Some rules are marked as "once" and should be consumed after the coding round.
+        // Thus these rules are included in the task prompt only on the first round.
+        const onceIdsThisRound = activeOnceRuleIds(rulesState);
+        const task = await buildInitialTask({
+          feature,
+          saifDir,
+          rules: rulesForPrompt(rulesState),
+        });
 
         // Hatchet: `runChild` resolves to the child workflow's final aggregate output. For a
         // multi-task DAG, that object is keyed by each step's `name` (see TS SDK
@@ -426,6 +456,11 @@ export function createFeatRunWorkflow() {
           'vague-specs-check': vagueOut,
         } = iterResult;
 
+        // Mark once rules as consumed if they were used this round.
+        if (onceIdsThisRound.length > 0) {
+          markOnceRulesConsumed(rulesState, onceIdsThisRound);
+        }
+
         const emptyAgentRound = !agentOut.patchContent.trim() || agentOut.steps.length === 0;
         if (emptyAgentRound && !(await sandboxHasCommitsBeyondInitialImport(sandboxRaw.codePath))) {
           errorFeedback =
@@ -450,6 +485,7 @@ export function createFeatRunWorkflow() {
             attempt,
             patchPath: agentOut.patchPath,
             lastRunId,
+            rules: rulesState,
           };
         }
 
@@ -469,6 +505,7 @@ export function createFeatRunWorkflow() {
             lastRunId: testOut.testRunId,
             lastPatchContent: agentOut.patchContent,
             lastErrorFeedback: 'Test run was cancelled.',
+            rules: rulesState,
           };
         }
 
@@ -501,6 +538,7 @@ export function createFeatRunWorkflow() {
         lastRunId,
         lastPatchContent,
         lastErrorFeedback,
+        rules: rulesState,
       };
     },
   });
@@ -548,6 +586,7 @@ export function createFeatRunWorkflow() {
             runPatchSteps,
             specRef: opts.feature.relativePath,
             status: 'completed',
+            rules: loopResult.rules,
             opts: loopOpts,
           });
           const expectedArtifactRevision = opts.resume?.artifactRevisionAtResume;
@@ -617,6 +656,7 @@ export function createFeatRunWorkflow() {
             specRef: opts.feature.relativePath,
             lastFeedback: lastFeedback || undefined,
             status: 'failed',
+            rules: loopResult?.rules ?? input.runContext.rules,
             opts: loopOpts,
           });
           const expectedArtifactRevision = opts.resume?.artifactRevisionAtResume;

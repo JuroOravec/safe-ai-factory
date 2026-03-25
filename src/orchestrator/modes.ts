@@ -23,6 +23,7 @@ import { consola } from '../logger.js';
 import { hasFeatureSuccessfullyFailed } from '../provisioners/docker/index.js';
 import { createProvisioner } from '../provisioners/index.js';
 import { type CoderInspectSessionHandle } from '../provisioners/types.js';
+import { cloneRunRules, rulesForPrompt } from '../runs/rules.js';
 import { type RunPatchStep, type RunStorage, StaleArtifactError } from '../runs/types.js';
 import { buildRunArtifact, type BuildRunArtifactOpts } from '../runs/utils/artifact.js';
 import { deserializeArtifactConfig } from '../runs/utils/serialize.js';
@@ -434,6 +435,7 @@ async function runStartCore(
           baseCommitSha: runContext.baseCommitSha,
           basePatchDiff: runContext.basePatchDiff,
           lastErrorFeedback: runContext.lastErrorFeedback,
+          rules: runContext.rules,
         },
       };
 
@@ -573,6 +575,7 @@ async function runResumeCore(
     runContext: {
       baseCommitSha: artifact.baseCommitSha,
       basePatchDiff: artifact.basePatchDiff,
+      rules: cloneRunRules(artifact.rules),
     },
     initialErrorFeedback: artifact.lastFeedback,
     persistedRunId: runId,
@@ -671,6 +674,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
       runContext: {
         baseCommitSha: artifact.baseCommitSha,
         basePatchDiff: artifact.basePatchDiff,
+        rules: cloneRunRules(artifact.rules),
       },
       initialErrorFeedback: artifact.lastFeedback,
     };
@@ -704,7 +708,11 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
     const inspectRunId = `${sandbox.runId}-inspect`;
     const codingProvisioner = createProvisioner(mergedOpts.codingEnvironment);
 
-    const task = await buildInitialTask({ feature, saifDir });
+    const task = await buildInitialTask({
+      feature,
+      saifDir,
+      rules: rulesForPrompt(runContext.rules),
+    });
     const errorFeedback = artifact.lastFeedback ?? '';
 
     const coderLlmConfig = resolveAgentLlmConfig('coder', mergedOpts.overrides);
@@ -798,6 +806,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
               runPatchSteps: nextSteps,
               specRef: feature.relativePath,
               lastFeedback: artifact.lastFeedback,
+              rules: runContext.rules,
               status: artifact.status,
               opts: artifactLoopOpts as BuildRunArtifactOpts,
             });
