@@ -154,6 +154,11 @@ export const runTestArgs = {
     type: 'boolean' as const,
     description: 'Open a Pull Request after pushing. Requires --push and provider token env var.',
   },
+  branch: {
+    type: 'string' as const,
+    description:
+      'Override the git branch name used when applying the patch to the host (default: saifac/<feature>-<runId>-<diffHash>).',
+  },
   'git-provider': {
     type: 'string' as const,
     description:

@@ -204,6 +204,7 @@ const ORCHESTRATOR_MERGE_KEYS = [
   'reviewerEnabled',
   'push',
   'pr',
+  'targetBranch',
   'gitProvider',
   'runStorage',
   'stagingEnvironment',
@@ -315,6 +316,7 @@ async function applyOrchestratorBaseline(
   const agentLogFormat = resolveAgentLogFormat(noCli, agentProfile, config);
   const push = config?.defaults?.push ?? null;
   const pr = resolvePr(config, push);
+  const targetBranch = null;
   const gitProvider = resolveGitProvider(config);
   const runStorage = resolveRunStorage(noCli, projectDir, config);
   const stagingEnvironment = resolveStagingEnvironment(config);
@@ -356,6 +358,7 @@ async function applyOrchestratorBaseline(
     reviewerEnabled,
     push,
     pr,
+    targetBranch,
     gitProvider,
     runStorage,
     stagingEnvironment,

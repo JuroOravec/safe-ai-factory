@@ -122,7 +122,7 @@ Cleanup message:
 ```bash
 ^C
 [inspect] SIGINT received — stopping session and cleaning up Docker (this may take a few seconds)...
-[inspect] Saved updated run patch steps to storage.
+[inspect] Saved updated run commits to storage.
 ```
 
 <!-- # TODO ADD GIF ~20s: Ctrl+C through cleanup. -->
@@ -160,7 +160,6 @@ Resume again with:
 | ----- | ---------- |
 | `.saifac-inspect-stale-<runId>.json` file | Something else updated that run while you were in inspect; your changes landed in that file. Follow the CLI text; details in [run inspect](../commands/run-inspect.md#what-it-does). |
 
-
 ## Recap
 
 `run list` → Run ID → `run inspect` → attach → open folder → edit → **Ctrl+C** → `run resume`
@@ -173,6 +172,6 @@ Resume again with:
 
 ## See also
 
-- [`run inspect`](../commands/run-inspect.md) · [`run resume`](../commands/run-resume.md) · [`run test`](../commands/run-test.md)  
+- [`run inspect`](../commands/run-inspect.md) · [`run resume`](../commands/run-resume.md) · [`run test`](../commands/run-test.md) · [`run apply`](../commands/run-apply.md)  
 - [Provide user feedback to the agent](providing-user-feedback.md) — steer via `run rules` instead of hand-editing the sandbox  
 - [Runs](../runs.md) · [Usage](../usage.md) · [Troubleshooting](../troubleshooting.md)

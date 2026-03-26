@@ -62,6 +62,7 @@ export type SerializedLoopOpts = {
   coderImage: string;
   push: string | null;
   pr: boolean;
+  targetBranch?: string | null;
   gitProviderId: string;
   gateRetries: number;
   agentEnv: Record<string, string>;

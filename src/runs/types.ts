@@ -30,10 +30,10 @@ export interface RunRule {
 }
 
 /**
- * One incremental commit in the sandbox / resume worktree (message + unified diff + optional author).
- * Diffs apply in order on top of `baseCommitSha` + optional `basePatchDiff` + prior steps.
+ * One recorded commit in the sandbox / resume worktree (message + unified diff + optional author).
+ * Diffs apply in order on top of `baseCommitSha` + optional `basePatchDiff` + prior run commits.
  */
-export interface RunPatchStep {
+export interface RunCommit {
   message: string;
   diff: string;
   /** Git author line, e.g. `Name <email>`. Defaults to saifac when omitted on apply. */
@@ -80,8 +80,8 @@ export interface RunArtifact {
   baseCommitSha: string;
   /** Uncommitted changes at run start (git diff + git diff --cached) */
   basePatchDiff?: string;
-  /** Incremental coding rounds / inspect sessions (apply in order; each diff is one replayed commit; one outer round may add several). */
-  runPatchSteps: RunPatchStep[];
+  /** Commits from coding rounds / inspect sessions (apply in order; each diff is one replayed commit; one outer round may add several). */
+  runCommits: RunCommit[];
 
   /** Feature path, e.g. saifac/features/feat-stripe-webhooks */
   specRef: string;

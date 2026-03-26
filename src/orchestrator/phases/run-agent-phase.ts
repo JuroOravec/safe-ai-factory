@@ -17,7 +17,7 @@ import { getSaifRoot } from '../../constants.js';
 import { resolveAgentLlmConfig } from '../../llm-config.js';
 import { consola } from '../../logger.js';
 import { createProvisioner } from '../../provisioners/index.js';
-import type { RunPatchStep } from '../../runs/types.js';
+import type { RunCommit } from '../../runs/types.js';
 import type { CleanupRegistry } from '../../utils/cleanup.js';
 import { git } from '../../utils/git.js';
 import type { IterativeLoopOpts } from '../loop.js';
@@ -68,8 +68,8 @@ export interface RunAgentPhaseOutput {
   patchPath: string;
   /** HEAD at the start of this round (for Ralph reset on failure). */
   preRoundHeadSha: string;
-  /** One entry per sandbox commit this round (+ optional WIP step); empty when no capture-worthy changes. */
-  steps: RunPatchStep[];
+  /** One entry per sandbox commit this round (+ optional WIP); empty when no capture-worthy changes. */
+  commits: RunCommit[];
 }
 
 export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgentPhaseOutput> {
@@ -144,7 +144,7 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
   const {
     patch: patchContent,
     patchPath,
-    steps,
+    commits,
   } = await extractIncrementalRoundPatch(sandbox.codePath, {
     preRoundHeadSha: preRoundHead,
     attempt,
@@ -164,5 +164,5 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
     );
   }
 
-  return { patchContent, patchPath, preRoundHeadSha: preRoundHead, steps };
+  return { patchContent, patchPath, preRoundHeadSha: preRoundHead, commits };
 }

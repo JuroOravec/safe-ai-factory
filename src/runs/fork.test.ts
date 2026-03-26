@@ -19,7 +19,7 @@ function makeSourceArtifact(runId: string): RunArtifact {
     runId,
     baseCommitSha: 'abc123dead',
     basePatchDiff: 'diff --git a/x b/x\n',
-    runPatchSteps: [{ message: 'step1', diff: 'patch hunk\n' }],
+    runCommits: [{ message: 'step1', diff: 'patch hunk\n' }],
     specRef: 'saifac/features/my-feat',
     rules: [],
     lastFeedback: 'try again',
@@ -105,7 +105,7 @@ describe('forkStoredRun', () => {
       expect(forked).not.toBeNull();
       expect(forked!.baseCommitSha).toBe(source.baseCommitSha);
       expect(forked!.basePatchDiff).toBe(source.basePatchDiff);
-      expect(forked!.runPatchSteps).toEqual(source.runPatchSteps);
+      expect(forked!.runCommits).toEqual(source.runCommits);
       expect(forked!.lastFeedback).toBe(source.lastFeedback);
       expect(forked!.status).toBe('failed');
       expect(forked!.config.maxRuns).toBe(17);

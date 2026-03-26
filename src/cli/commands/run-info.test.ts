@@ -32,7 +32,7 @@ async function writeRunJson(projectDir: string, runId: string): Promise<void> {
     runId,
     baseCommitSha: 'abc',
     basePatchDiff: 'SECRET_BASE',
-    runPatchSteps: [{ message: 'm', diff: 'SECRET_RUN' }],
+    runCommits: [{ message: 'm', diff: 'SECRET_RUN' }],
     specRef: 'saifac/features/x',
     config: {
       featureName: 'feat-x',
@@ -133,12 +133,15 @@ describe('saifac run info', () => {
       expect(logs).toHaveLength(1);
       const text = logs[0]!;
       expect(text).toContain('\n');
-      const parsed = JSON.parse(text) as { config: Record<string, unknown> };
+      const parsed = JSON.parse(text) as {
+        config: Record<string, unknown>;
+        runCommits?: unknown[];
+      };
 
       expect(parsed.config.startupScriptFile).toBe('sandbox/startup.sh');
       expect(parsed.config).not.toHaveProperty('startupScript');
       expect(parsed).not.toHaveProperty('basePatchDiff');
-      expect(parsed).not.toHaveProperty('runPatchSteps');
+      expect(parsed.runCommits).toEqual([{ message: 'm' }]);
       expect(text).not.toContain('SECRET_BASE');
       expect(text).not.toContain('SECRET_RUN');
       expect(text).not.toContain('START_CONTENT');

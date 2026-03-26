@@ -40,7 +40,7 @@ RUN_ID   FEATURE    STATUS  STARTED                    UPDATED
 5wjddk1  add-login  failed  2026-03-24T00:00:00.000Z   2026-03-24T01:49:10.982Z
 ```
 
-## Flags overview
+## Flags
 
 By default, `run resume` uses the same arguments as the original run.
 
@@ -108,4 +108,5 @@ Once the workspace is reconstructed, `run resume` follows the same flow as `feat
 - [`run list`](run-list.md) — List stored run IDs
 - [`run info`](run-info.md) — View a saved run (summary JSON)
 - [`run test`](run-test.md) — Re-test a stored patch without the coding agent
+- [`run apply`](run-apply.md) — Apply run commits to the host repo as a branch
 - [`run remove`](run-remove.md) — Delete a stored run

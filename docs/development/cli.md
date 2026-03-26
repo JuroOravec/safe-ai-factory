@@ -11,7 +11,7 @@ The published binary is `saifac` → `dist/cli.js`, built from `src/cli/index.ts
 
 ## Command tree
 
-`src/cli/index.ts` registers top-level commands: `init`, `feat` / `feature` (alias), `run`, `cache`, `doctor`. Deeper nesting lives under each file in `src/cli/commands/` (e.g. `run ls`, `feat run`).
+`src/cli/index.ts` registers top-level commands: `init`, `feat` / `feature` (alias), `run`, `cache`, `doctor`. Deeper nesting lives under each file in `src/cli/commands/` (e.g. `run ls`, `run apply`, `feat run`).
 
 Citty picks the **first argv token that does not start with `-`** as the subcommand name, then slices remaining args for the child command. Options can generally appear before or after the subcommand as long as the parser can still associate values with flags (e.g. `--project-dir /path`).
 

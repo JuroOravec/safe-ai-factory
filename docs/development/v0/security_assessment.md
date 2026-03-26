@@ -38,15 +38,15 @@ The original design document contained several Critical and High vulnerabilities
 
 **How it was fixed (two layers):**
 
-1. **Patch filter (`modes.ts`)** — `.git/hooks/**` is included in the default `patchExclude` rules passed to `extractIncrementalRoundPatch()`. The patch filtering stage in `sandbox.ts` strips any matching file section before the round diff is recorded (and before host apply via `run-patch-steps.json`), so the hook never reaches the host.
+1. **Patch filter (`modes.ts`)** — `.git/hooks/**` is included in the default `patchExclude` rules passed to `extractIncrementalRoundPatch()`. The patch filtering stage in `sandbox.ts` strips any matching file section before the round diff is recorded (and before host apply via `run-commits.json`), so the hook never reaches the host.
 
-2. **Last-resort guard in `applyPatchToHost` (`modes.ts`)** — Before calling `git apply`, the function reads `patch.diff` and throws hard if a `.git/hooks/` path is present:
+2. **Last-resort guard (`assertRunCommitsSafeForHost` in `phases/apply-patch.ts`)** — Before calling `git apply`, host apply scans the combined **`RunCommit`** diffs and throws hard if a `.git/hooks/` path is present. The same check runs in **`runApplyCore`** (`modes.ts`) before **`saifac run apply`** reconstructs the branch:
    ```typescript
    if (/^diff --git.*\.git\/hooks\//m.test(patchContent)) {
      throw new Error('[orchestrator] Patch rejected: contains changes to .git/hooks/. ...');
    }
    ```
-   This covers the `test` mode path, which applies an externally-supplied patch that may not have gone through the filter.
+   This covers any path where commits reach the host without having gone through the sandbox filter (for example externally supplied or replayed stored data).
 
 **Note:** `.github/` is intentionally **not** excluded. The agent is permitted to create PR templates, workflows, and other GitHub-facing files as part of legitimate feature work.
 

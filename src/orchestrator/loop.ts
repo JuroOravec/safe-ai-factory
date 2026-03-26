@@ -27,7 +27,7 @@ import {
   type TestsResult,
 } from '../provisioners/types.js';
 import { activeOnceRuleIds, markOnceRulesConsumed, rulesForPrompt } from '../runs/rules.js';
-import { type RunPatchStep, type RunRule, StaleArtifactError } from '../runs/types.js';
+import { type RunCommit, type RunRule, StaleArtifactError } from '../runs/types.js';
 import { buildRunArtifact, type BuildRunArtifactOpts } from '../runs/utils/artifact.js';
 import type { SupportedSandboxProfileId } from '../sandbox-profiles/types.js';
 import type { Feature } from '../specs/discover.js';
@@ -189,6 +189,13 @@ export interface IterativeLoopOpts {
    */
   pr: boolean;
   /**
+   * When set, use this branch name when tests have passed and we're applying the patch
+   * agent's changes to the user's project.
+   *
+   * Same as `--branch` on feat run / run resume / run test.
+   */
+  targetBranch: string | null;
+  /**
    * Git hosting provider to use for push URL resolution and PR creation.
    *
    * The required auth token is read from the corresponding env var (e.g. GITHUB_TOKEN).
@@ -273,9 +280,9 @@ export interface IterativeLoopOpts {
    */
   verbose?: boolean;
   /**
-   * When resuming, seed {@link RunArtifact#runPatchSteps} (replayed in sandbox before the loop).
+   * When resuming, seed {@link RunArtifact#runCommits} (replayed in sandbox before the loop).
    */
-  seedRunPatchSteps?: RunPatchStep[];
+  seedRunCommits?: RunCommit[];
   /**
    * When true, skip the coding agent and run only staging + tests (+ optional apply to host on pass).
    * Used by `saifac run test` (stored run re-verification).
@@ -467,6 +474,7 @@ export async function runIterativeLoop(
     coderImage,
     push,
     pr,
+    targetBranch,
     gitProvider,
     gateRetries,
     agentEnv,
@@ -480,8 +488,8 @@ export async function runIterativeLoop(
   const runContext = opts.runContext;
   const runId = sandbox.runId;
 
-  /** Accumulated incremental steps (seeded from resume + each successful coding round). */
-  let runPatchStepsAccum: RunPatchStep[] = [...(opts.seedRunPatchSteps ?? [])];
+  /** Accumulated run commits (seeded from resume + each successful coding round). */
+  let runCommitsAccum: RunCommit[] = [...(opts.seedRunCommits ?? [])];
   let lastErrorFeedback = '';
 
   // Resolve the coder agent's LLM config once per loop.
@@ -521,7 +529,7 @@ export async function runIterativeLoop(
           runId,
           baseCommitSha: runContext.baseCommitSha,
           basePatchDiff: runContext.basePatchDiff,
-          runPatchSteps: runPatchStepsAccum,
+          runCommits: runCommitsAccum,
           specRef: feature.relativePath,
           lastFeedback: didSucceed ? undefined : lastErrorFeedback || undefined,
           rules: runContext.rules,
@@ -579,8 +587,8 @@ export async function runIterativeLoop(
         '\n[orchestrator] test-only — skipping coding agent; verifying stored patch with staging tests.',
       );
       await writeUtf8(
-        join(sandbox.sandboxBasePath, 'run-patch-steps.json'),
-        JSON.stringify(runPatchStepsAccum),
+        join(sandbox.sandboxBasePath, 'run-commits.json'),
+        JSON.stringify(runCommitsAccum),
       );
 
       const verifyOnly = await runStagingTestVerification({
@@ -597,13 +605,16 @@ export async function runIterativeLoop(
           codePath: sandbox.codePath,
           projectDir,
           feature,
-          runId: verifyOnly.lastRunId,
+          runId,
+          commits: runCommitsAccum,
           hostBasePatchPath: sandbox.hostBasePatchPath,
           push,
           pr,
           gitProvider,
           overrides,
           verbose: opts.verbose,
+          targetBranch,
+          startCommit: runContext?.baseCommitSha?.trim() || undefined,
         });
         await destroySandbox(sandbox.sandboxBasePath);
         sandboxDestroyed = true;
@@ -706,8 +717,8 @@ export async function runIterativeLoop(
         markOnceRulesConsumed(runContext.rules, onceIdsThisRound);
       }
 
-      // 2. Extract incremental patch(es) for this round (one RunPatchStep per agent commit + optional WIP).
-      const { patch: patchContent, steps: roundSteps } = await extractIncrementalRoundPatch(
+      // 2. Extract incremental patch(es) for this round (one RunCommit per sandbox commit + optional WIP).
+      const { patch: patchContent, commits: roundCommits } = await extractIncrementalRoundPatch(
         sandbox.codePath,
         {
           preRoundHeadSha: preRoundHead,
@@ -719,8 +730,8 @@ export async function runIterativeLoop(
       // Detect if there has been any changes made to the sandbox by the agent.
       // Previously we checked only the current patch, but changes may be already committed.
       // So to truly know if no changes were made, we need to also look at the sandbox history.
-      const roundStepCount = roundSteps.length;
-      const roundPatchEmpty = roundStepCount === 0 || !patchContent.trim();
+      const roundCommitCount = roundCommits.length;
+      const roundPatchEmpty = roundCommitCount === 0 || !patchContent.trim();
       const hasPriorWorkInSandbox = await sandboxHasCommitsBeyondInitialImport(sandbox.codePath);
 
       // No changes whatsoever - no patch, no commits
@@ -733,25 +744,25 @@ export async function runIterativeLoop(
         continue;
       }
 
-      // No changes this round, but the sandbox already has commits (e.g. resumed runPatchSteps)
+      // No changes this round, but the sandbox already has commits (e.g. resumed runCommits)
       if (roundPatchEmpty && hasPriorWorkInSandbox) {
         consola.log(
-          '[orchestrator] No new changes this coding round, but the sandbox already has commits (e.g. resumed runPatchSteps) — running tests on the current tree.',
+          '[orchestrator] No new changes this coding round, but the sandbox already has commits (e.g. resumed runCommits) — running tests on the current tree.',
         );
-        if (runPatchStepsAccum.length > 0) {
+        if (runCommitsAccum.length > 0) {
           await writeUtf8(
-            join(sandbox.sandboxBasePath, 'run-patch-steps.json'),
-            JSON.stringify(runPatchStepsAccum),
+            join(sandbox.sandboxBasePath, 'run-commits.json'),
+            JSON.stringify(runCommitsAccum),
           );
         }
       }
 
-      // Changes this round - add the steps to the runPatchStepsAccum and write to file
+      // Changes this round — append round commits to the accumulator and write to file
       if (!roundPatchEmpty) {
-        runPatchStepsAccum = [...runPatchStepsAccum, ...roundSteps];
+        runCommitsAccum = [...runCommitsAccum, ...roundCommits];
         await writeUtf8(
-          join(sandbox.sandboxBasePath, 'run-patch-steps.json'),
-          JSON.stringify(runPatchStepsAccum),
+          join(sandbox.sandboxBasePath, 'run-commits.json'),
+          JSON.stringify(runCommitsAccum),
         );
 
         consola.log(`[orchestrator] Extracted patch (${patchContent.length} bytes)`);
@@ -784,13 +795,16 @@ export async function runIterativeLoop(
           codePath: sandbox.codePath,
           projectDir,
           feature,
-          runId: verify.lastRunId,
+          runId,
+          commits: runCommitsAccum,
           hostBasePatchPath: sandbox.hostBasePatchPath,
           push,
           pr,
           gitProvider,
           overrides,
           verbose: opts.verbose,
+          targetBranch,
+          startCommit: runContext?.baseCommitSha?.trim() || undefined,
         });
         await destroySandbox(sandbox.sandboxBasePath);
         sandboxDestroyed = true;
@@ -805,12 +819,12 @@ export async function runIterativeLoop(
 
       if (verify.kind === 'aborted') {
         consola.log(`\n[orchestrator] Tests aborted after ${attempts} attempt(s).`);
-        if (roundStepCount > 0) {
-          runPatchStepsAccum = runPatchStepsAccum.slice(0, -roundStepCount);
+        if (roundCommitCount > 0) {
+          runCommitsAccum = runCommitsAccum.slice(0, -roundCommitCount);
         }
         await writeUtf8(
-          join(sandbox.sandboxBasePath, 'run-patch-steps.json'),
-          JSON.stringify(runPatchStepsAccum),
+          join(sandbox.sandboxBasePath, 'run-commits.json'),
+          JSON.stringify(runCommitsAccum),
         );
         await destroySandbox(sandbox.sandboxBasePath);
         sandboxDestroyed = true;
@@ -841,12 +855,12 @@ export async function runIterativeLoop(
         `\n[orchestrator] Attempt ${attempts} FAILED (tests failed after ${verify.testAttempts} run(s)).`,
       );
 
-      if (roundStepCount > 0) {
-        runPatchStepsAccum = runPatchStepsAccum.slice(0, -roundStepCount);
+      if (roundCommitCount > 0) {
+        runCommitsAccum = runCommitsAccum.slice(0, -roundCommitCount);
       }
       await writeUtf8(
-        join(sandbox.sandboxBasePath, 'run-patch-steps.json'),
-        JSON.stringify(runPatchStepsAccum),
+        join(sandbox.sandboxBasePath, 'run-commits.json'),
+        JSON.stringify(runCommitsAccum),
       );
 
       // Reset to state at start of this attempt (Ralph: discard failed round only; keep resume seed)
@@ -1150,6 +1164,9 @@ export function logIterativeLoopSettings(opts: OrchestratorOpts): void {
   consola.log(`  Gate retries: ${opts.gateRetries}`);
   if (opts.push) {
     consola.log(`  Push: ${opts.push}${opts.pr ? ` (+ PR via ${opts.gitProvider.id})` : ''}`);
+  }
+  if (opts.targetBranch) {
+    consola.log(`  Host apply target branch: ${opts.targetBranch}`);
   }
   if (opts.verbose === true) consola.log('  Verbose: enabled');
   if (opts.testOnly) consola.log('  Test-only: skip coding agent (verification / `run test`)');

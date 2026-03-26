@@ -55,6 +55,7 @@ saifac feature run [options]
 | `--storage`            | —     | string  | Where run state is stored. Bare global (`local`, `none`, `file:///path`, `s3`, `s3://bucket/prefix`) or per-key `runs=…` / `tasks=…` with the same value forms; comma-separated mixes. Feat run uses the `runs` key (default: local). `none` disables persistence. |
 | `--push`               | —     | string  | Push feature branch after success. Accepts Git URL, slug (owner/repo), or remote name.                                                                              |
 | `--pr`                 | —     | boolean | Open a Pull Request after pushing. Requires `--push` and provider token env var.                                                                                    |
+| `--branch`             | —     | string  | Override the git branch name used when applying the patch to the host (default: `saifac/<feature>-<runId>-<diffHash>`). |
 | `--git-provider`       | —     | string  | Git hosting provider for push/PR. `github` \| `gitlab` \| `bitbucket` \| `azure` \| `gitea` (default: `github`)                                                     |
 | `--model`              | —     | string  | LLM model. Single global or comma-separated `agent=model` (e.g. `anthropic/claude-opus-4-5` or `pr-summarizer=openai/gpt-4o-mini`). At most one global.             |
 | `--base-url`           | —     | string  | LLM base URL. Single global (e.g. `http://localhost:11434/v1`) or comma-separated `agent=url` (e.g. `pr-summarizer=https://api.openai.com/v1`). At most one global. |
@@ -125,7 +126,7 @@ saifac feat run -n add-login --push origin --pr
 2. Starts the coder container (via Leash by default) or runs the agent on the host with `--dangerous-debug`.
 3. In a loop: runs the agent → runs the gate script → assesses with the test runner. Repeats until tests pass or max runs are exceeded.
 4. On failure due to spec ambiguity (when `--resolve-ambiguity` is `ai` or `prompt`), the Vague Specs Checker may update the spec and regenerate tests, then retry.
-5. On success, optionally pushes the branch and opens a PR.
+5. On success, applies the winning patch to a new local branch, then optionally pushes and opens a PR. The branch name is `saifac/<feature>-<runId>-<diffHash>` by default, or `--branch`.
 6. On failure, saves run state to `.saifac/runs/` and prints the `saifac run resume` command to resume.
 
 ## Resuming previous runs
@@ -152,9 +153,10 @@ The Vague Specs Checker is implemented as a single LLM call that internally perf
 
 ## See also
 
-- [feat design](feat-design.md) — Generate specs and tests (run first)
-- [feat design-fail2pass](feat-design-fail2pass.md) — Validate tests before running
-- `saifac run resume <runId>` — Resume a failed run from storage
+- [`feat design`](feat-design.md) — Generate specs and tests (run first)
+- [`feat design-fail2pass`](feat-design-fail2pass.md) — Validate tests before running
+- [`run resume`](run-resume.md) — Resume a failed run from storage
+- [`run apply`](run-apply.md) — Apply run commits to the host without re-running tests
 - [Semantic reviewer](../reviewer.md) — Reviewer configuration and `--no-reviewer`
 - [Cedar access control](../leash-access-control.md) — Customize Leash policy
 - [LLM configuration](../models.md) — Model flags, agent names, auto-discovery

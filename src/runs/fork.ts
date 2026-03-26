@@ -22,7 +22,7 @@ async function allocateUnusedRunId(runStorage: RunStorage): Promise<string> {
 }
 
 /**
- * Clones a stored run to a new run ID: same base commit, base patch, and patch steps as the source;
+ * Clones a stored run to a new run ID: same base commit, base patch, and run commits as the source;
  * config is merged from the source artifact and CLI the same way as `run resume` (defaults → artifact → CLI).
  *
  * Does not create a worktree, sandbox, or agent loop — use `saifac run resume <newId>` next.
@@ -59,7 +59,7 @@ export async function forkStoredRun(opts: ForkStoredRunOpts): Promise<{ newRunId
     runId: newRunId,
     baseCommitSha: source.baseCommitSha,
     basePatchDiff: source.basePatchDiff,
-    runPatchSteps: source.runPatchSteps.map((s) => ({ ...s })),
+    runCommits: source.runCommits.map((c) => ({ ...c })),
     specRef: feature.relativePath,
     lastFeedback: source.lastFeedback,
     rules: cloneRunRules(source.rules),

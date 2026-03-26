@@ -55,7 +55,7 @@ import { runAgentPhase } from '../../orchestrator/phases/run-agent-phase.js';
 import { runTestPhase } from '../../orchestrator/phases/run-test-phase.js';
 import { createSandbox, destroySandbox, type Sandbox } from '../../orchestrator/sandbox.js';
 import { activeOnceRuleIds, markOnceRulesConsumed, rulesForPrompt } from '../../runs/rules.js';
-import { type RunPatchStep, type RunRule, StaleArtifactError } from '../../runs/types.js';
+import { type RunCommit, type RunRule, StaleArtifactError } from '../../runs/types.js';
 import { buildRunArtifact } from '../../runs/utils/artifact.js';
 import { gitClean, gitResetHard } from '../../utils/git.js';
 import { pathExists, readUtf8, writeUtf8 } from '../../utils/io.js';
@@ -66,7 +66,7 @@ import { deserializeOrchestratorOpts } from '../utils/serialize-opts.js';
 // Zod schemas for step I/O (addresses step 1.5)
 // ---------------------------------------------------------------------------
 
-const runPatchStepSchema = z.object({
+const runCommitSchema = z.object({
   message: z.string(),
   diff: z.string(),
   author: z.string().optional(),
@@ -76,7 +76,7 @@ export const agentPhaseOutputSchema = z.object({
   patchContent: z.string(),
   patchPath: z.string(),
   preRoundHeadSha: z.string(),
-  steps: z.array(runPatchStepSchema),
+  commits: z.array(runCommitSchema),
 });
 export type AgentPhaseOutput = z.infer<typeof agentPhaseOutputSchema>;
 
@@ -229,7 +229,7 @@ export function createFeatRunIterationWorkflow() {
       const agentOutput = await ctx.parentOutput(runAgentTask);
       const { sandbox, attempt } = input;
 
-      const emptyRoundPatch = !agentOutput.patchContent.trim() || agentOutput.steps.length === 0;
+      const emptyRoundPatch = !agentOutput.patchContent.trim() || agentOutput.commits.length === 0;
       if (emptyRoundPatch && !(await sandboxHasCommitsBeyondInitialImport(sandbox.codePath))) {
         return {
           status: 'failed' as const,
@@ -340,7 +340,7 @@ export function createFeatRunWorkflow() {
         agentScript: opts.agentScript,
         stageScript: opts.stageScript,
         verbose: !!opts.verbose,
-        runPatchSteps: opts.resume?.seedRunPatchSteps ?? [],
+        runCommits: opts.resume?.seedRunCommits ?? [],
         runId: persistedRunId,
       })) as Sandbox & { [x: string]: JsonValue };
     },
@@ -361,10 +361,10 @@ export function createFeatRunWorkflow() {
 
       if (testOnly) {
         consola.log('[hatchet] test-only — skipping agent iterations; running verification tests.');
-        const runPatchStepsAccum = [...(resume?.seedRunPatchSteps ?? [])];
+        const runCommitsAccum = [...(resume?.seedRunCommits ?? [])];
         await writeUtf8(
-          join(sandboxRaw.sandboxBasePath, 'run-patch-steps.json'),
-          JSON.stringify(runPatchStepsAccum),
+          join(sandboxRaw.sandboxBasePath, 'run-commits.json'),
+          JSON.stringify(runCommitsAccum),
         );
         const testRunnerOpts = await prepareTestRunnerOpts({
           feature: opts.feature,
@@ -417,7 +417,7 @@ export function createFeatRunWorkflow() {
       let lastPatchContent = '';
       let lastErrorFeedback = '';
       let lastRunId = '';
-      let runPatchStepsAccum: RunPatchStep[] = [...(resume?.seedRunPatchSteps ?? [])];
+      let runCommitsAccum: RunCommit[] = [...(resume?.seedRunCommits ?? [])];
 
       for (let attempt = 1; attempt <= maxRuns; attempt++) {
         consola.log(`\n[hatchet] ===== ATTEMPT ${attempt}/${maxRuns} =====`);
@@ -461,7 +461,7 @@ export function createFeatRunWorkflow() {
           markOnceRulesConsumed(rulesState, onceIdsThisRound);
         }
 
-        const emptyAgentRound = !agentOut.patchContent.trim() || agentOut.steps.length === 0;
+        const emptyAgentRound = !agentOut.patchContent.trim() || agentOut.commits.length === 0;
         if (emptyAgentRound && !(await sandboxHasCommitsBeyondInitialImport(sandboxRaw.codePath))) {
           errorFeedback =
             'No changes were made. Please implement the feature as described in the plan.';
@@ -470,10 +470,10 @@ export function createFeatRunWorkflow() {
           continue;
         }
 
-        runPatchStepsAccum = [...runPatchStepsAccum, ...agentOut.steps];
+        runCommitsAccum = [...runCommitsAccum, ...agentOut.commits];
         await writeUtf8(
-          join(sandboxRaw.sandboxBasePath, 'run-patch-steps.json'),
-          JSON.stringify(runPatchStepsAccum),
+          join(sandboxRaw.sandboxBasePath, 'run-commits.json'),
+          JSON.stringify(runCommitsAccum),
         );
 
         lastPatchContent = agentOut.patchContent;
@@ -491,12 +491,12 @@ export function createFeatRunWorkflow() {
 
         if (testOut.status === 'aborted') {
           consola.log('[hatchet] Test run aborted by cancellation.');
-          if (agentOut.steps.length > 0) {
-            runPatchStepsAccum = runPatchStepsAccum.slice(0, -agentOut.steps.length);
+          if (agentOut.commits.length > 0) {
+            runCommitsAccum = runCommitsAccum.slice(0, -agentOut.commits.length);
           }
           await writeUtf8(
-            join(sandboxRaw.sandboxBasePath, 'run-patch-steps.json'),
-            JSON.stringify(runPatchStepsAccum),
+            join(sandboxRaw.sandboxBasePath, 'run-commits.json'),
+            JSON.stringify(runCommitsAccum),
           );
           return {
             success: false,
@@ -518,12 +518,12 @@ export function createFeatRunWorkflow() {
 
         consola.log(`\n[hatchet] Attempt ${attempt} FAILED.`);
 
-        if (agentOut.steps.length > 0) {
-          runPatchStepsAccum = runPatchStepsAccum.slice(0, -agentOut.steps.length);
+        if (agentOut.commits.length > 0) {
+          runCommitsAccum = runCommitsAccum.slice(0, -agentOut.commits.length);
         }
         await writeUtf8(
-          join(sandboxRaw.sandboxBasePath, 'run-patch-steps.json'),
-          JSON.stringify(runPatchStepsAccum),
+          join(sandboxRaw.sandboxBasePath, 'run-commits.json'),
+          JSON.stringify(runCommitsAccum),
         );
 
         await gitResetHard({ cwd: sandboxRaw.codePath, ref: agentOut.preRoundHeadSha });
@@ -558,32 +558,42 @@ export function createFeatRunWorkflow() {
         return { applied: false };
       }
 
+      const commitsPath = join(sandboxRaw.sandboxBasePath, 'run-commits.json');
+      let runCommits: RunCommit[] = [];
+      if (await pathExists(commitsPath)) {
+        try {
+          const raw = JSON.parse(await readUtf8(commitsPath)) as unknown;
+          runCommits = Array.isArray(raw) ? (raw as RunCommit[]) : [];
+        } catch {
+          runCommits = [];
+        }
+      }
+
       await applyPatchToHost({
         codePath: sandboxRaw.codePath,
         projectDir: opts.projectDir,
         feature: opts.feature,
-        runId: loopResult.lastRunId,
+        runId: sandboxRaw.runId,
+        commits: runCommits,
         hostBasePatchPath: sandboxRaw.hostBasePatchPath,
         push: opts.push,
         pr: opts.pr,
         gitProvider: opts.gitProvider,
         overrides: opts.overrides,
         verbose: !!opts.verbose,
+        targetBranch: opts.targetBranch,
+        startCommit: input.runContext.baseCommitSha?.trim() || undefined,
       });
 
       const runStorage = opts.runStorage;
       if (runStorage) {
         try {
-          const stepsPath = join(sandboxRaw.sandboxBasePath, 'run-patch-steps.json');
-          const runPatchSteps: RunPatchStep[] = (await pathExists(stepsPath))
-            ? (JSON.parse(await readUtf8(stepsPath)) as RunPatchStep[])
-            : [];
           const { runStorage: _rs, resume: _res, ...loopOpts } = opts;
           const artifact = buildRunArtifact({
             runId: sandboxRaw.runId,
             baseCommitSha: input.runContext.baseCommitSha,
             basePatchDiff: input.runContext.basePatchDiff,
-            runPatchSteps,
+            runCommits,
             specRef: opts.feature.relativePath,
             status: 'completed',
             rules: loopResult.rules,
@@ -627,9 +637,9 @@ export function createFeatRunWorkflow() {
       }
 
       try {
-        const stepsPath = join(sandboxRaw.sandboxBasePath, 'run-patch-steps.json');
-        const runPatchSteps: RunPatchStep[] = (await pathExists(stepsPath))
-          ? (JSON.parse(await readUtf8(stepsPath)) as RunPatchStep[])
+        const commitsPath = join(sandboxRaw.sandboxBasePath, 'run-commits.json');
+        const runCommits: RunCommit[] = (await pathExists(commitsPath))
+          ? (JSON.parse(await readUtf8(commitsPath)) as RunCommit[])
           : [];
 
         let loopResult: ConvergenceOutput | null = null;
@@ -652,7 +662,7 @@ export function createFeatRunWorkflow() {
             runId: sandboxRaw.runId,
             baseCommitSha: input.runContext.baseCommitSha,
             basePatchDiff: input.runContext.basePatchDiff,
-            runPatchSteps,
+            runCommits,
             specRef: opts.feature.relativePath,
             lastFeedback: lastFeedback || undefined,
             status: 'failed',

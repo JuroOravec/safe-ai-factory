@@ -45,6 +45,7 @@ function makeOrchestratorOpts(): OrchestratorOpts {
     coderImage: 'coder:latest',
     push: null,
     pr: false,
+    targetBranch: null,
     gateRetries: 10,
     agentEnv: {},
     agentLogFormat: 'openhands',
@@ -79,7 +80,7 @@ function makeOrchestratorOpts(): OrchestratorOpts {
 const baseArtifact: RunArtifact = {
   runId: 'run-inspect-1',
   baseCommitSha: 'abc123',
-  runPatchSteps: [{ message: 'saifac: coding attempt 1', diff: 'original patch\n' }],
+  runCommits: [{ message: 'saifac: coding attempt 1', diff: 'original patch\n' }],
   specRef: 'saifac/features/my-feat',
   rules: [],
   config: {
@@ -277,7 +278,7 @@ describe('runInspect', () => {
     extractIncrementalRoundPatchMock.mockResolvedValue({
       patch: '',
       patchPath: join(sandbox.sandboxBasePath, 'patch.diff'),
-      steps: [],
+      commits: [],
     });
   });
 
@@ -400,7 +401,7 @@ describe('runInspect', () => {
     const artifact = {
       ...baseArtifact,
       artifactRevision: 2,
-      runPatchSteps: [] as RunArtifact['runPatchSteps'],
+      runCommits: [] as RunArtifact['runCommits'],
     };
     const storage = makeStorage({
       getRun: vi.fn().mockResolvedValue(artifact),
@@ -413,7 +414,7 @@ describe('runInspect', () => {
     extractIncrementalRoundPatchMock.mockResolvedValue({
       patch: 'new patch content\n',
       patchPath: join(sandbox.sandboxBasePath, 'patch.diff'),
-      steps: [newStep],
+      commits: [newStep],
     });
 
     const p = runInspect({
@@ -432,7 +433,7 @@ describe('runInspect', () => {
     expect(storage.saveRun).toHaveBeenCalledWith(
       artifact.runId,
       expect.objectContaining({
-        runPatchSteps: [newStep],
+        runCommits: [newStep],
       }),
       { ifRevisionEquals: 2 },
     );
@@ -443,7 +444,7 @@ describe('runInspect', () => {
     const artifact = {
       ...baseArtifact,
       artifactRevision: 1,
-      runPatchSteps: [] as RunArtifact['runPatchSteps'],
+      runCommits: [] as RunArtifact['runCommits'],
     };
     const storage = makeStorage({
       getRun: vi.fn().mockResolvedValue(artifact),
@@ -463,7 +464,7 @@ describe('runInspect', () => {
     extractIncrementalRoundPatchMock.mockResolvedValue({
       patch: 'conflict patch\n',
       patchPath: join(sandbox.sandboxBasePath, 'patch.diff'),
-      steps: [staleStep],
+      commits: [staleStep],
     });
 
     const p = runInspect({
@@ -488,7 +489,7 @@ describe('runInspect', () => {
     const runInspect = await importRunInspect();
     const artifact = {
       ...baseArtifact,
-      runPatchSteps: [{ message: 'm', diff: 'a\n' }],
+      runCommits: [{ message: 'm', diff: 'a\n' }],
     };
     const diskError = new Error('disk full');
     const storage = makeStorage({
@@ -498,7 +499,7 @@ describe('runInspect', () => {
     extractIncrementalRoundPatchMock.mockResolvedValue({
       patch: 'b\n',
       patchPath: join(sandbox.sandboxBasePath, 'patch.diff'),
-      steps: [{ message: 'saifac: inspect session', diff: 'b\n' }],
+      commits: [{ message: 'saifac: inspect session', diff: 'b\n' }],
     });
 
     const p = runInspect({

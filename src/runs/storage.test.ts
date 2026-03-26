@@ -10,7 +10,7 @@ import { type RunArtifact, StaleArtifactError } from './types.js';
 const dummyArtifact: RunArtifact = {
   runId: 'test-1',
   baseCommitSha: 'abc123',
-  runPatchSteps: [{ message: 'm', diff: 'diff' }],
+  runCommits: [{ message: 'm', diff: 'diff' }],
   specRef: 'saifac/features/x',
   rules: [],
   config: {
@@ -106,14 +106,14 @@ describe('createRunStorage', () => {
       await storage.saveRun('run-1', {
         ...dummyArtifact,
         runId: 'run-1',
-        runPatchSteps: [{ message: 'm', diff: 'updated' }],
+        runCommits: [{ message: 'm', diff: 'updated' }],
         startedAt: t1,
         updatedAt: t1,
       });
       const r2 = await storage.getRun('run-1');
       expect(r2?.artifactRevision).toBe(2);
       expect(r2?.startedAt).toBe(t0);
-      expect(r2?.runPatchSteps).toEqual([{ message: 'm', diff: 'updated' }]);
+      expect(r2?.runCommits).toEqual([{ message: 'm', diff: 'updated' }]);
     } finally {
       await rm(tmp, { recursive: true, force: true });
     }
@@ -128,7 +128,7 @@ describe('createRunStorage', () => {
 
       await storage.saveRun(
         'run-1',
-        { ...dummyArtifact, runId: 'run-1', runPatchSteps: [{ message: 'm', diff: 'v2' }] },
+        { ...dummyArtifact, runId: 'run-1', runCommits: [{ message: 'm', diff: 'v2' }] },
         { ifRevisionEquals: 1 },
       );
       expect((await storage.getRun('run-1'))?.artifactRevision).toBe(2);
@@ -145,7 +145,7 @@ describe('createRunStorage', () => {
       await expect(
         storage.saveRun(
           'run-1',
-          { ...dummyArtifact, runId: 'run-1', runPatchSteps: [{ message: 'm', diff: 'stale' }] },
+          { ...dummyArtifact, runId: 'run-1', runCommits: [{ message: 'm', diff: 'stale' }] },
           { ifRevisionEquals: 0 },
         ),
       ).rejects.toThrow(StaleArtifactError);

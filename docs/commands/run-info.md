@@ -42,6 +42,10 @@ Example of the default **pretty-printed** output:
 {
   "runId": "abc12x",
   "baseCommitSha": "a1b2c3d",
+  "runCommits": [
+    { "message": "feat: add login form", "author": "openhands <agent@local>" },
+    { "message": "fix: validation" }
+  ],
   "specRef": "saifac/features/add-login",
   "lastFeedback": "Test failure: expected 200, got 404",
   "config": {

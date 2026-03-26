@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 import { consola } from '../logger.js';
 import {
-  type RunPatchStep,
+  type RunCommit,
   type RunSaveOptions,
   type RunStorage,
   StaleArtifactError,
@@ -29,7 +29,7 @@ import {
 } from '../utils/git.js';
 import { pathExists, readUtf8, spawnAsync, writeUtf8 } from '../utils/io.js';
 import { type RunStorageContext } from './loop.js';
-import { applyRunPatchStepInRepo } from './patch.js';
+import { applyRunCommitInRepo } from './patch.js';
 import { diffUntrackedFilesVersusDevNull, SAIFAC_TEMP_ROOT, type Sandbox } from './sandbox.js';
 
 // ---------------------------------------------------------------------------
@@ -88,13 +88,18 @@ export interface CreateResumeWorktreeParams {
   runId: string;
   baseCommitSha: string;
   basePatchDiff: string | undefined;
-  runPatchSteps: RunPatchStep[];
+  runCommits: RunCommit[];
+  /**
+   * Git branch for the worktree. Defaults to `saifac-resume-${runId}` (ephemeral resume/test).
+   * For `run apply` we set this to `saifac/<feature>-<runId>-<hash>`.
+   */
+  outputBranchName?: string;
 }
 
 export interface CreateResumeWorktreeResult {
   worktreePath: string;
   branchName: string;
-  /** Directory tree (no `.git`) at base + base patch — before any `runPatchSteps`; used to build sandbox "Base state". */
+  /** Directory tree (no `.git`) at base + base patch — before any `runCommits`; used to build sandbox "Base state". */
   baseSnapshotPath: string;
 }
 
@@ -115,15 +120,15 @@ async function gitWorktreeListForDebug(cwd: string): Promise<string> {
  * Layers applied on top of `baseCommitSha`:
  * - Base patch diff — uncommitted host changes at run start (optional).
  * - Dedicated **saifac: base patch** commit (always, including empty when there was no base patch).
- * - Each `runPatchStep` applied and committed in order.
+ * - Each {@link RunCommit} applied and committed in order.
  *
  * Also writes {@link CreateResumeWorktreeResult#baseSnapshotPath}: a copy of the tree after the
- * base patch (before run steps) for sandbox `rsync` + replayed `runPatchSteps` commits.
+ * base patch (before run commits) for sandbox `rsync` + replayed `runCommits`.
  */
 export async function createResumeWorktree(
   params: CreateResumeWorktreeParams,
 ): Promise<CreateResumeWorktreeResult> {
-  const { projectDir, runId, baseCommitSha, basePatchDiff, runPatchSteps } = params;
+  const { projectDir, runId, baseCommitSha, basePatchDiff, runCommits, outputBranchName } = params;
 
   try {
     await git({ cwd: projectDir, args: ['rev-parse', baseCommitSha] });
@@ -146,7 +151,7 @@ export async function createResumeWorktree(
   const dirKey = createHash('sha256').update(projectDir).digest('hex').slice(0, 16);
   const worktreePath = join(resumeWorktreesBase, `${dirKey}-${runId}`);
   const baseSnapshotPath = join(resumeWorktreesBase, `${dirKey}-${runId}-base`);
-  const branchName = `saifac-resume-${runId}`;
+  const branchName = outputBranchName ?? `saifac-resume-${runId}`;
 
   // Same runId may have left a broken worktree dir / branch from a prior attempt; git would
   // otherwise leave us with no usable path and Node reports spawn ENOENT when cwd is missing.
@@ -217,7 +222,7 @@ export async function createResumeWorktree(
     }
 
     // Plain directory tree (no .git) right after the base patch — rsync source for the sandbox
-    // "Base state" before replaying runPatchSteps inside code/.
+    // "Base state" before replaying runCommits inside code/.
     await mkdir(baseSnapshotPath, { recursive: true });
     await spawnAsync({
       command: 'rsync',
@@ -226,9 +231,9 @@ export async function createResumeWorktree(
       stdio: 'inherit',
     });
 
-    // Agent output from the artifact, one commit per step, on the worktree the user will inspect / link from.
-    for (const step of runPatchSteps) {
-      await applyRunPatchStepInRepo({ cwd: worktreePath, step, gitEnv });
+    // Stored run commits from the artifact, replayed on the worktree the user will inspect / link from.
+    for (const commit of runCommits) {
+      await applyRunCommitInRepo({ cwd: worktreePath, commit, gitEnv });
     }
   } catch (err: unknown) {
     // Remove worktree on failure. cleanupResumeWorkspace only invokes onError when *cleanup*
@@ -279,10 +284,11 @@ export interface CleanupResumeWorkspaceParams {
   worktreePath: string;
   projectDir: string;
   branchName: string;
+  deleteBranch?: boolean;
 }
 
 /**
- * Removes the resume worktree and deletes the branch.
+ * Removes the resume worktree and optionally deletes the branch.
  * `onError` runs only if cleanup itself throws (e.g. git worktree remove failed); it does not
  * run on success. Callers that need to propagate a prior error must throw after awaiting this.
  */
@@ -290,10 +296,13 @@ export async function cleanupResumeWorkspace(
   params: CleanupResumeWorkspaceParams,
   onError: () => void,
 ): Promise<void> {
-  const { worktreePath, projectDir, branchName } = params;
+  const { worktreePath, projectDir, branchName, deleteBranch } = params;
   try {
     await gitWorktreeRemove({ cwd: projectDir, path: worktreePath });
-    await gitBranchDelete({ cwd: projectDir, branch: branchName, force: true });
+    // `run apply` sets this to false so the branch is kept and made available to the user.
+    if (deleteBranch) {
+      await gitBranchDelete({ cwd: projectDir, branch: branchName, force: true });
+    }
   } catch {
     onError();
   }
@@ -320,18 +329,18 @@ export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promis
   const { sandbox, runContext, opts, runStorage, saveRunOptions } = params;
   const runId = sandbox.runId;
 
-  // Interrupt path: reuse steps the loop already flushed to disk so resume isn’t blind;
+  // Interrupt path: reuse commits the loop already flushed to disk so resume isn’t blind;
   // bad/missing JSON → empty array.
-  const stepsPath = join(sandbox.sandboxBasePath, 'run-patch-steps.json');
-  let runPatchSteps: RunPatchStep[] = [];
-  if (await pathExists(stepsPath)) {
+  const commitsPath = join(sandbox.sandboxBasePath, 'run-commits.json');
+  let runCommits: RunCommit[] = [];
+  if (await pathExists(commitsPath)) {
     try {
-      const raw = JSON.parse(await readUtf8(stepsPath)) as unknown;
+      const raw = JSON.parse(await readUtf8(commitsPath)) as unknown;
       if (Array.isArray(raw)) {
-        runPatchSteps = raw as RunPatchStep[];
+        runCommits = raw as RunCommit[];
       }
     } catch {
-      runPatchSteps = [];
+      runCommits = [];
     }
   }
 
@@ -339,7 +348,7 @@ export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promis
     runId,
     baseCommitSha: runContext.baseCommitSha,
     basePatchDiff: runContext.basePatchDiff,
-    runPatchSteps,
+    runCommits,
     specRef: opts.feature.relativePath,
     lastFeedback: runContext.lastErrorFeedback,
     rules: runContext.rules,

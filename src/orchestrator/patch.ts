@@ -1,30 +1,30 @@
 import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { RunPatchStep } from '../runs/types.js';
+import type { RunCommit } from '../runs/types.js';
 import { git, gitAdd, gitApply, gitCommit } from '../utils/git.js';
 import { writeUtf8 } from '../utils/io.js';
 
 export const SAIFAC_DEFAULT_AUTHOR = 'saifac <saifac@safeaifactory.com>';
 
-export function resolveRunPatchStepAuthor(step: RunPatchStep): string {
-  return step.author?.trim() || SAIFAC_DEFAULT_AUTHOR;
+export function resolveRunCommitAuthor(commit: RunCommit): string {
+  return commit.author?.trim() || SAIFAC_DEFAULT_AUTHOR;
 }
 
 /**
- * Applies one step's unified diff, stages (excluding `.saifac/`), and commits with message + author.
+ * Applies one run commit's unified diff, stages (excluding `.saifac/`), and commits with message + author.
  */
-export async function applyRunPatchStepInRepo(opts: {
+export async function applyRunCommitInRepo(opts: {
   cwd: string;
-  step: RunPatchStep;
+  commit: RunCommit;
   gitEnv?: NodeJS.ProcessEnv;
   verbose?: boolean;
 }): Promise<void> {
-  const { cwd, step, gitEnv = process.env, verbose = false } = opts;
-  if (!step.diff.trim()) return;
+  const { cwd, commit, gitEnv = process.env, verbose = false } = opts;
+  if (!commit.diff.trim()) return;
 
-  const tmpPath = join(cwd, '.saifac-step.patch');
-  const safeDiff = step.diff.endsWith('\n') ? step.diff : `${step.diff}\n`;
+  const tmpPath = join(cwd, '.saifac-commit.patch');
+  const safeDiff = commit.diff.endsWith('\n') ? commit.diff : `${commit.diff}\n`;
   await writeUtf8(tmpPath, safeDiff);
   await gitApply({ cwd, env: gitEnv, patchFile: tmpPath });
   await unlink(tmpPath).catch(() => {});
@@ -44,23 +44,23 @@ export async function applyRunPatchStepInRepo(opts: {
   await gitCommit({
     cwd,
     env: gitEnv,
-    message: step.message,
-    author: resolveRunPatchStepAuthor(step),
+    message: commit.message,
+    author: resolveRunCommitAuthor(commit),
     verbose,
   });
 }
 
 /**
- * Applies each step in order (incremental diffs on top of the current tree).
+ * Applies each run commit in order (incremental diffs on top of the current tree).
  */
-export async function replayRunPatchSteps(opts: {
+export async function replayRunCommits(opts: {
   cwd: string;
-  steps: RunPatchStep[];
+  commits: RunCommit[];
   gitEnv?: NodeJS.ProcessEnv;
   verbose?: boolean;
 }): Promise<void> {
-  const { cwd, steps, gitEnv = process.env, verbose = false } = opts;
-  for (const step of steps) {
-    await applyRunPatchStepInRepo({ cwd, step, gitEnv, verbose });
+  const { cwd, commits, gitEnv = process.env, verbose = false } = opts;
+  for (const commit of commits) {
+    await applyRunCommitInRepo({ cwd, commit, gitEnv, verbose });
   }
 }

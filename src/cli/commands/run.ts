@@ -10,6 +10,7 @@
  *   fork          Clone a stored run to a new ID
  *   resume        Resume a stored run from storage
  *   test          Re-test a stored run's patch (no coding agent)
+ *   apply         Create git branch with run's changes and optional push/PR
  *   inspect       Open an idle coding container for a stored run
  *   rules         Manage user feedback rules on a stored run (create, list, get, update, remove)
  */
@@ -20,7 +21,7 @@ import { loadSaifacConfig } from '../../config/load.js';
 import { type SaifacConfig } from '../../config/schema.js';
 import type { ModelOverrides } from '../../llm-config.js';
 import { consola, outputCliData, setVerboseLogging } from '../../logger.js';
-import { runInspect, runResume, runTestsFromRun } from '../../orchestrator/modes.js';
+import { runApply, runInspect, runResume, runTestsFromRun } from '../../orchestrator/modes.js';
 import {
   type OrchestratorCliInput,
   parseModelOverridesCliDelta,
@@ -441,6 +442,59 @@ const testCommand = defineCommand({
   },
 });
 
+const applyCommand = defineCommand({
+  meta: {
+    name: 'apply',
+    description: "Create git branch with run's changes and optional push/PR.",
+  },
+  args: {
+    ...commonRunArgs,
+    ...runTestArgs,
+    runId: {
+      type: 'positional' as const,
+      description: 'Run ID to apply (from saifac run ls)',
+      required: true,
+    },
+  },
+  async run({ args }) {
+    const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
+    const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
+    const config = await loadSaifacConfig(saifDir, projectDir);
+
+    const runArgs = args as FeatRunArgs;
+    setVerboseLogging(runArgs.verbose === true);
+
+    const runStorage = resolveRunStorage(readStorageStringFromCli(runArgs), projectDir, config);
+    if (!runStorage) {
+      consola.error('Run storage is disabled (--storage none). Cannot apply a stored run.');
+      process.exit(1);
+    }
+
+    const runId = parseRunId(args);
+    const cli = await buildOrchestratorCliInputFromFeatArgs(runArgs, {
+      projectDir,
+      saifDir,
+      config,
+    });
+    const cliModelDelta = parseModelOverridesCliDelta(runArgs);
+
+    consola.log(`\nApplying stored run to host: ${runId}`);
+
+    const result = await runApply({
+      runId,
+      runStorage,
+      projectDir,
+      saifDir,
+      config,
+      cli,
+      cliModelDelta,
+    });
+
+    consola.log(`\n${result.message}`);
+    if (!result.success) process.exit(1);
+  },
+});
+
 const runCommand = defineCommand({
   meta: {
     name: 'run',
@@ -457,6 +511,7 @@ const runCommand = defineCommand({
     resume: resumeCommand,
     inspect: inspectCommand,
     test: testCommand,
+    apply: applyCommand,
     rules: runRulesCommand,
   },
 });

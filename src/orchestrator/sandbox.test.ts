@@ -142,7 +142,7 @@ describe('sandboxHasCommitsBeyondInitialImport', () => {
     }
   });
 
-  it('is true after an additional commit (e.g. replayed runPatchSteps)', async () => {
+  it('is true after an additional commit (e.g. replayed runCommits)', async () => {
     const base = await mkdtemp(join(process.cwd(), 'sb-commits-1-'));
     const codePath = join(base, 'code');
     try {
@@ -170,7 +170,7 @@ describe('extractIncrementalRoundPatch', () => {
     GIT_COMMITTER_EMAIL: 't@test.dev',
   };
 
-  it('returns one step per commit on the first-parent chain', async () => {
+  it('returns one run commit per commit on the first-parent chain', async () => {
     const base = await mkdtemp(join(process.cwd(), 'extract-round-'));
     const codePath = join(base, 'code');
     try {
@@ -199,15 +199,15 @@ describe('extractIncrementalRoundPatch', () => {
         author: 'Agent2 <a2@x.dev>',
       });
 
-      const { steps, patch } = await extractIncrementalRoundPatch(codePath, {
+      const { commits, patch } = await extractIncrementalRoundPatch(codePath, {
         preRoundHeadSha: preRound,
         attempt: 1,
       });
-      expect(steps).toHaveLength(2);
-      expect(steps[0].message).toContain('commit one');
-      expect(steps[0].author).toContain('Agent1');
-      expect(steps[1].message).toContain('commit two');
-      expect(steps[1].author).toContain('Agent2');
+      expect(commits).toHaveLength(2);
+      expect(commits[0].message).toContain('commit one');
+      expect(commits[0].author).toContain('Agent1');
+      expect(commits[1].message).toContain('commit two');
+      expect(commits[1].author).toContain('Agent2');
       expect(patch).toContain('a.txt');
       expect(patch).toContain('b.txt');
     } finally {
@@ -215,7 +215,7 @@ describe('extractIncrementalRoundPatch', () => {
     }
   });
 
-  it('records a single WIP step when there are no new commits but staged changes', async () => {
+  it('records a single WIP run commit when there are no new commits but staged changes', async () => {
     const base = await mkdtemp(join(process.cwd(), 'extract-wip-'));
     const codePath = join(base, 'code');
     try {
@@ -229,12 +229,12 @@ describe('extractIncrementalRoundPatch', () => {
       await writeUtf8(join(codePath, 'wip.txt'), 'wip\n');
       await gitAdd({ cwd: codePath, env: gitEnv });
 
-      const { steps, patch } = await extractIncrementalRoundPatch(codePath, {
+      const { commits, patch } = await extractIncrementalRoundPatch(codePath, {
         preRoundHeadSha: preRound,
         attempt: 1,
       });
-      expect(steps).toHaveLength(1);
-      expect(steps[0].message).toBe('saifac: coding attempt 1');
+      expect(commits).toHaveLength(1);
+      expect(commits[0].message).toBe('saifac: coding attempt 1');
       expect(patch).toContain('wip.txt');
       const headAfter = (await git({ cwd: codePath, args: ['rev-parse', 'HEAD'] })).trim();
       expect(headAfter).not.toBe(preRound);
@@ -243,7 +243,7 @@ describe('extractIncrementalRoundPatch', () => {
     }
   });
 
-  it('returns no steps when nothing changed since preRoundHead', async () => {
+  it('returns no commits when nothing changed since preRoundHead', async () => {
     const base = await mkdtemp(join(process.cwd(), 'extract-empty-'));
     const codePath = join(base, 'code');
     try {
@@ -254,11 +254,11 @@ describe('extractIncrementalRoundPatch', () => {
       await gitCommit({ cwd: codePath, env: gitEnv, message: 'Base state' });
       const preRound = (await git({ cwd: codePath, args: ['rev-parse', 'HEAD'] })).trim();
 
-      const { steps, patch } = await extractIncrementalRoundPatch(codePath, {
+      const { commits, patch } = await extractIncrementalRoundPatch(codePath, {
         preRoundHeadSha: preRound,
         attempt: 1,
       });
-      expect(steps).toEqual([]);
+      expect(commits).toEqual([]);
       expect(patch).toBe('');
     } finally {
       await rm(base, { recursive: true, force: true });

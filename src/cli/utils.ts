@@ -177,6 +177,7 @@ export interface FeatRunArgs extends OrchestratorArgs {
   'agent-log-format'?: string;
   push?: string;
   pr?: boolean;
+  branch?: string;
   'git-provider'?: string;
   verbose?: boolean;
 }
@@ -1243,6 +1244,9 @@ export async function buildOrchestratorCliInputFromFeatArgs(
 
   const pr = runArgs.pr === true ? true : undefined;
 
+  const targetBranch =
+    typeof runArgs.branch === 'string' && runArgs.branch.trim() ? runArgs.branch.trim() : undefined;
+
   const gitProvider =
     typeof runArgs['git-provider'] === 'string' && runArgs['git-provider'].trim()
       ? getGitProvider(runArgs['git-provider'].trim())
@@ -1304,6 +1308,7 @@ export async function buildOrchestratorCliInputFromFeatArgs(
     reviewerEnabled,
     push,
     pr,
+    targetBranch,
     gitProvider,
     runStorage,
     stagingEnvironment: undefined,

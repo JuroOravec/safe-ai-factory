@@ -42,6 +42,7 @@ To customize the run, you can use a subset of the same flags as [`feat run`](fea
 | `--storage`           | —     | string  | Where saved runs live (`local`, `file://…`, `s3`, etc.). See [Runs](../runs.md).               |
 | `--push`              | —     | string  | After tests pass: where to push (remote name, URL, or `owner/repo`).                            |
 | `--pr`                | —     | boolean | Open a PR after a push (needs `--push` and provider setup).                                    |
+| `--branch`            | —     | string  | Override the git branch name used when applying the patch to the host (default: `saifac/<feature>-<runId>-<diffHash>`). |
 | `--git-provider`      | —     | string  | `github`, `gitlab`, `bitbucket`, `azure`, or `gitea` (default: `github`).                      |
 | `--verbose`           | `-v`  | boolean | More detailed logs.                                                                            |
 
@@ -82,7 +83,7 @@ saifac run test add-login-r1 --storage runs=s3://my-bucket/runs
 1. Loads the saved run for the id you gave.
 2. Rebuilds a **temporary copy** of your project exactly as that run left it (same approach as [`run resume`](run-resume.md), but no agent loop).
 3. Spins up the usual **sandbox** (isolated copy, staging, test runner) and runs the **test suite**.
-5. On success, **applies the patch to your real repo** and can **push** or **open a PR** if you asked for that.
+5. On success, **applies the patch to your real repo** on branch `saifac/<feature>-<runId>-<diffHash>` (default, or `--branch`), and optionally **push** or **open a PR**.
 
 ## Notes
 
@@ -101,4 +102,5 @@ saifac run test add-login-r1 --storage runs=s3://my-bucket/runs
 - [`run list`](run-list.md) — List saved run ids
 - [`run info`](run-info.md) — View a saved run (summary JSON)
 - [`run resume`](run-resume.md) — Continue with the agent after a failure
+- [`run apply`](run-apply.md) — Apply run commits to the host repo as a branch
 - [`run remove`](run-remove.md) — Delete a saved run

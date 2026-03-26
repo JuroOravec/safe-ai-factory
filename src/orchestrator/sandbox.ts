@@ -28,11 +28,11 @@ import { minimatch } from 'minimatch';
 
 import type { TestCatalog } from '../design-tests/schema.js';
 import { consola } from '../logger.js';
-import type { RunPatchStep } from '../runs/types.js';
+import type { RunCommit } from '../runs/types.js';
 import type { Feature } from '../specs/discover.js';
 import { git, gitAdd, gitCommit, gitDiff, gitInit } from '../utils/git.js';
 import { pathExists, readUtf8, spawnAsync, spawnWait, writeUtf8 } from '../utils/io.js';
-import { replayRunPatchSteps, SAIFAC_DEFAULT_AUTHOR } from './patch.js';
+import { replayRunCommits, SAIFAC_DEFAULT_AUTHOR } from './patch.js';
 
 /** Recursively removes all directories named "hidden" under baseDir. Exported for testing. */
 export async function removeAllHiddenDirs(baseDir: string): Promise<number> {
@@ -192,13 +192,13 @@ export interface CreateSandboxOpts {
   verbose?: boolean;
   /**
    * When set, rsync the code tree from this directory instead of {@link projectDir}.
-   * Used for resume: base snapshot (before `runPatchSteps`) so the sandbox can replay commits.
+   * Used for resume: base snapshot (before `runCommits`) so the sandbox can replay commits.
    */
   codeSourceDir?: string;
   /**
-   * Incremental steps to replay after the initial "Base state" commit (resume / test-from-run).
+   * Run commits to replay after the initial "Base state" commit (resume / test-from-run).
    */
-  runPatchSteps?: RunPatchStep[];
+  runCommits?: RunCommit[];
 }
 
 /**
@@ -256,7 +256,7 @@ export async function diffUntrackedFilesVersusDevNull(projectDir: string): Promi
  * 1. rsync repo → sandboxBasePath/code/ (honoring .gitignore)
  * 2. Remove ALL hidden/ dirs under saifac/features/ so the coder agent cannot see holdout
  *    tests from any feature (current or others)
- * 3. git init + "Base state" commit, then replay {@link CreateSandboxOpts#runPatchSteps}
+ * 3. git init + "Base state" commit, then replay {@link CreateSandboxOpts#runCommits}
  * 4. Write gate.sh (user-supplied or default) to sandboxBasePath/gate.sh
  * 5. Write startup.sh (from profile or --startup-script) to sandboxBasePath/startup.sh
  * 6. Write agent-install.sh (from agent profile or --agent-install-script) to sandboxBasePath/agent-install.sh
@@ -279,7 +279,7 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
     agentScript,
     stageScript,
     verbose,
-    runPatchSteps = [],
+    runCommits = [],
   } = opts;
   const codeRsyncSource = opts.codeSourceDir ?? projectDir;
   const runId = opts.runId ?? Math.random().toString(36).substring(2, 9);
@@ -409,14 +409,14 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   };
 
   // Apply all commits that have been made to the sandbox since the initial commit.
-  if (runPatchSteps.length > 0) {
-    await replayRunPatchSteps({
+  if (runCommits.length > 0) {
+    await replayRunCommits({
       cwd: codePath,
-      steps: runPatchSteps,
+      commits: runCommits,
       gitEnv: replayGitEnv,
       verbose: !!verbose,
     });
-    consola.log(`[sandbox] Replayed ${runPatchSteps.length} run patch step(s) in ${codePath}`);
+    consola.log(`[sandbox] Replayed ${runCommits.length} run commit(s) in ${codePath}`);
   }
 
   // Write gate.sh: user-supplied content or the built-in pnpm check default.
@@ -497,13 +497,13 @@ export interface ExtractIncrementalRoundPatchOpts extends ExtractPatchOpts {
 }
 
 /**
- * After an agent round: record **one {@link RunPatchStep} per commit** on the first-parent chain
- * from `preRoundHeadSha` to `HEAD`, then optionally **one more step** for leftover uncommitted work
+ * After an agent round: record **one {@link RunCommit} per git commit** on the first-parent chain
+ * from `preRoundHeadSha` to `HEAD`, then optionally **one more** for leftover uncommitted work
  * (committed here with `saifac: coding attempt <n>` unless overridden).
  *
  * Does **not** reset the repo — HEAD stays at the tip so tests run on the real tree.
- * On failed tests the caller should `git reset --hard` to `preRoundHeadSha` and drop all steps
- * from this round from `runPatchSteps`.
+ * On failed tests the caller should `git reset --hard` to `preRoundHeadSha` and drop all commits
+ * from this round from `runCommits`.
  *
  * Writes combined `patch.diff` beside `code/` (for bookkeeping / PR summarizer).
  * Uses `git diff --binary` so binary files survive `git apply` on replay / host apply.
@@ -511,7 +511,7 @@ export interface ExtractIncrementalRoundPatchOpts extends ExtractPatchOpts {
 export async function extractIncrementalRoundPatch(
   codePath: string,
   opts: ExtractIncrementalRoundPatchOpts,
-): Promise<{ patch: string; patchPath: string; steps: RunPatchStep[] }> {
+): Promise<{ patch: string; patchPath: string; commits: RunCommit[] }> {
   const sandboxBasePath = join(codePath, '..');
   const patchPath = join(sandboxBasePath, 'patch.diff');
   const gitEnv = {
@@ -524,7 +524,7 @@ export async function extractIncrementalRoundPatch(
 
   const preRoundHead = opts.preRoundHeadSha.trim();
   const exclude = opts.exclude ?? [];
-  const steps: RunPatchStep[] = [];
+  const commits: RunCommit[] = [];
 
   // Commits the agent made this round only (linear history — merges follow first parent).
   const revListRaw = (
@@ -541,7 +541,7 @@ export async function extractIncrementalRoundPatch(
         .filter(Boolean)
     : [];
 
-  // Each commit becomes its own replayable step: diff from parent → stored message/author from that commit.
+  // Each commit becomes its own replayable RunCommit: diff from parent → stored message/author from that commit.
   for (const sha of commitShas) {
     const parent = (
       await git({ cwd: codePath, env: gitEnv, args: ['rev-parse', `${sha}^`] })
@@ -560,12 +560,12 @@ export async function extractIncrementalRoundPatch(
     const patch = exclude.length ? filterPatchHunks(rawPatch, exclude) : rawPatch;
     const normalizedPatch = patch.endsWith('\n') ? patch : `${patch}\n`;
     if (!normalizedPatch.trim()) continue;
-    steps.push({ message, diff: normalizedPatch, author });
+    commits.push({ message, diff: normalizedPatch, author });
   }
 
   // Leftover uncommitted / unstaged changes:
   // Stage them, optionally make one temporary commit so we can diff it,
-  // then either record a WIP step or undo the commit.
+  // then either record a WIP run commit or undo the commit.
   // if exclude rules stripped everything — working tree stays ready for tests either way.
   await gitAdd({ cwd: codePath, env: gitEnv });
   // Omit `.saifac/` from the staged changes
@@ -607,19 +607,19 @@ export async function extractIncrementalRoundPatch(
     const wipPatch = exclude.length ? filterPatchHunks(rawWip, exclude) : rawWip;
     const normalizedWip = wipPatch.endsWith('\n') ? wipPatch : `${wipPatch}\n`;
     if (normalizedWip.trim()) {
-      steps.push({ message: wipMessage, diff: normalizedWip, author: wipAuthor });
+      commits.push({ message: wipMessage, diff: normalizedWip, author: wipAuthor });
     } else {
       // Nothing left after exclude rules — drop the capture commit but keep changes staged (same tree for tests).
       await git({ cwd: codePath, env: gitEnv, args: ['reset', '--soft', 'HEAD~1'] });
     }
   }
 
-  // Single file for humans / PR summarizer: all step diffs back-to-back (steps[] is the source of truth for replay).
+  // Single file for humans / PR summarizer: all commit diffs back-to-back (commits[] is the source of truth for replay).
   const combinedPatch =
-    steps.length > 0 ? `${steps.map((s) => s.diff.replace(/\n+$/, '')).join('\n')}\n` : '';
+    commits.length > 0 ? `${commits.map((c) => c.diff.replace(/\n+$/, '')).join('\n')}\n` : '';
   await writeUtf8(patchPath, combinedPatch);
 
-  return { patch: combinedPatch, patchPath, steps };
+  return { patch: combinedPatch, patchPath, commits };
 }
 
 /**

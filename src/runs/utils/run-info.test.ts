@@ -7,7 +7,7 @@ const minimalArtifact: RunArtifact = {
   runId: 'r1',
   baseCommitSha: 'abc',
   basePatchDiff: 'base-diff-content',
-  runPatchSteps: [{ message: 'm', diff: 'run-diff-content' }],
+  runCommits: [{ message: 'm', diff: 'run-diff-content' }],
   specRef: 'saifac/features/x',
   rules: [],
   lastFeedback: 'feedback line',
@@ -60,15 +60,32 @@ const minimalArtifact: RunArtifact = {
 };
 
 describe('toRunInfoJson', () => {
-  it('omits patch diff fields', () => {
+  it('omits basePatchDiff and run commit diffs; keeps message (and author when set)', () => {
     const view = toRunInfoJson(minimalArtifact);
     expect(view).not.toHaveProperty('basePatchDiff');
-    expect(view).not.toHaveProperty('runPatchSteps');
+    expect(view.runCommits).toEqual([{ message: 'm' }]);
+    const row = (view.runCommits as unknown[])[0] as Record<string, unknown>;
+    expect(row).not.toHaveProperty('diff');
+  });
+
+  it('includes author in runCommits when present', () => {
+    const art: RunArtifact = {
+      ...minimalArtifact,
+      runCommits: [
+        { message: 'first', diff: 'd1', author: 'Alice <a@b.com>' },
+        { message: 'second', diff: 'd2' },
+      ],
+    };
+    const view = toRunInfoJson(art);
+    expect(view.runCommits).toEqual([
+      { message: 'first', author: 'Alice <a@b.com>' },
+      { message: 'second' },
+    ]);
   });
 
   it('omits script bodies but keeps *File paths', () => {
     const view = toRunInfoJson(minimalArtifact);
-    const cfg = view.config as Record<string, unknown>;
+    const cfg = view.config;
     expect(cfg.startupScriptFile).toBe('path/startup.sh');
     expect(cfg.testScriptFile).toBe('path/test.sh');
     expect(cfg).not.toHaveProperty('startupScript');

@@ -14,7 +14,7 @@ import { getGitProvider } from '../../git/index.js';
 import type { OrchestratorOpts } from '../../orchestrator/modes.js';
 import type { PatchExcludeRule } from '../../orchestrator/sandbox.js';
 import { createRunStorage } from '../../runs/storage.js';
-import type { RunPatchStep, RunRule } from '../../runs/types.js';
+import type { RunCommit, RunRule } from '../../runs/types.js';
 import type { SerializedPatchExcludeRule } from '../../runs/utils/serialize.js';
 import { resolveTestProfile } from '../../test-profiles/index.js';
 
@@ -37,6 +37,7 @@ export interface SerializedOrchestratorOpts extends Record<string, unknown> {
   coderImage: string;
   push: string | null;
   pr: boolean;
+  targetBranch?: string | null;
   gitProviderId: string;
   gateRetries: number;
   agentEnv: Record<string, string>;
@@ -64,7 +65,7 @@ export interface SerializedOrchestratorOpts extends Record<string, unknown> {
   resume: {
     sandboxSourceDir: string;
     baseSnapshotPath?: string;
-    seedRunPatchSteps?: RunPatchStep[];
+    seedRunCommits?: RunCommit[];
     initialErrorFeedback?: string;
     persistedRunId?: string;
     artifactRevisionAtResume?: number;
@@ -106,7 +107,7 @@ export function serializeOrchestratorOpts(opts: OrchestratorOpts): SerializedOrc
       ? {
           sandboxSourceDir: resume.sandboxSourceDir,
           baseSnapshotPath: resume.baseSnapshotPath,
-          seedRunPatchSteps: resume.seedRunPatchSteps,
+          seedRunCommits: resume.seedRunCommits,
           initialErrorFeedback: resume.initialErrorFeedback,
           persistedRunId: resume.persistedRunId,
           artifactRevisionAtResume: resume.artifactRevisionAtResume,
@@ -157,6 +158,7 @@ export function deserializeOrchestratorOpts(serialized: Record<string, unknown>)
     coderImage: s.coderImage,
     push: s.push,
     pr: s.pr,
+    targetBranch: s.targetBranch ?? null,
     gitProvider: getGitProvider(s.gitProviderId),
     gateRetries: s.gateRetries,
     agentEnv: s.agentEnv,
@@ -184,7 +186,7 @@ export function deserializeOrchestratorOpts(serialized: Record<string, unknown>)
       ? {
           sandboxSourceDir: s.resume.sandboxSourceDir,
           baseSnapshotPath: s.resume.baseSnapshotPath,
-          seedRunPatchSteps: s.resume.seedRunPatchSteps ?? [],
+          seedRunCommits: s.resume.seedRunCommits ?? [],
           initialErrorFeedback: s.resume.initialErrorFeedback,
           persistedRunId: s.resume.persistedRunId,
           artifactRevisionAtResume: s.resume.artifactRevisionAtResume,

@@ -8,6 +8,7 @@
  *  5. inspect        — Idle coding container for a stored run (changes made in the container are saved)
  */
 
+import { mkdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { SaifacConfig } from '../config/schema.js';
@@ -24,7 +25,7 @@ import { hasFeatureSuccessfullyFailed } from '../provisioners/docker/index.js';
 import { createProvisioner } from '../provisioners/index.js';
 import { type CoderInspectSessionHandle } from '../provisioners/types.js';
 import { cloneRunRules, rulesForPrompt } from '../runs/rules.js';
-import { type RunPatchStep, type RunStorage, StaleArtifactError } from '../runs/types.js';
+import { type RunCommit, type RunStorage, StaleArtifactError } from '../runs/types.js';
 import { buildRunArtifact, type BuildRunArtifactOpts } from '../runs/utils/artifact.js';
 import { deserializeArtifactConfig } from '../runs/utils/serialize.js';
 import { resolveFeature } from '../specs/discover.js';
@@ -43,12 +44,22 @@ import {
 } from './loop.js';
 import { type OrchestratorCliInput, resolveOrchestratorOpts } from './options.js';
 import {
+  assertRunCommitsSafeForHost,
+  pushHostApplyBranch,
+  resolveHostApplyBranchName,
+} from './phases/apply-patch.js';
+import {
   captureBaseGitState,
   cleanupResumeWorkspace,
   createResumeWorktree,
   saveRunOnError,
 } from './resume.js';
-import { createSandbox, destroySandbox, extractIncrementalRoundPatch } from './sandbox.js';
+import {
+  createSandbox,
+  destroySandbox,
+  extractIncrementalRoundPatch,
+  SAIFAC_TEMP_ROOT,
+} from './sandbox.js';
 import { getArgusBinaryPath } from './sidecars/reviewer/argus.js';
 
 export interface OrchestratorOpts extends IterativeLoopOpts {
@@ -130,10 +141,10 @@ export interface OrchestratorOpts extends IterativeLoopOpts {
     sandboxSourceDir: string;
     runContext: RunStorageContext;
     initialErrorFeedback?: string;
-    /** Base tree copy (before run steps) — sandbox rsync source for resume/tests/inspect */
+    /** Base tree copy (before run commits) — sandbox rsync source for resume/tests/inspect */
     baseSnapshotPath?: string;
-    /** Stored `runPatchSteps` replayed after the sandbox "Base state" commit */
-    seedRunPatchSteps?: RunPatchStep[];
+    /** Stored {@link RunArtifact#runCommits} replayed after the sandbox "Base state" commit */
+    seedRunCommits?: RunCommit[];
     /**
      * When resuming from `run storage`, the run id to reuse for the sandbox and persisted artifact
      * (same as the key passed to `saifac run resume <id>`).
@@ -215,6 +226,7 @@ export const runFail2Pass = withCleanupRegistry(runFail2PassCore);
 export const runStart = withCleanupRegistry(runStartCore);
 export const runResume = withCleanupRegistry(runResumeCore);
 export const runTestsFromRun = withCleanupRegistry(runTestsFromRunCore);
+export const runApply = withCleanupRegistry(runApplyCore);
 
 // ---------------------------------------------------------------------------
 // Mode 1: fail2pass
@@ -464,7 +476,7 @@ async function runStartCore(
     agentScript,
     stageScript,
     verbose: opts.verbose,
-    runPatchSteps: opts.resume?.seedRunPatchSteps ?? [],
+    runCommits: opts.resume?.seedRunCommits ?? [],
     runId: opts.resume?.persistedRunId,
   });
 
@@ -492,7 +504,7 @@ async function runStartCore(
     runStorage,
     runContext,
     initialErrorFeedback: opts.resume?.initialErrorFeedback ?? null,
-    seedRunPatchSteps: opts.resume?.seedRunPatchSteps ?? [],
+    seedRunCommits: opts.resume?.seedRunCommits ?? [],
     registry,
   });
 }
@@ -548,7 +560,7 @@ async function runResumeCore(
     runId,
     baseCommitSha: artifact.baseCommitSha,
     basePatchDiff: artifact.basePatchDiff,
-    runPatchSteps: artifact.runPatchSteps,
+    runCommits: artifact.runCommits,
   });
 
   const deserialized = deserializeArtifactConfig(artifact.config);
@@ -571,7 +583,7 @@ async function runResumeCore(
   mergedOpts.resume = {
     sandboxSourceDir: worktreePath,
     baseSnapshotPath,
-    seedRunPatchSteps: artifact.runPatchSteps,
+    seedRunCommits: artifact.runCommits,
     runContext: {
       baseCommitSha: artifact.baseCommitSha,
       basePatchDiff: artifact.basePatchDiff,
@@ -635,11 +647,11 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
     runId,
     baseCommitSha: artifact.baseCommitSha,
     basePatchDiff: artifact.basePatchDiff,
-    runPatchSteps: artifact.runPatchSteps,
+    runCommits: artifact.runCommits,
   });
 
   const expectedRevision = artifact.artifactRevision ?? 0;
-  const prevStepsJson = JSON.stringify(artifact.runPatchSteps);
+  const prevCommitsJson = JSON.stringify(artifact.runCommits);
   let inspectSaveError: unknown;
 
   try {
@@ -670,7 +682,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
     mergedOpts.resume = {
       sandboxSourceDir: worktreePath,
       baseSnapshotPath,
-      seedRunPatchSteps: artifact.runPatchSteps,
+      seedRunCommits: artifact.runCommits,
       runContext: {
         baseCommitSha: artifact.baseCommitSha,
         basePatchDiff: artifact.basePatchDiff,
@@ -695,7 +707,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
       agentScript: mergedOpts.agentScript,
       stageScript: mergedOpts.stageScript,
       verbose: mergedOpts.verbose,
-      runPatchSteps: mergedOpts.resume?.seedRunPatchSteps ?? [],
+      runCommits: mergedOpts.resume?.seedRunCommits ?? [],
     });
 
     const preInspectHead = (
@@ -786,24 +798,24 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
           });
 
           // Extract any changes made in the container
-          const { steps: inspectSteps } = await extractIncrementalRoundPatch(sandbox.codePath, {
+          const { commits: inspectCommits } = await extractIncrementalRoundPatch(sandbox.codePath, {
             preRoundHeadSha: preInspectHead,
             attempt: 1,
             message: 'saifac: inspect session',
             exclude: patchExclude,
           });
-          const nextSteps =
-            inspectSteps.length > 0
-              ? [...artifact.runPatchSteps, ...inspectSteps]
-              : artifact.runPatchSteps;
-          const nextJson = JSON.stringify(nextSteps);
-          if (nextJson !== prevStepsJson) {
+          const nextCommits =
+            inspectCommits.length > 0
+              ? [...artifact.runCommits, ...inspectCommits]
+              : artifact.runCommits;
+          const nextJson = JSON.stringify(nextCommits);
+          if (nextJson !== prevCommitsJson) {
             const { runStorage: _rs, resume: _r, ...artifactLoopOpts } = mergedOpts;
             const newArtifact = buildRunArtifact({
               runId,
               baseCommitSha: runContext.baseCommitSha,
               basePatchDiff: runContext.basePatchDiff,
-              runPatchSteps: nextSteps,
+              runCommits: nextCommits,
               specRef: feature.relativePath,
               lastFeedback: artifact.lastFeedback,
               rules: runContext.rules,
@@ -814,14 +826,14 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
               await runStorage.saveRun(runId, newArtifact, {
                 ifRevisionEquals: expectedRevision,
               });
-              consola.log('[inspect] Saved updated run patch steps to storage.');
+              consola.log('[inspect] Saved updated run commits to storage.');
             } catch (e) {
               if (e instanceof StaleArtifactError) {
                 consola.warn(`[inspect] ${e.message}`);
                 const fallback = join(projectDir, `.saifac-inspect-stale-${runId}.json`);
                 await writeUtf8(fallback, nextJson);
                 consola.warn(
-                  `[inspect] Wrote working tree steps to ${fallback} — merge manually after reloading the run.`,
+                  `[inspect] Wrote working tree commits to ${fallback} — merge manually after reloading the run.`,
                 );
               } else {
                 inspectSaveError = e;
@@ -845,6 +857,120 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
   }
 
   if (inspectSaveError) throw inspectSaveError;
+}
+
+// ---------------------------------------------------------------------------
+// Mode 3c: apply (stored run → host branch + optional push/PR, no sandbox/tests)
+// ---------------------------------------------------------------------------
+
+/**
+ * Reconstructs the run's codebase state, pushes changes to a branch,
+ * and optionally pushes to a remote repository + opens a pull request.
+ */
+async function runApplyCore(
+  opts: ResumeOpts,
+  _registry: CleanupRegistry,
+): Promise<OrchestratorResult> {
+  const { runId, projectDir, runStorage, cli, cliModelDelta, config, saifDir } = opts;
+  if (!runStorage) {
+    throw new Error('Run storage is disabled (--storage none). Cannot apply a stored run.');
+  }
+
+  const artifact = await runStorage.getRun(runId);
+  if (!artifact) {
+    throw new Error(`Run not found: ${runId}. List runs with: saifac run ls`);
+  }
+
+  const commits = artifact.runCommits;
+  if (commits.length === 0) {
+    return {
+      success: false,
+      attempts: 0,
+      runId,
+      message: 'Run has no commits to apply to the host repository.',
+    };
+  }
+
+  assertRunCommitsSafeForHost(commits);
+
+  consola.log(`\n[orchestrator] MODE: apply — ${artifact.config.featureName} (run ${runId})`);
+
+  const deserialized = deserializeArtifactConfig(artifact.config);
+  const feature = await resolveFeature({
+    input: deserialized.featureName,
+    projectDir,
+    saifDir: deserialized.saifDir,
+  });
+
+  const mergedOpts = await resolveOrchestratorOpts({
+    projectDir,
+    saifDir,
+    config,
+    feature,
+    cli,
+    cliModelDelta,
+    artifact,
+  });
+
+  const branchName = resolveHostApplyBranchName({
+    featureName: feature.name,
+    runId,
+    commits,
+    targetBranch: mergedOpts.targetBranch,
+  });
+
+  const { worktreePath, branchName: wtBranch } = await createResumeWorktree({
+    projectDir,
+    runId,
+    baseCommitSha: artifact.baseCommitSha,
+    basePatchDiff: artifact.basePatchDiff,
+    runCommits: commits,
+    outputBranchName: branchName,
+  });
+
+  const gitEnv = {
+    ...process.env,
+    GIT_AUTHOR_NAME: process.env.GIT_AUTHOR_NAME ?? 'saifac',
+    GIT_AUTHOR_EMAIL: process.env.GIT_AUTHOR_EMAIL ?? 'saifac@safeaifactory.com',
+    GIT_COMMITTER_NAME: process.env.GIT_COMMITTER_NAME ?? 'saifac',
+    GIT_COMMITTER_EMAIL: process.env.GIT_COMMITTER_EMAIL ?? 'saifac@safeaifactory.com',
+  };
+
+  const patchFile = join(SAIFAC_TEMP_ROOT, `saifac-apply-pr-${runId}.diff`);
+  await mkdir(SAIFAC_TEMP_ROOT, { recursive: true });
+  const patchContent = commits.map((c) => c.diff).join('\n');
+  await writeUtf8(patchFile, patchContent.endsWith('\n') ? patchContent : `${patchContent}\n`);
+
+  try {
+    await pushHostApplyBranch({
+      cwd: projectDir,
+      projectDir,
+      branchName: wtBranch,
+      feature,
+      runId,
+      patchFile,
+      push: mergedOpts.push,
+      pr: mergedOpts.pr,
+      gitProvider: mergedOpts.gitProvider,
+      overrides: mergedOpts.overrides,
+      env: gitEnv,
+    });
+  } finally {
+    await unlink(patchFile).catch(() => {});
+    await cleanupResumeWorkspace(
+      { worktreePath, projectDir, branchName: wtBranch, deleteBranch: false },
+      () => {
+        consola.warn(`[orchestrator] Could not remove apply worktree at ${worktreePath}`);
+      },
+    );
+  }
+
+  return {
+    success: true,
+    attempts: 1,
+    runId,
+    message: `Patch applied on branch "${wtBranch}"${mergedOpts.push ? ' (pushed)' : ''}.`,
+  };
 }
 
 // ---------------------------------------------------------------------------
