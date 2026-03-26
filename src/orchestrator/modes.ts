@@ -9,7 +9,7 @@
  */
 
 import { mkdir, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import type { SaifacConfig } from '../config/schema.js';
 import { getSaifRoot } from '../constants.js';
@@ -45,6 +45,7 @@ import {
 import { type OrchestratorCliInput, resolveOrchestratorOpts } from './options.js';
 import {
   assertRunCommitsSafeForHost,
+  computeRunCommitsDiffHash,
   pushHostApplyBranch,
   resolveHostApplyBranchName,
 } from './phases/apply-patch.js';
@@ -256,6 +257,7 @@ type Fail2PassOpts = Pick<
   | 'stageScript'
   | 'testScript'
   | 'verbose'
+  | 'includeDirty'
 >;
 
 async function runFail2PassCore(
@@ -293,6 +295,7 @@ async function runFail2PassCore(
     agentScript,
     stageScript,
     verbose: opts.verbose,
+    includeDirty: opts.includeDirty,
   });
   registry.setEmergencySandboxPath(sandbox.sandboxBasePath);
   const testRunnerOpts = await prepareTestRunnerOpts({
@@ -403,6 +406,13 @@ async function runStartCore(
 
   consola.log(`\n[orchestrator] MODE: ${testOnly ? 'test' : 'start'} — ${feature.name}`);
 
+  if (opts.includeDirty) {
+    consola.warn(
+      '[orchestrator] --include-dirty: sandbox includes uncommitted/untracked files. ' +
+        'Prefer `saifac run export <runId>` over `run apply` so untracked files are not baked into the branch.',
+    );
+  }
+
   const sandboxSourceDir = getSandboxSourceDir(opts);
 
   // ─── Run context (for save-on-Ctrl+C / save-on-failure) ────────────────────
@@ -478,6 +488,7 @@ async function runStartCore(
     verbose: opts.verbose,
     runCommits: opts.resume?.seedRunCommits ?? [],
     runId: opts.resume?.persistedRunId,
+    includeDirty: opts.includeDirty,
   });
 
   registry.setEmergencySandboxPath(sandbox.sandboxBasePath);
@@ -708,6 +719,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
       stageScript: mergedOpts.stageScript,
       verbose: mergedOpts.verbose,
       runCommits: mergedOpts.resume?.seedRunCommits ?? [],
+      includeDirty: mergedOpts.includeDirty,
     });
 
     const preInspectHead = (
@@ -970,6 +982,94 @@ async function runApplyCore(
     attempts: 1,
     runId,
     message: `Patch applied on branch "${wtBranch}"${mergedOpts.push ? ' (pushed)' : ''}.`,
+  };
+}
+
+export interface RunExportOpts {
+  runId: string;
+  runStorage: RunStorage;
+  /** Repo root (for HEAD vs baseCommitSha warning). */
+  projectDir: string;
+  /**
+   * Output path (default: ./saifac-<featureName>-<runId>-<diffHash>.patch in cwd;
+   * basename matches the default target branch `saifac/<feature>-<runId>-<hash>`.
+   */
+  output?: string;
+}
+
+/**
+ * Export run's changes as a single diff (one unified patch for `git apply` on the working tree).
+ */
+export async function runExport(opts: RunExportOpts): Promise<OrchestratorResult> {
+  const { runId, runStorage, projectDir, output } = opts;
+  const artifact = await runStorage.getRun(runId);
+  if (!artifact) {
+    return {
+      success: false,
+      attempts: 0,
+      runId,
+      message: `Run not found: ${runId}. List runs with: saifac run ls`,
+    };
+  }
+
+  const commits = artifact.runCommits;
+  if (!commits.length) {
+    return {
+      success: false,
+      attempts: 0,
+      runId,
+      message: `Run "${runId}" has no commits to export.`,
+    };
+  }
+
+  // Reject patches that would touch host .git/hooks (same guard as run apply).
+  assertRunCommitsSafeForHost(commits);
+
+  // One multi-patch diff file: stored commits were recorded in order; trailing newline helps git apply.
+  const patchContent = commits.map((c) => c.diff).join('\n');
+  const normalized = patchContent.endsWith('\n') ? patchContent : `${patchContent}\n`;
+  const outTrim = typeof output === 'string' ? output.trim() : '';
+  const featureName =
+    typeof artifact.config.featureName === 'string' && artifact.config.featureName.trim()
+      ? artifact.config.featureName.trim()
+      : 'unknown';
+  const diffHash = computeRunCommitsDiffHash(commits);
+  const defaultPatchBasename = `saifac-${featureName}-${runId}-${diffHash}.patch`;
+  const outPath = outTrim
+    ? resolve(process.cwd(), outTrim)
+    : join(process.cwd(), defaultPatchBasename);
+  await writeUtf8(outPath, normalized);
+
+  // Patches assume the tree matches run start; warn if the user’s branch has moved on.
+  try {
+    const head = (await git({ cwd: projectDir, args: ['rev-parse', 'HEAD'] })).trim();
+    if (head && head !== artifact.baseCommitSha) {
+      consola.warn(
+        `[run export] Current HEAD (${head.slice(0, 7)}) differs from run base (${artifact.baseCommitSha.slice(0, 7)}). Patch may not apply cleanly.`,
+      );
+    }
+  } catch {
+    // not a git repo or unreadable — skip
+  }
+
+  const message = [
+    `Patch written to: ${outPath}`,
+    '',
+    'Apply to working tree:',
+    `  git apply ${outPath}`,
+    '',
+    'Stage the diff:',
+    `  git apply --cached ${outPath}`,
+    '',
+    'Dry-run:',
+    `  git apply --check ${outPath}`,
+  ].join('\n');
+
+  return {
+    success: true,
+    attempts: 1,
+    runId,
+    message,
   };
 }
 

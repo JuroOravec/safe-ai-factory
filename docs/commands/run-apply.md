@@ -14,7 +14,7 @@ saifac run apply <runId> [options]
 
 - **LLM API keys** — (Optional) To generate a PR summary (`--pr`).
 
-## Flags
+## Arguments
 
 `run apply` accepts the same **push / PR / branch / storage / verbosity** flags as [`run test`](run-test.md) (see that page for the full table). It does **not** accept agent, gate, or test-runner flags — there is no sandbox or test phase.
 

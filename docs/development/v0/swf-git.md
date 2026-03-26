@@ -5,6 +5,7 @@ This document describes all the ways Git is used throughout the AI-Driven Softwa
 ## Table of Contents
 
 1. [Overview](#1-overview)
+   - [Working tree contract](#working-tree-contract)
 2. [Sandbox Creation](#2-sandbox-creation)
 3. [Patch extraction (incremental rounds)](#3-patch-extraction-incremental-rounds)
 4. [Patch Exclude Rules (Reward-Hacking Prevention)](#4-patch-exclude-rules-reward-hacking-prevention)
@@ -30,6 +31,12 @@ The Software Factory uses Git in three distinct phases:
 
 The host repository's working directory is **never** modified during the loop. All agent edits happen in the sandbox. Only after tests pass does the orchestrator create a separate worktree, apply the patch there, commit it, and optionally push. The user's current branch and uncommitted work remain untouched—enabling safe parallel runs of multiple agents.
 
+### Working tree contract
+
+**Primary workflow:** SAIFAC assumes the project you run against is in a **clean, committed** state at **`HEAD`**. By default the sandbox is filled with **`git archive HEAD`** (the tree recorded in Git at the tip commit), not whatever happens to be on disk. That keeps the baseline aligned with Git: what the agent sees is what is committed. **[`saifac run apply`](../../commands/run-apply.md)** and merging the resulting `saifac/…` branch into your line of work are straightforward in that mode.
+
+**Edge case — dirty working tree:** **`--include-dirty`** on **`feat run`** (or **`defaults.includeDirty`** in config) switches the sandbox copy to an **rsync** of the working tree (committed + staged + unstaged + untracked, still respecting `.gitignore`). That is intentionally **opt-in**: local reminders, WIP files, and parallel edits are easier to model, but host apply can bake those paths into the feature branch history. For that situation, prefer **[`saifac run export`](../../commands/run-export.md)** and apply the unified diff with **`git apply`** (or review via staged apply) so you control what gets committed. Distributed / CI runs should stay on the default (committed-only) contract.
+
 ---
 
 ## 2. Sandbox Creation
@@ -41,7 +48,8 @@ The host repository's working directory is **never** modified during the loop. A
 ```
 {sandboxBaseDir}/{projectName}-{featureName}-{runId}/
   tests.full.json     ← Full test catalog (public + hidden) for the Test Runner
-  code/               ← rsync copy of the repo; workspace for OpenHands
+  host-base.patch     ← Empty when sandbox matches HEAD; else delta for host apply (see below)
+  code/               ← Default: tree at HEAD via git archive; optional: rsync working tree
     .git/             ← Fresh git repo (git init), NOT a clone of the host
     saifac/features/
       (all hidden/ dirs removed — agent cannot see holdout tests from any feature)
@@ -51,17 +59,29 @@ The host repository's working directory is **never** modified during the loop. A
 
 ### Key Git-related steps
 
-1. **rsync** copies the repo into `code/`, honoring `.gitignore` and **excluding** the host's `.git`:
+1. **`host-base.patch`** is written **before** the tree copy. When the sandbox will match **`HEAD`** exactly (default **`feat run`**: `git archive` only), the file is **empty** — no host replay is needed before applying agent diffs. When the sandbox is populated from a **working tree** (**`--include-dirty`**, or **`codeSourceDir`** for resume / base snapshot), **`host-base.patch`** holds **`git diff HEAD`** (tracked changes) plus synthetic diffs for **untracked** files so the host worktree can be brought in sync with the sandbox baseline before **`git apply`** of the agent's commits.
 
-   ```bash
-   rsync -a --filter=':- .gitignore' --exclude='.git' "${projectDir}/" "${codePath}/"
-   ```
+2. **Populate `code/`** — one of:
 
-   The sandbox starts with no Git history from the host.
+   - **Default (`includeDirty` false, no `codeSourceDir`):** committed tree only, via `git archive HEAD` piped into `tar`:
 
-2. **Remove all `hidden/` dirs** under `saifac/features/` from the code copy. This strips holdout tests from _every_ feature (not just the current one), so the agent cannot read or infer them. The Test Runner later mounts the real `hidden/` dirs from the host when verifying the patch.
+     ```bash
+     git -C "${projectDir}" archive HEAD | tar -x -C "${codePath}"
+     ```
 
-3. **Fresh Git repo inside `code/`:**
+     Respects Git's index for tracked paths at **`HEAD`** (and usual `git archive` export rules).
+
+   - **`--include-dirty` or `codeSourceDir` (resume snapshot):** **rsync** from the source directory, honoring `.gitignore` and excluding `.git`:
+
+     ```bash
+     rsync -a --filter=:- .gitignore --exclude=.git "${codeRsyncSource}/" "${codePath}/"
+     ```
+
+   The sandbox still has **no** Git history from the host after this step.
+
+3. **Remove all `hidden/` dirs** under `saifac/features/` from the code copy. This strips holdout tests from _every_ feature (not just the current one), so the agent cannot read or infer them. The Test Runner later mounts the real `hidden/` dirs from the host when verifying the patch.
+
+4. **Fresh Git repo inside `code/`:**
 
    ```bash
    git init
@@ -69,11 +89,11 @@ The host repository's working directory is **never** modified during the loop. A
    git commit -m "Base state"
    ```
 
-   Uses fixed author/committer (`saifac`, `saifac@safeaifactory.com`) for reproducibility.
+   Uses fixed author/committer (`saifac`, `saifac@safeaifactory.com`) for reproducibility. Untracked files from an rsync copy become **tracked** in this commit; that is why the dirty-workflow and **`run apply`** interact awkwardly unless you use **`run export`**.
 
-4. **Why a fresh repo?** The sandbox is a _pure file copy_ used for diffing. The agent (OpenHands) writes files; we need a clean baseline to compute per-round diffs. Cloning the host repo would bring along its history and remotes—unnecessary and potentially confusing when we later apply the patch to a different branch.
+5. **Why a fresh repo?** The sandbox is a _snapshot_ used for diffing. The agent (OpenHands) writes files; we need a clean baseline to compute per-round diffs. Cloning the host repo would bring along its history and remotes—unnecessary and potentially confusing when we later apply the patch to a different branch.
 
-**Resume / `run test`:** `createSandbox()` may set `codeSourceDir` to a **base snapshot** directory (tree before `runCommits`) and pass `runCommits` to **replay** each recorded commit after `"Base state"`. The sandbox is still built with **rsync**, not `git clone --local`.
+**Resume / `run test`:** `createSandbox()` may set `codeSourceDir` to a **base snapshot** directory (tree before `runCommits`) and pass `runCommits` to **replay** each recorded commit after `"Base state"`. The tree is copied from that snapshot with **rsync** (not `git clone --local`).
 
 ---
 
@@ -216,10 +236,10 @@ The sandbox and the worktree are populated from different sources. This asymmetr
 
 | Location            | How it is created                  | What it contains                                                 |
 | ------------------- | ---------------------------------- | ---------------------------------------------------------------- |
-| **Sandbox `code/`** | `rsync` from the main working tree | Full working tree state: committed + UNCOMMITTED + **untracked** |
+| **Sandbox `code/`** | Default: `git archive HEAD` into `code/`; optional `rsync` | Default: **committed** tree at `HEAD` only. With **`--include-dirty`** (or `defaults.includeDirty` in config): same as before — full working tree (committed + uncommitted + untracked, respecting `.gitignore`). Resume with a **base snapshot** always uses **rsync** from that snapshot. |
 | **Worktree**        | `git worktree add` at **`baseCommitSha`** when set (else `HEAD`) | Only **COMMITTED** files at that commit until **`host-base.patch`** |
 
-- **Sandbox:** When `createSandbox()` runs, it uses `rsync -a --filter=':- .gitignore' --exclude='.git' "${projectDir}/" "${codePath}/"`. This copies everything from the main working tree that is not gitignored, including untracked files and directories. The agent (OpenHands) therefore sees and can rely on paths like `saifac/features/<featureName>/` even if they have never been committed.
+- **Sandbox:** By default `createSandbox()` runs `git archive HEAD` (via `sh` + `tar`) so the agent sees only committed files; `host-base.patch` is empty. With **`--include-dirty`**, it **rsync**s the working tree (`-a --filter=:- .gitignore --exclude=.git`) so uncommitted and untracked paths are visible; `host-base.patch` captures the delta for host apply. To land those runs without merging a branch that bakes in untracked files, use **`saifac run export`** and `git apply`. See [run-export.md](../../commands/run-export.md).
 
 - **Worktree:** For host apply, `git worktree add` creates the branch at **`baseCommitSha`** when set (stored run start), so the tree matches the sandbox’s git baseline even if the user has moved `HEAD` since. Untracked and uncommitted files from the main working tree are not present until **`host-base.patch`** is applied.
 

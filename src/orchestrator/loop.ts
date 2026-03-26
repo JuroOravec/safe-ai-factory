@@ -259,6 +259,11 @@ export interface IterativeLoopOpts {
    */
   reviewerEnabled: boolean;
   /**
+   * When true, copy untracked and uncommitted files into the sandbox (rsync). When false (default),
+   * only the committed tree at `HEAD` is copied (`git archive`).
+   */
+  includeDirty: boolean;
+  /**
    * Normalized staging environment — always present (defaults to `{ provisioner: 'docker' }` when
    * `environments.staging` is absent in config). Contains `app` (with DEFAULT_STAGING_APP
    * defaults) and `appEnvironment` (defaults to `{}`). Used to configure the staging container
@@ -1169,5 +1174,8 @@ export function logIterativeLoopSettings(opts: OrchestratorOpts): void {
     consola.log(`  Host apply target branch: ${opts.targetBranch}`);
   }
   if (opts.verbose === true) consola.log('  Verbose: enabled');
+  if (opts.includeDirty) {
+    consola.log('  Sandbox copy: uncommitted + untracked included (--include-dirty)');
+  }
   if (opts.testOnly) consola.log('  Test-only: skip coding agent (verification / `run test`)');
 }

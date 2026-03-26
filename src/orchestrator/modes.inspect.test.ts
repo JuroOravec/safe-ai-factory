@@ -53,6 +53,7 @@ function makeOrchestratorOpts(): OrchestratorOpts {
     testProfile,
     gitProvider,
     reviewerEnabled: false,
+    includeDirty: false,
     stagingEnvironment: {
       provisioner: 'docker',
       app: { sidecarPort: 8080, sidecarPath: '/exec' },
@@ -102,6 +103,8 @@ const baseArtifact: RunArtifact = {
     coderImage: '',
     push: null,
     pr: false,
+    targetBranch: null,
+    includeDirty: false,
     gateRetries: 10,
     reviewerEnabled: true,
     agentEnv: {},

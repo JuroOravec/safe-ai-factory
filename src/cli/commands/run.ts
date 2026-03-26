@@ -11,6 +11,7 @@
  *   resume        Resume a stored run from storage
  *   test          Re-test a stored run's patch (no coding agent)
  *   apply         Create git branch with run's changes and optional push/PR
+ *   export        Export run's changes as a single diff
  *   inspect       Open an idle coding container for a stored run
  *   rules         Manage user feedback rules on a stored run (create, list, get, update, remove)
  */
@@ -21,7 +22,13 @@ import { loadSaifacConfig } from '../../config/load.js';
 import { type SaifacConfig } from '../../config/schema.js';
 import type { ModelOverrides } from '../../llm-config.js';
 import { consola, outputCliData, setVerboseLogging } from '../../logger.js';
-import { runApply, runInspect, runResume, runTestsFromRun } from '../../orchestrator/modes.js';
+import {
+  runApply,
+  runExport,
+  runInspect,
+  runResume,
+  runTestsFromRun,
+} from '../../orchestrator/modes.js';
 import {
   type OrchestratorCliInput,
   parseModelOverridesCliDelta,
@@ -495,6 +502,53 @@ const applyCommand = defineCommand({
   },
 });
 
+const exportCommand = defineCommand({
+  meta: {
+    name: 'export',
+    description: "Export run's changes as a single diff.",
+  },
+  args: {
+    ...commonRunArgs,
+    runId: {
+      type: 'positional' as const,
+      description: 'Run ID to export (from saifac run ls)',
+      required: true,
+    },
+    output: {
+      type: 'string' as const,
+      alias: 'o' as const,
+      description: 'Output path (default: ./saifac-<feature>-<runId>-<diffHash>.patch)',
+    },
+  },
+  async run({ args }) {
+    const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
+    const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
+    const config = await loadSaifacConfig(saifDir, projectDir);
+
+    const runStorage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
+    if (!runStorage) {
+      consola.error('Run storage is disabled (--storage none). Cannot export a stored run.');
+      process.exit(1);
+    }
+
+    const runId = parseRunId(args);
+    const outputRaw = args.output;
+    const output = typeof outputRaw === 'string' && outputRaw.trim() ? outputRaw : undefined;
+
+    consola.log(`\nExport run's changes as a single diff — ${runId}`);
+
+    const result = await runExport({
+      runId,
+      runStorage,
+      projectDir,
+      output,
+    });
+
+    consola.log(`\n${result.message}`);
+    if (!result.success) process.exit(1);
+  },
+});
+
 const runCommand = defineCommand({
   meta: {
     name: 'run',
@@ -512,6 +566,7 @@ const runCommand = defineCommand({
     inspect: inspectCommand,
     test: testCommand,
     apply: applyCommand,
+    export: exportCommand,
     rules: runRulesCommand,
   },
 });

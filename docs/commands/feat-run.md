@@ -56,6 +56,7 @@ saifac feature run [options]
 | `--push`               | —     | string  | Push feature branch after success. Accepts Git URL, slug (owner/repo), or remote name.                                                                              |
 | `--pr`                 | —     | boolean | Open a Pull Request after pushing. Requires `--push` and provider token env var.                                                                                    |
 | `--branch`             | —     | string  | Override the git branch name used when applying the patch to the host (default: `saifac/<feature>-<runId>-<diffHash>`). |
+| `--include-dirty`      | —     | boolean | Include uncommitted and untracked files in the sandbox (default: **off** — only `HEAD` is copied). |
 | `--git-provider`       | —     | string  | Git hosting provider for push/PR. `github` \| `gitlab` \| `bitbucket` \| `azure` \| `gitea` (default: `github`)                                                     |
 | `--model`              | —     | string  | LLM model. Single global or comma-separated `agent=model` (e.g. `anthropic/claude-opus-4-5` or `pr-summarizer=openai/gpt-4o-mini`). At most one global.             |
 | `--base-url`           | —     | string  | LLM base URL. Single global (e.g. `http://localhost:11434/v1`) or comma-separated `agent=url` (e.g. `pr-summarizer=https://api.openai.com/v1`). At most one global. |

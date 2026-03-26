@@ -203,6 +203,11 @@ const featRunCoreArgs = {
     type: 'string' as const,
     description: 'Max gate retries per run (default: 10).',
   },
+  'include-dirty': {
+    type: 'boolean' as const,
+    description:
+      'Include untracked and uncommitted files in the sandbox copy. Default: only committed files (HEAD).',
+  },
   'agent-env': {
     type: 'string' as const,
     description:

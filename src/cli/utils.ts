@@ -169,6 +169,7 @@ export interface FeatRunArgs extends OrchestratorArgs {
   cedar?: string;
   'coder-image'?: string;
   'gate-retries'?: string;
+  'include-dirty'?: boolean;
   'no-reviewer'?: boolean;
   /** Set by citty for `--no-reviewer` (negated boolean). */
   reviewer?: boolean;
@@ -1243,6 +1244,7 @@ export async function buildOrchestratorCliInputFromFeatArgs(
     typeof runArgs.push === 'string' && runArgs.push.trim() ? runArgs.push.trim() : undefined;
 
   const pr = runArgs.pr === true ? true : undefined;
+  const includeDirty = runArgs['include-dirty'] === true ? true : undefined;
 
   const targetBranch =
     typeof runArgs.branch === 'string' && runArgs.branch.trim() ? runArgs.branch.trim() : undefined;
@@ -1306,6 +1308,7 @@ export async function buildOrchestratorCliInputFromFeatArgs(
     agentLogFormat,
     gateRetries,
     reviewerEnabled,
+    includeDirty,
     push,
     pr,
     targetBranch,

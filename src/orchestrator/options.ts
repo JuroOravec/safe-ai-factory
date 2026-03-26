@@ -202,6 +202,7 @@ const ORCHESTRATOR_MERGE_KEYS = [
   'agentLogFormat',
   'gateRetries',
   'reviewerEnabled',
+  'includeDirty',
   'push',
   'pr',
   'targetBranch',
@@ -307,6 +308,7 @@ async function applyOrchestratorBaseline(
 
   const gateRetries = config?.defaults?.gateRetries ?? DEFAULT_ORCHESTRATOR_GATE_RETRIES;
   const reviewerEnabled = config?.defaults?.reviewerEnabled ?? DEFAULT_REVIEWER_ENABLED;
+  const includeDirty = config?.defaults?.includeDirty ?? false;
   const agentEnv = await mergeAgentEnvFromReads({
     projectDir,
     config,
@@ -356,6 +358,7 @@ async function applyOrchestratorBaseline(
     agentLogFormat,
     gateRetries,
     reviewerEnabled,
+    includeDirty,
     push,
     pr,
     targetBranch,

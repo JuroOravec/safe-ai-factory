@@ -23,7 +23,7 @@ Same as [`run resume`](run-resume.md): use the id from the end of a run, or from
 saifac run list
 ```
 
-## Flags overview
+## Arguments
 
 By default, options follow the **saved run**, like resume. You can override many of them the same way as [`feat run`](feat-run.md); use that page as the full reference.
 

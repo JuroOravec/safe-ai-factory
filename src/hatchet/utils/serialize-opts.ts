@@ -80,6 +80,8 @@ export interface SerializedOrchestratorOpts extends Record<string, unknown> {
   runStorageUri: string | null;
   /** When true, verbose logs are enabled. */
   verbose?: boolean;
+  /** When true, sandbox includes uncommitted/untracked files. */
+  includeDirty?: boolean;
 }
 
 export function serializeOrchestratorOpts(opts: OrchestratorOpts): SerializedOrchestratorOpts {
@@ -198,5 +200,6 @@ export function deserializeOrchestratorOpts(serialized: Record<string, unknown>)
       : null,
     runStorage: s.runStorageUri ? createRunStorage(s.runStorageUri, s.projectDir) : null,
     verbose: !!s.verbose,
+    includeDirty: s.includeDirty ?? false,
   };
 }

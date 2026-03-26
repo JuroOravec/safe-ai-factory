@@ -399,6 +399,20 @@ describe('createSandbox + destroySandbox (integration)', () => {
         "import { expect } from 'vitest';\n",
       );
 
+      const gitTestEnv = {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'test',
+        GIT_AUTHOR_EMAIL: 'test@test',
+        GIT_COMMITTER_NAME: 'test',
+        GIT_COMMITTER_EMAIL: 'test@test',
+      };
+      await gitAdd({ cwd: projectDir });
+      await gitCommit({
+        cwd: projectDir,
+        message: 'Add saifac feature fixtures',
+        env: gitTestEnv,
+      });
+
       const feature = await resolveFeature({
         input: 'my-feature',
         projectDir,
@@ -511,6 +525,20 @@ describe('createSandbox + destroySandbox (integration)', () => {
         "import { expect } from 'vitest';\n",
       );
 
+      const gitTestEnv = {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'test',
+        GIT_AUTHOR_EMAIL: 'test@test',
+        GIT_COMMITTER_NAME: 'test',
+        GIT_COMMITTER_EMAIL: 'test@test',
+      };
+      await gitAdd({ cwd: projectDir });
+      await gitCommit({
+        cwd: projectDir,
+        message: 'Add saifac feature fixtures',
+        env: gitTestEnv,
+      });
+
       const feature = await resolveFeature({
         input: 'my-feature',
         projectDir,
@@ -618,6 +646,20 @@ describe('createSandbox + destroySandbox (integration)', () => {
       );
       await mkdir(profileHidden, { recursive: true });
       await writeUtf8(join(profileHidden, 'edge.spec.ts'), "import { expect } from 'vitest';\n");
+
+      const gitTestEnv = {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'test',
+        GIT_AUTHOR_EMAIL: 'test@test',
+        GIT_COMMITTER_NAME: 'test',
+        GIT_COMMITTER_EMAIL: 'test@test',
+      };
+      await gitAdd({ cwd: projectDir });
+      await gitCommit({
+        cwd: projectDir,
+        message: 'Add nested saifac feature fixtures',
+        env: gitTestEnv,
+      });
 
       const feature = await resolveFeature({
         input: '(auth)/login',

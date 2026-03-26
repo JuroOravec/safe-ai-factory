@@ -71,6 +71,7 @@ export type SerializedLoopOpts = {
   testProfileId: string;
   testRetries: number;
   reviewerEnabled: boolean;
+  includeDirty: boolean;
   patchExcludeStr?: SerializedPatchExcludeRule[];
   /**
    * Normalized staging environment — always present.

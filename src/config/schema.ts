@@ -114,6 +114,11 @@ export const saifacConfigDefaultsSchema = z.object({
   coderImage: z.string().optional(),
   gateRetries: z.number().int().positive().optional(),
   reviewerEnabled: z.boolean().optional(),
+  /**
+   * When true, the sandbox copy includes untracked and uncommitted files (rsync working tree).
+   * When false (default), only files at `HEAD` are copied (`git archive`).
+   */
+  includeDirty: z.boolean().optional(),
   agentLogFormat: z.enum(['openhands', 'raw']).optional(),
   push: z.string().optional(),
   pr: z.boolean().optional(),

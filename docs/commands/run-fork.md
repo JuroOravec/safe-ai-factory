@@ -18,7 +18,7 @@ saifac run fork <sourceRunId> [options]
 
 Use [`run list`](run-list.md), or use the ID printed when a run ends ([`feat run`](feat-run.md) or [`run resume`](run-resume.md)).
 
-## Flags overview
+## Arguments
 
 You can pass the **same options as [`feat run`](feat-run.md)** (models, agent, scripts, `--max-runs`, `--storage`, `--verbose`, etc.).
 

@@ -8,7 +8,7 @@
  * Directory structure produced:
  *   {sandboxBaseDir}/{proj}-{feat}-{runId}/
  *     gate.sh                ← user-supplied or default gate script; mounted :ro at /saifac/gate.sh
- *     code/                  ← rsync copy of repo; workspace for OpenHands; build context/mount
+ *     code/                  ← copy of repo (git archive HEAD or rsync); workspace for the AI agent
  *                              for staging container (Container A) during tests
  *       .git/                ← fresh git repo for diffing
  *       saifac/features/{feat}/tests/
@@ -58,7 +58,7 @@ export interface Sandbox {
   runId: string;
   /** e.g. /tmp/saifac/sandboxes/{proj}-{feat}-{runId} */
   sandboxBasePath: string;
-  /** sandboxBasePath/code — rsync copy of the repo */
+  /** sandboxBasePath/code — copy of the repo (committed tree or working tree) */
   codePath: string;
   /** sandboxBasePath/gate.sh — inner gate script; mounted :ro at /saifac/gate.sh in the container */
   gatePath: string;
@@ -199,6 +199,34 @@ export interface CreateSandboxOpts {
    * Run commits to replay after the initial "Base state" commit (resume / test-from-run).
    */
   runCommits?: RunCommit[];
+  /**
+   * When false (default), copy only `git archive HEAD` from {@link projectDir} into `code/`.
+   * When true, rsync the working tree (respecting `.gitignore`).
+   * Ignored when {@link codeSourceDir} is set (resume): always rsync from that directory.
+   */
+  includeDirty: boolean;
+}
+
+/**
+ * Materialize the tree at `HEAD` into `destDir` (no `.git`). Requires a repo with at least one commit.
+ */
+export async function copyCommittedGitTreeToDir(repoDir: string, destDir: string): Promise<void> {
+  await spawnAsync({
+    command: 'sh',
+    // NOTE: git archive already excludes .git by default; no extra settings needed.
+    //       Also, by principle, git should contain only files NOT in .gitignore.
+    args: [
+      '-c',
+      'git -C "$SAIFAC_GIT_ARCHIVE_REPO" archive HEAD | tar -x -C "$SAIFAC_GIT_ARCHIVE_DEST"',
+    ],
+    cwd: repoDir,
+    env: {
+      ...process.env,
+      SAIFAC_GIT_ARCHIVE_REPO: repoDir,
+      SAIFAC_GIT_ARCHIVE_DEST: destDir,
+    },
+    stdio: 'inherit',
+  });
 }
 
 /**
@@ -253,7 +281,8 @@ export async function diffUntrackedFilesVersusDevNull(projectDir: string): Promi
 /**
  * Creates an isolated sandbox for the feature.
  *
- * 1. rsync repo → sandboxBasePath/code/ (honoring .gitignore)
+ * 1. Populate sandboxBasePath/code/ — `git archive HEAD` (default) or rsync when {@link CreateSandboxOpts#includeDirty}
+ *    or when {@link CreateSandboxOpts#codeSourceDir} is set (resume snapshot)
  * 2. Remove ALL hidden/ dirs under saifac/features/ so the coder agent cannot see holdout
  *    tests from any feature (current or others)
  * 3. git init + "Base state" commit, then replay {@link CreateSandboxOpts#runCommits}
@@ -280,8 +309,10 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
     stageScript,
     verbose,
     runCommits = [],
+    includeDirty,
   } = opts;
   const codeRsyncSource = opts.codeSourceDir ?? projectDir;
+  const copyWorkingTree = !!opts.codeSourceDir || includeDirty;
   const runId = opts.runId ?? Math.random().toString(36).substring(2, 9);
 
   const dirName = `${projectName}-${feature.name}-${runId}`;
@@ -316,39 +347,60 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
     );
   }
 
-  // Capture tracked + untracked changes so applyPatchToHost can faithfully reconstruct the
-  // host's working tree in the worktree before applying the agent's patch.
-  // `git diff HEAD` only covers tracked files; untracked files (e.g. a new CHANGELOG.md that
-  // exists on the host but is not committed) must be included separately, otherwise the agent's
-  // modification diff will fail with "No such file or directory" in the worktree.
-  // Always use projectDir here — resume sets codeSourceDir to a base snapshot dir with no .git.
-  const trackedPatch = await gitDiff({ cwd: projectDir, args: ['--binary', 'HEAD'] });
-  const untrackedPatch = await diffUntrackedFilesVersusDevNull(projectDir);
-  const parts: string[] = [];
-  if (trackedPatch.trim()) {
-    parts.push(trackedPatch.endsWith('\n') ? trackedPatch : `${trackedPatch}\n`);
-  }
-  if (untrackedPatch.trim()) {
-    parts.push(untrackedPatch.endsWith('\n') ? untrackedPatch : `${untrackedPatch}\n`);
-  }
-  const hostBasePatch = parts.join('');
-  await writeUtf8(hostBasePatchPath, hostBasePatch);
-  if (hostBasePatch.trim()) {
-    const lineCount = hostBasePatch.split('\n').length;
-    consola.log(
-      `[sandbox] Captured ${lineCount} lines of host uncommitted + untracked changes to host-base.patch`,
-    );
+  // host-base.patch: only needed when the sandbox tree can differ from baseCommitSha (dirty or resume).
+  if (!copyWorkingTree) {
+    // Case: Copying codebase from git archive HEAD (no uncommitted changes). No patch needed.
+    await writeUtf8(hostBasePatchPath, '');
+    consola.log('[sandbox] host-base.patch empty (sandbox matches HEAD; no uncommitted snapshot)');
   } else {
-    consola.log('[sandbox] Host working tree is clean — host-base.patch is empty');
+    // Capture tracked + untracked changes so applyPatchToHost can faithfully reconstruct the
+    // host's working tree in the worktree before applying the agent's patch.
+    // `git diff HEAD` only covers tracked files; untracked files (e.g. a new CHANGELOG.md that
+    // exists on the host but is not committed) must be included separately, otherwise the agent's
+    // modification diff will fail with "No such file or directory" in the worktree when it's applied.
+    // Always use projectDir — resume uses a snapshot dir without .git for the tree copy.
+    const trackedPatch = await gitDiff({ cwd: projectDir, args: ['--binary', 'HEAD'] });
+    const untrackedPatch = await diffUntrackedFilesVersusDevNull(projectDir);
+    const parts: string[] = [];
+    if (trackedPatch.trim()) {
+      parts.push(trackedPatch.endsWith('\n') ? trackedPatch : `${trackedPatch}\n`);
+    }
+    if (untrackedPatch.trim()) {
+      parts.push(untrackedPatch.endsWith('\n') ? untrackedPatch : `${untrackedPatch}\n`);
+    }
+    const hostBasePatch = parts.join('');
+    await writeUtf8(hostBasePatchPath, hostBasePatch);
+    if (hostBasePatch.trim()) {
+      const lineCount = hostBasePatch.split('\n').length;
+      consola.log(
+        `[sandbox] Captured ${lineCount} lines of host uncommitted + untracked changes to host-base.patch`,
+      );
+    } else {
+      consola.log('[sandbox] Host working tree is clean — host-base.patch is empty');
+    }
   }
 
-  // rsync the repo into code/, respecting .gitignore to skip node_modules etc.
-  await spawnAsync({
-    command: 'rsync',
-    args: ['-a', '--filter=:- .gitignore', '--exclude=.git', `${codeRsyncSource}/`, `${codePath}/`],
-    cwd: codeRsyncSource,
-    stdio: 'inherit',
-  });
+  // Copy user's workspace into code/.
+  // Either use `git archive HEAD` (copying state as it was at the latest commit), or
+  // if `--include-dirty`, rsync the working tree as it is now (incl all uncommited or untracked changes).
+  // In both cases we respect .gitignore (to skip node_modules etc) and exclude .git.
+  if (copyWorkingTree) {
+    await spawnAsync({
+      command: 'rsync',
+      args: [
+        '-a',
+        '--filter=:- .gitignore',
+        '--exclude=.git',
+        `${codeRsyncSource}/`,
+        `${codePath}/`,
+      ],
+      cwd: codeRsyncSource,
+      stdio: 'inherit',
+    });
+  } else {
+    consola.log(`[sandbox] Populating code/ from git archive HEAD at ${projectDir}`);
+    await copyCommittedGitTreeToDir(projectDir, codePath);
+  }
 
   // Read the test catalog to discover which tests are hidden.
   const testsJsonPath = join(feature.absolutePath, 'tests', 'tests.json');

@@ -40,7 +40,7 @@ RUN_ID   FEATURE    STATUS  STARTED                    UPDATED
 5wjddk1  add-login  failed  2026-03-24T00:00:00.000Z   2026-03-24T01:49:10.982Z
 ```
 
-## Flags
+## Arguments
 
 By default, `run resume` uses the same arguments as the original run.
 

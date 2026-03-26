@@ -342,6 +342,7 @@ export function createFeatRunWorkflow() {
         verbose: !!opts.verbose,
         runCommits: opts.resume?.seedRunCommits ?? [],
         runId: persistedRunId,
+        includeDirty: opts.includeDirty,
       })) as Sandbox & { [x: string]: JsonValue };
     },
   });

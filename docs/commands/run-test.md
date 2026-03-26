@@ -15,7 +15,7 @@ saifac run test <runId> [options]
 - **Docker daemon** — Same as [`feat run`](feat-run.md).
 - **LLM API keys** — Same as `feat run`.
 
-## Flags
+## Arguments
 
 By default, `run test` uses the same arguments as the original run.
 
