@@ -1,6 +1,11 @@
 # Steer the agent with run rules
 
-Add short instructions to an agent's Run. The next time you resume a Run ([`run resume`](../commands/run-resume.md)), your rules will be added to the coding agent's prompt.
+Add short instructions to an agent's Run. They are merged into the coding agent's **task prompt**.
+
+You can do this in two ways:
+
+- **Live feedback** — While a run is still executing (`feat run` or `run resume`), add rules in another terminal; the agent can see them on the **next inner round** (after the current agent step finishes).
+- **Offline feedback** — Add rules after the run has stopped, then [`run resume`](../commands/run-resume.md) so the next agent run includes your feedback.
 
 **You need:** Docker, and a **Run ID**.
 
@@ -72,7 +77,7 @@ saifac run rules create <runId> --content "Do not touch vendor/." --scope always
 
 ## 3. (Optional) Change or delete a rule
 
-Before you resume a Run, you can modify, delete, or add new rules. [See full CLI reference](../commands/run-rules.md).
+Whether **during** a live coding session or **before** resume — you can modify, delete, or add rules. [See full CLI reference](../commands/run-rules.md).
 
 We'll do a quick sanity check of the rules we have on the run:
 

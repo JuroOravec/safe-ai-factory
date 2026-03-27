@@ -3,7 +3,8 @@
  * Used by mode 'start' (and 'resume' via runStartCore).
  */
 
-import { join } from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 import { isCancel, text } from '@clack/prompts';
 
@@ -26,7 +27,17 @@ import {
   type RunTestsOpts,
   type TestsResult,
 } from '../provisioners/types.js';
-import { activeOnceRuleIds, markOnceRulesConsumed, rulesForPrompt } from '../runs/rules.js';
+import {
+  activeOnceRuleIds,
+  appendMissingRunRules,
+  formatRuleBlockForPending,
+  markOnceRulesConsumed,
+  pendingRulesPath,
+  preparePendingRulesFile,
+  reconcileRunRulesWithStorage,
+  rulesForPrompt,
+  startRulesWatcher,
+} from '../runs/rules.js';
 import {
   type InnerRoundSummary,
   type OuterAttemptSummary,
@@ -538,8 +549,11 @@ export async function runIterativeLoop(
     testScript,
   });
 
-  /** Saves the current round progress to storage. */
-  const saveRoundProgress = async () => {
+  /**
+   * Persists the current running artifact (rules with `consumedAt`, commits, round summaries,
+   * last feedback). Used for incremental saves and immediately after marking once-rules consumed.
+   */
+  const saveRunningArtifact = async (failureContext: string) => {
     if (!runStorage || !runContext) return;
     try {
       const {
@@ -572,10 +586,12 @@ export async function runIterativeLoop(
       if (err instanceof StaleArtifactError) {
         consola.warn(`[orchestrator] ${err.message}`);
       } else {
-        consola.warn('[orchestrator] Failed to save round progress:', err);
+        consola.warn(`[orchestrator] Failed to save ${failureContext}:`, err);
       }
     }
   };
+
+  const saveRoundProgress = async () => saveRunningArtifact('round progress');
 
   const cleanupAndSaveRun = async (input: { didSucceed: boolean }) => {
     const { didSucceed } = input;
@@ -730,6 +746,23 @@ export async function runIterativeLoop(
         await git({ cwd: sandbox.codePath, args: ['rev-parse', 'HEAD'] })
       ).trim();
 
+      // Part of real-time human feedback:
+      // Refresh the Run artifact on each attempt (outer loop), so that if new Run rules
+      // were created while tests ran on the previous attempt, we detect them and include them
+      // in the task prompt for next inner round.
+      if (runStorage && runContext) {
+        const freshArtifact = await runStorage.getRun(runId);
+        if (freshArtifact) {
+          runContext.rules = reconcileRunRulesWithStorage({
+            inMemory: runContext.rules,
+            fromStorage: freshArtifact.rules ?? [],
+          });
+          if (freshArtifact.artifactRevision !== undefined) {
+            runContext.expectedArtifactRevision = freshArtifact.artifactRevision;
+          }
+        }
+      }
+
       // Some rules are marked as "once" and should be consumed after the coding round.
       // Thus these rules are included in the task prompt only on the first round.
       const onceIdsThisRound = runContext ? activeOnceRuleIds(runContext.rules) : [];
@@ -747,6 +780,32 @@ export async function runIterativeLoop(
       registry?.registerProvisioner(codingProvisioner, codingRunId);
 
       let innerRounds: InnerRoundSummary[] = [];
+
+      // Part of real-time human feedback:
+      // Poll the saved Run artifact for new active rules and append them to the pending-rules file
+      // so we can include them in the task prompt for the next inner round.
+      const rulesWatcher = (() => {
+        if (!runStorage || !runContext) return null;
+        const rc = runContext;
+        const knownRuleIds = new Set(
+          runContext ? rulesForPrompt(runContext.rules).map((r) => r.id) : [],
+        );
+        const pendingFile = pendingRulesPath(sandbox.sandboxBasePath);
+        return startRulesWatcher({
+          runStorage,
+          runId,
+          knownRuleIds,
+          onNewRules: async (newRules) => {
+            await mkdir(dirname(pendingFile), { recursive: true });
+            await appendUtf8(pendingFile, formatRuleBlockForPending(newRules));
+            rc.rules = appendMissingRunRules({ inMemory: rc.rules, incoming: newRules });
+          },
+          onArtifactRevision: (rev) => {
+            rc.expectedArtifactRevision = rev;
+          },
+        });
+      })();
+
       try {
         await codingProvisioner.setup({
           runId: codingRunId,
@@ -756,6 +815,7 @@ export async function runIterativeLoop(
         });
 
         await prepareRoundsStatsFile(sandbox.sandboxBasePath);
+        await preparePendingRulesFile(sandbox.sandboxBasePath);
 
         await codingProvisioner.runAgent({
           codePath: sandbox.codePath,
@@ -780,13 +840,16 @@ export async function runIterativeLoop(
 
         innerRounds = await readInnerRounds(roundsStatsPath(sandbox.sandboxBasePath));
       } finally {
+        rulesWatcher?.stop();
         registry?.deregisterProvisioner(codingProvisioner);
         await codingProvisioner.teardown({ runId: codingRunId });
       }
 
-      // Mark once rules as consumed if they were used this round.
+      // Mark once rules as consumed if they were used this round, then persist so storage
+      // stays authoritative before the next reconcile (start of next outer attempt).
       if (runContext && onceIdsThisRound.length > 0) {
         markOnceRulesConsumed(runContext.rules, onceIdsThisRound);
+        await saveRunningArtifact('consumed rules');
       }
 
       // 2. Extract incremental patch(es) for this round (one RunCommit per sandbox commit + optional WIP).

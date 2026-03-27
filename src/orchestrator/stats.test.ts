@@ -1,11 +1,12 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { consola } from '../logger.js';
-import { writeUtf8 } from '../utils/io.js';
+import { pendingRulesPath, preparePendingRulesFile } from '../runs/rules.js';
+import { readUtf8, writeUtf8 } from '../utils/io.js';
 import { prepareRoundsStatsFile, readInnerRounds, roundsStatsPath } from './stats.js';
 
 describe('stats', () => {
@@ -50,6 +51,23 @@ describe('stats', () => {
       const rows = await readInnerRounds(logPath);
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ round: 1, phase: 'agent_failed', gateOutput: 'curl: (22)' });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('pendingRulesPath lives beside roundsStatsPath under .saifac', () => {
+    const base = '/tmp/sbx';
+    expect(dirname(pendingRulesPath(base))).toBe(dirname(roundsStatsPath(base)));
+    expect(pendingRulesPath(base)).toMatch(/pending-rules\.md$/);
+  });
+
+  it('preparePendingRulesFile creates an empty file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'saifac-pending-'));
+    try {
+      const p = pendingRulesPath(dir);
+      await preparePendingRulesFile(dir);
+      expect(await readUtf8(p)).toBe('');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

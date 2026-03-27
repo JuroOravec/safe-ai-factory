@@ -4,8 +4,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { resolveAgentProfile } from '../agent-profiles/index.js';
+import type { SaifacConfig } from '../config/schema.js';
 import { consola } from '../logger.js';
-import { parseModelOverridesCliDelta } from './options.js';
+import { parseModelOverridesCliDelta, resolveAgentLogFormat } from './options.js';
 
 describe('parseModelOverridesCliDelta', () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
@@ -49,5 +51,23 @@ describe('parseModelOverridesCliDelta', () => {
       coder: 'openai/gpt-4o',
       'vague-specs-check': 'openai/gpt-4o-mini',
     });
+  });
+});
+
+describe('resolveAgentLogFormat', () => {
+  it('prefers agent profile defaultLogFormat over config.defaults.agentLogFormat', () => {
+    const cfg = {
+      defaults: { agentLogFormat: 'openhands' as const },
+    } satisfies Partial<SaifacConfig> as SaifacConfig;
+    expect(resolveAgentLogFormat(undefined, resolveAgentProfile('debug'), cfg)).toBe('raw');
+  });
+
+  it('keeps openhands when that profile is selected even if config defaults to raw', () => {
+    const cfg = {
+      defaults: { agentLogFormat: 'raw' as const },
+    } satisfies Partial<SaifacConfig> as SaifacConfig;
+    expect(resolveAgentLogFormat(undefined, resolveAgentProfile('openhands'), cfg)).toBe(
+      'openhands',
+    );
   });
 });

@@ -33,6 +33,15 @@
 #                                 is treated as a gate failure and the agent retries.
 #   SAIFAC_ROUNDS_STATS_PATH     — (optional) JSONL path for inner-round summaries (default:
 #                                 `${SAIFAC_TASK_PATH}/stats.jsonl`).
+#   SAIFAC_PENDING_RULES_PATH    — (optional) markdown file the host appends with human feedback
+#                                 between inner rounds (default: `pending-rules.md` next to task.md).
+#                                 This script renames the file when consumed so the next round
+#                                 picks up only new content.
+#   SAIFAC_RUN_ID                  — (optional) orchestrator run id; echoed in round banners for logs.
+#
+# Agent stdout boundaries (for host log formatting): one line each, echoed by this script only —
+#   [SAIFAC:AGENT_START]  — before bash "$AGENT_SCRIPT" (streams live via tee)
+#   [SAIFAC:AGENT_END]    — after the agent exits (host applies OpenHands parsing only between these)
 
 set -euo pipefail
 
@@ -51,6 +60,7 @@ AGENT_SCRIPT="${SAIFAC_AGENT_SCRIPT:-/saifac/agent.sh}"
 GATE_RETRIES="${SAIFAC_GATE_RETRIES:-5}"
 TASK_PATH="${SAIFAC_TASK_PATH:-/workspace/.saifac/task.md}"
 ROUNDS_STATS_PATH="${SAIFAC_ROUNDS_STATS_PATH:-$(dirname "$TASK_PATH")/stats.jsonl}"
+PENDING_RULES_PATH="${SAIFAC_PENDING_RULES_PATH:-$(dirname "$TASK_PATH")/pending-rules.md}"
 
 if [ -z "${SAIFAC_INITIAL_TASK:-}" ]; then
   echo "[coder-start] ERROR: SAIFAC_INITIAL_TASK is not set." >&2
@@ -157,7 +167,15 @@ main() {
   while [ "$round" -lt "$GATE_RETRIES" ]; do
     round=$((round + 1))
     round_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "[coder-start] ===== Round $round/$GATE_RETRIES ====="
+    echo "[coder-start] ===== Round $round/$GATE_RETRIES${SAIFAC_RUN_ID:+ (run $SAIFAC_RUN_ID)} ====="
+
+    # Human feedback queued on the host (e.g. `saifac run rules create` while the agent runs).
+    if [ -f "$PENDING_RULES_PATH" ] && [ -s "$PENDING_RULES_PATH" ]; then
+      pending_content="$(cat "$PENDING_RULES_PATH")"
+      mv "$PENDING_RULES_PATH" "${PENDING_RULES_PATH}.consumed.${round}"
+      current_task="$(printf '%s\n\n## Human Feedback\n\n%s' "$current_task" "$pending_content")"
+      echo "[coder-start] Applied pending human feedback (round $round)."
+    fi
 
     # Write the current task to SAIFAC_TASK_PATH so the agent script can read it.
     # Agent scripts must consume the task from this file (not from env var or CLI args).
@@ -168,12 +186,19 @@ main() {
     # This is where we call the actual agent, e.g. OpenHands, Aider, Claude, Codex, etc.
     # Instead of calling openhands directly, we call the agent script - a bash script
     # that can contain anything. This way we can use any agent, not just OpenHands.
-    # Capture stdout+stderr like the gate; non-zero exit is a retryable failure (not set -e abort).
+    # Stream to stdout (tee) so the host sees live output; keep a copy for failure feedback.
+    # The command is wrapped in blocks like [SAIFAC:AGENT_START] so we can foramt the agent's
+    # output differently for differnet agents. E.g. OpenHands uses JSON, Aider uses Markdown.
     echo "[coder-start] Running agent: $AGENT_SCRIPT"
-    agent_output=$(bash "$AGENT_SCRIPT" 2>&1) && agent_exit=0 || agent_exit=$?
-    if [ -n "${agent_output:-}" ]; then
-      printf '%s\n' "$agent_output"
-    fi
+    agent_tmpfile="$(mktemp)"
+    printf '%s\n' '[SAIFAC:AGENT_START]'
+    set +e
+    bash "$AGENT_SCRIPT" 2>&1 | tee "$agent_tmpfile"
+    agent_exit="${PIPESTATUS[0]}"
+    set -e
+    printf '%s\n' '[SAIFAC:AGENT_END]'
+    agent_output="$(cat "$agent_tmpfile")"
+    rm -f "$agent_tmpfile"
 
     # Agent script failed, log and retry.
     if [ "$agent_exit" -ne 0 ]; then

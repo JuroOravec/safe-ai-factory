@@ -12,7 +12,7 @@ More guides can slot in here—for example: first feature end-to-end, reading ru
 | Guide | Use it when… |
 | ----- | ------------ |
 | [Fix agent mistakes with inspect and resume](inspect-and-resume.md) | The coding agent is wrong, stuck on an error, or you need to patch the sandbox by hand and then let the agent continue. |
-| [Provide user feedback to the agent](providing-user-feedback.md) | The agent is wrong or stuck, or to tweak agent's behavior (`run rules` + `run resume`). |
+| [Live user feedback to the agent](providing-user-feedback.md) | Steer via **run rules** — Instructions appear in the task prompt. |
 
 ## Reference links
 

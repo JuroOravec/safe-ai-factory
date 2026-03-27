@@ -2,6 +2,8 @@
 
 Manage **user feedback rules** stored on a run artifact. Rules are injected into the agent **task prompt** (see [Runs — Run rules](../runs.md#run-rules-user-feedback)).
 
+**Live feedback:** You can call these commands **while a run is still executing** a coding phase (`feat run` / `run resume`). New rules are picked up for the **next inner round**.
+
 **Subcommands:** `create`, `list` / `ls`, `get`, `update`, `remove` / `rm`.
 
 ## Usage
@@ -158,7 +160,7 @@ saifac run rules rm abc12x a1b2c3
 
 ## See also
 
-- [Guide: Provide user feedback to the agent](../guides/providing-user-feedback.md) — Step-by-step (`run rules` → `run resume`)
+- [Guide: Live user feedback to the agent](../guides/providing-user-feedback.md) — Instructions appear in the task prompt.
 - [Runs](../runs.md) — Run storage, artifact shape, rule semantics
 - [`run resume`](run-resume.md) — Next step after adding rules
 - [`run info`](run-info.md) — Inspect artifact JSON (includes `rules` when present)
