@@ -207,7 +207,8 @@ export class DockerProvisioner implements Provisioner {
       Cmd: ['/bin/sh', '/saifac/staging-start.sh'],
       HostConfig: {
         NetworkMode: this.networkName,
-        Binds: [`${codePath}:/workspace`, `${saifacPath}:/saifac:ro`],
+        // Writable: putArchive injects sidecar into /saifac before start.
+        Binds: [`${codePath}:/workspace`, `${saifacPath}:/saifac`],
         SecurityOpt: ['no-new-privileges'],
         CapDrop: ['ALL'],
       },
