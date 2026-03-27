@@ -1,14 +1,7 @@
-/**
- * Unit tests for agent-runner utilities.
- *
- * Focuses on the pure, side-effect-free helpers that can run without Docker
- * or the filesystem.
- */
-
 import { describe, expect, it, vi } from 'vitest';
 
 import { consola } from '../logger.js';
-import { filterAgentEnv } from '../provisioners/docker/index.js';
+import { filterAgentEnv } from './agent-env.js';
 
 describe('filterAgentEnv', () => {
   it('passes through non-reserved keys unchanged', () => {
@@ -27,6 +20,7 @@ describe('filterAgentEnv', () => {
       SAIFAC_INITIAL_TASK: '1',
       SAIFAC_GATE_RETRIES: '2',
       SAIFAC_GATE_SCRIPT: '3',
+      SAIFAC_REVIEWER_ENABLED: '1',
       SAIFAC_STARTUP_SCRIPT: '4',
       SAIFAC_AGENT_INSTALL_SCRIPT: '5',
       SAIFAC_AGENT_SCRIPT: '6',

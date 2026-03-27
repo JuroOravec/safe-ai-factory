@@ -13,7 +13,6 @@ import { join, resolve } from 'node:path';
 
 import { resolveAgentProfile } from '../agent-profiles/index.js';
 import type { SaifacConfig } from '../config/schema.js';
-import { getSaifRoot } from '../constants.js';
 import { getHatchetClient } from '../hatchet/client.js';
 import { serializeOrchestratorOpts } from '../hatchet/utils/serialize-opts.js';
 import {
@@ -24,7 +23,12 @@ import { type ModelOverrides, resolveAgentLlmConfig } from '../llm-config.js';
 import { consola } from '../logger.js';
 import { createProvisioner } from '../provisioners/index.js';
 import { defaultProvisionerLog } from '../provisioners/logs.js';
-import { type CoderInspectSessionHandle, type TestsResult } from '../provisioners/types.js';
+import {
+  type AssertionSuiteResult,
+  type CoderInspectSessionHandle,
+  type TestsResult,
+} from '../provisioners/types.js';
+import { parseJUnitXmlString } from '../provisioners/utils/test-parser.js';
 import { cloneRunRules, rulesForPrompt } from '../runs/rules.js';
 import { type RunStorage } from '../runs/storage.js';
 import {
@@ -39,6 +43,8 @@ import { resolveFeature } from '../specs/discover.js';
 import { CleanupRegistry } from '../utils/cleanup.js';
 import { git } from '../utils/git.js';
 import { writeUtf8 } from '../utils/io.js';
+import { filterAgentEnv } from './agent-env.js';
+import { buildTaskPrompt } from './agent-task.js';
 import { createAgentStdoutPipe, createDefaultAgentLog } from './logs.js';
 import {
   buildInitialTask,
@@ -332,8 +338,7 @@ async function runFail2PassCore(
       stagingEnvironment,
       feature,
       projectName,
-      startupPath: sandbox.startupPath,
-      stagePath: sandbox.stagePath,
+      saifacPath: sandbox.saifacPath,
       onLog: defaultProvisionerLog,
     });
 
@@ -344,7 +349,6 @@ async function runFail2PassCore(
       runId: sandbox.runId,
       feature,
       projectName,
-      reportPath: join(sandbox.sandboxBasePath, 'results.xml'),
       onLog: defaultProvisionerLog,
     });
 
@@ -798,10 +802,17 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
       mergedOpts.reviewerEnabled && !mergedOpts.dangerousDebug
         ? {
             llmConfig: resolveAgentLlmConfig('reviewer', mergedOpts.overrides),
-            scriptPath: join(getSaifRoot(), 'src', 'orchestrator', 'scripts', 'reviewer.sh'),
             argusBinaryPath: await getArgusBinaryPath(),
           }
         : null;
+
+    const taskPrompt = await buildTaskPrompt({
+      codePath: sandbox.codePath,
+      task,
+      saifDir,
+      feature,
+      errorFeedback,
+    });
 
     let inspectHandle: CoderInspectSessionHandle | null = null;
 
@@ -827,17 +838,12 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
         inspectHandle = await codingProvisioner.startInspect({
           codePath: sandbox.codePath,
           sandboxBasePath: sandbox.sandboxBasePath,
-          task,
-          errorFeedback,
-          saifDir,
-          feature,
+          taskPrompt,
           coderImage: mergedOpts.coderImage,
           dangerousNoLeash: inspectDangerousNoLeash,
           cedarPolicyPath: mergedOpts.cedarPolicyPath,
-          startupPath: sandbox.startupPath,
-          agentInstallPath: sandbox.agentInstallPath,
-          agentPath: sandbox.agentPath,
-          agentEnv: mergedOpts.agentEnv,
+          saifacPath: sandbox.saifacPath,
+          agentEnv: filterAgentEnv(mergedOpts.agentEnv),
           onAgentStdout,
           onAgentStdoutEnd,
           onLog: defaultProvisionerLog,
@@ -1183,8 +1189,9 @@ export function getSandboxSourceDir(opts: {
  * Skips `sidecar:health` tests (infra health-check).
  */
 function hasFeatureSuccessfullyFailed(result: TestsResult): boolean {
-  if (!result.testSuites) return result.status === 'failed';
-  for (const suite of result.testSuites) {
+  const testSuites: AssertionSuiteResult[] | undefined = parseJUnitXmlString(result.rawJunitXml);
+  if (!testSuites) return result.status === 'failed';
+  for (const suite of testSuites) {
     for (const assertion of suite.assertionResults) {
       if (assertion.ancestorTitles.includes('sidecar:health')) continue;
       if (assertion.status === 'failed') return true;

@@ -21,11 +21,12 @@
  *       ...rest of repo...
  */
 
-import { chmod, mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { minimatch } from 'minimatch';
 
+import { getSaifRoot } from '../constants.js';
 import type { TestCatalog } from '../design-tests/schema.js';
 import { consola } from '../logger.js';
 import type { RunCommit } from '../runs/types.js';
@@ -62,8 +63,10 @@ export interface Sandbox {
   sandboxBasePath: string;
   /** sandboxBasePath/code — copy of the repo (committed tree or working tree) */
   codePath: string;
-  /** sandboxBasePath/gate.sh — inner gate script; mounted :ro at /saifac/gate.sh in the container */
-  gatePath: string;
+  /**
+   * sandboxBasePath/saifac — orchestration scripts; mounted :ro at /saifac in staging and coder containers.
+   */
+  saifacPath: string;
   /**
    * sandboxBasePath/host-base.patch — unified diff of the host repo's uncommitted changes
    * (staged + unstaged) captured at sandbox creation time via `git diff HEAD`.
@@ -75,31 +78,6 @@ export interface Sandbox {
    * Empty string when the host had no uncommitted changes at creation time (no-op).
    */
   hostBasePatchPath: string;
-  /**
-   * sandboxBasePath/startup.sh — installation script; mounted :ro at /saifac/startup.sh.
-   * Used by both the coder container and the staging container to install workspace deps.
-   * Set via --profile (default: node-pnpm-python) or --startup-script.
-   */
-  startupPath: string;
-  /**
-   * sandboxBasePath/agent-install.sh — one-time agent setup script; mounted :ro at /saifac/agent-install.sh.
-   * coder-start.sh runs this once after the startup script and before the agent loop begins.
-   * Used to install the coding agent (e.g. pipx install aider-chat).
-   * When absent / empty, the step is skipped.
-   */
-  agentInstallPath: string;
-  /**
-   * sandboxBasePath/agent.sh — agent runner script; mounted :ro at /saifac/agent.sh.
-   * coder-start.sh invokes this once per inner round with the task in $SAIFAC_TASK_PATH.
-   * Resolved from the agent profile (openhands by default). Override with --agent-script.
-   */
-  agentPath: string;
-  /**
-   * sandboxBasePath/stage.sh — profile's stage script; mounted read-only in the staging container at /saifac/stage.sh.
-   * Invoked by staging-start.sh after the installation script and the sidecar have run.
-   * Set via --profile or --stage-script.
-   */
-  stagePath: string;
 }
 
 /**
@@ -110,6 +88,8 @@ export const SAIFAC_TEMP_ROOT = join('/tmp', 'saifac');
 
 /** Disposable rsync sandboxes; `cache list` / `cache clear` use this path by default. */
 export const DEFAULT_SANDBOX_BASE_DIR = join(SAIFAC_TEMP_ROOT, 'sandboxes');
+
+const SAIFAC_SCRIPTS_DIR = join(getSaifRoot(), 'src', 'orchestrator', 'scripts');
 
 export interface CreateSandboxOpts {
   /** Resolved feature (name, absolutePath, relativePath). */
@@ -134,7 +114,7 @@ export interface CreateSandboxOpts {
    */
   sandboxBaseDir: string;
   /**
-   * Content of the gate script to write into the sandbox as `gate.sh`.
+   * Content of the gate script to write into the sandbox as `saifac/gate.sh`.
    * The script is mounted read-only at `/saifac/gate.sh` inside the coder container
    * and called by `coder-start.sh` after each OpenHands run. It must exit 0 to pass,
    * non-zero to fail (stdout+stderr are fed back to the agent as task feedback).
@@ -143,7 +123,7 @@ export interface CreateSandboxOpts {
    */
   gateScript: string;
   /**
-   * Content of the startup script to write into the sandbox as `startup.sh`.
+   * Content of the startup script to write into the sandbox as `saifac/startup.sh`.
    * The script is mounted read-only at `/saifac/startup.sh` inside the coder container
    * and executed once by `coder-start.sh` before the agent loop begins.
    *
@@ -155,7 +135,7 @@ export interface CreateSandboxOpts {
    */
   startupScript: string;
   /**
-   * Content of the agent setup script to write into the sandbox as `agent-install.sh`.
+   * Content of the agent setup script to write into the sandbox as `saifac/agent-install.sh`.
    * The script is mounted read-only at `/saifac/agent-install.sh` inside the coder container
    * and executed once by `coder-start.sh` after the startup script and before the agent loop.
    *
@@ -166,7 +146,7 @@ export interface CreateSandboxOpts {
    */
   agentInstallScript: string;
   /**
-   * Content of the agent script to write into the sandbox as `agent.sh`.
+   * Content of the agent script to write into the sandbox as `saifac/agent.sh`.
    * The script is mounted read-only at `/saifac/agent.sh` inside the coder container
    * and invoked by `coder-start.sh` once per inner round.
    *
@@ -177,7 +157,7 @@ export interface CreateSandboxOpts {
    */
   agentScript: string;
   /**
-   * Content of the staging script to write into the sandbox as `stage.sh`.
+   * Content of the staging script to write into the sandbox as `saifac/stage.sh`.
    * Mounted read-only in the staging container (Container A) at /saifac/stage.sh and
    * invoked by staging-start.sh after startup.sh and the sidecar have run.
    *
@@ -288,11 +268,8 @@ export async function diffUntrackedFilesVersusDevNull(projectDir: string): Promi
  * 2. Remove ALL hidden/ dirs under saifac/features/ so the coder agent cannot see holdout
  *    tests from any feature (current or others)
  * 3. git init + "Base state" commit, then replay {@link CreateSandboxOpts#runCommits}
- * 4. Write gate.sh (user-supplied or default) to sandboxBasePath/gate.sh
- * 5. Write startup.sh (from profile or --startup-script) to sandboxBasePath/startup.sh
- * 6. Write agent-install.sh (from agent profile or --agent-install-script) to sandboxBasePath/agent-install.sh
- * 7. Write agent.sh (from agent profile or --agent-script) to sandboxBasePath/agent.sh
- * 8. Write stage.sh (from profile or --stage-script) to sandboxBasePath/stage.sh
+ * 4. Create sandboxBasePath/saifac/ and write gate.sh, startup.sh, agent-install.sh, agent.sh, stage.sh
+ * 5. Copy factory scripts into saifac/: coder-start.sh, staging-start.sh, reviewer.sh
  *
  * If `{projectName}-{feature}-{runId}` already exists under {@link CreateSandboxOpts#sandboxBaseDir},
  * throws immediately (avoids clobbering an in-flight or leaked sandbox).
@@ -320,11 +297,12 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   const dirName = `${projectName}-${feature.name}-${runId}`;
   const sandboxBasePath = `${sandboxBaseDir}/${dirName}`;
   const codePath = join(sandboxBasePath, 'code');
-  const gatePath = join(sandboxBasePath, 'gate.sh');
-  const startupPath = join(sandboxBasePath, 'startup.sh');
-  const agentInstallPath = join(sandboxBasePath, 'agent-install.sh');
-  const agentPath = join(sandboxBasePath, 'agent.sh');
-  const stagePath = join(sandboxBasePath, 'stage.sh');
+  const saifacPath = join(sandboxBasePath, 'saifac');
+  const gatePath = join(saifacPath, 'gate.sh');
+  const startupPath = join(saifacPath, 'startup.sh');
+  const agentInstallPath = join(saifacPath, 'agent-install.sh');
+  const agentPath = join(saifacPath, 'agent.sh');
+  const stagePath = join(saifacPath, 'stage.sh');
   const hostBasePatchPath = join(sandboxBasePath, 'host-base.patch');
 
   if (await pathExists(sandboxBasePath)) {
@@ -338,6 +316,7 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
 
   consola.log(`[sandbox] Creating isolated sandbox at ${sandboxBasePath}`);
   await mkdir(codePath, { recursive: true });
+  await mkdir(saifacPath, { recursive: true });
 
   // Capture any uncommitted host changes (staged + unstaged) before rsync so that
   // applyPatchToHost can reconstruct the exact host state the sandbox was based on,
@@ -503,14 +482,17 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   await chmod(stagePath, 0o755);
   consola.log(`[sandbox] Stage script written to ${stagePath}`);
 
+  for (const name of ['coder-start.sh', 'staging-start.sh', 'reviewer.sh'] as const) {
+    const dest = join(saifacPath, name);
+    await copyFile(join(SAIFAC_SCRIPTS_DIR, name), dest);
+    await chmod(dest, 0o755);
+  }
+  consola.log(`[sandbox] Factory scripts copied to ${saifacPath}`);
+
   return {
     sandboxBasePath,
     codePath,
-    gatePath,
-    startupPath,
-    agentInstallPath,
-    agentPath,
-    stagePath,
+    saifacPath,
     hostBasePatchPath,
     runId,
   };

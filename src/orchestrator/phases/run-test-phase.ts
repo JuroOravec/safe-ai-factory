@@ -5,8 +5,6 @@
  * the result. Handles inner test-retry logic (flaky test environments).
  */
 
-import { join } from 'node:path';
-
 import { consola } from '../../logger.js';
 import { createProvisioner } from '../../provisioners/index.js';
 import { defaultProvisionerLog } from '../../provisioners/logs.js';
@@ -60,7 +58,7 @@ export async function runTestPhase(input: RunTestPhaseInput): Promise<RunTestPha
     testScript,
   });
 
-  let lastResult: TestsResult = { status: 'failed', stderr: '', stdout: '' };
+  let lastResult: TestsResult = { status: 'failed', stderr: '', stdout: '', rawJunitXml: null };
   let testRunId = '';
 
   for (let testAttempt = 1; testAttempt <= testRetries; testAttempt++) {
@@ -81,8 +79,7 @@ export async function runTestPhase(input: RunTestPhaseInput): Promise<RunTestPha
           stagingEnvironment,
           feature,
           projectName,
-          startupPath: sandbox.startupPath,
-          stagePath: sandbox.stagePath,
+          saifacPath: sandbox.saifacPath,
           onLog: defaultProvisionerLog,
         });
 
@@ -93,7 +90,6 @@ export async function runTestPhase(input: RunTestPhaseInput): Promise<RunTestPha
           runId: testRunId,
           feature,
           projectName,
-          reportPath: join(sandbox.sandboxBasePath, 'results.xml'),
           signal,
           onLog: defaultProvisionerLog,
         });

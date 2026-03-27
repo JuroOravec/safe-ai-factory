@@ -60,6 +60,7 @@ import {
   readInnerRounds,
   roundsStatsPath,
 } from '../../orchestrator/stats.js';
+import { parseJUnitXmlString } from '../../provisioners/utils/test-parser.js';
 import { activeOnceRuleIds, markOnceRulesConsumed, rulesForPrompt } from '../../runs/rules.js';
 import {
   type OuterAttemptSummary,
@@ -300,7 +301,7 @@ export function createFeatRunIterationWorkflow() {
         status: result.status,
         testRunId,
         stderr: result.stderr,
-        testSuites: result.testSuites,
+        testSuites: parseJUnitXmlString(result.rawJunitXml),
       };
     },
   });

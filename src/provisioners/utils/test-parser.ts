@@ -49,90 +49,94 @@ interface JUnitParsedRoot {
 // ---------------------------------------------------------------------------
 
 /**
- * Parses a JUnit XML report file into AssertionSuiteResult[].
- * Returns undefined if the file cannot be read or parsed.
+ * Given contents of a JUnit XML report file, parses it into AssertionSuiteResult[].
  */
-export async function parseJUnitXmlFromFile(
-  reportPath: string,
-): Promise<AssertionSuiteResult[] | undefined> {
+function parseJUnitXmlStringInternal(xmlStr: string): AssertionSuiteResult[] | undefined {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+    isArray: (_, jpath) =>
+      [
+        'testsuites',
+        'testsuites.testsuite',
+        'testsuite',
+        'testsuites.testsuite.testcase',
+        'testsuite.testcase',
+        'testsuites.testsuite.testcase.failure',
+        'testsuite.testcase.failure',
+        'testsuites.testsuite.testcase.error',
+        'testsuite.testcase.error',
+      ].includes(jpath),
+  });
+
+  const parsed = parser.parse(xmlStr) as JUnitParsedRoot;
+
+  let rawSuites: JUnitTestSuite[] = [];
+  if (Array.isArray(parsed.testsuites)) {
+    rawSuites = parsed.testsuites[0]?.testsuite ?? [];
+  } else if (parsed.testsuites?.testsuite) {
+    rawSuites = (parsed.testsuites as JUnitTestSuitesObject).testsuite ?? [];
+  } else if (parsed.testsuite) {
+    rawSuites = parsed.testsuite;
+  }
+
+  return rawSuites.map((ts) => {
+    const suiteName = ts.name ?? 'unknown';
+    const assertionResults: AssertionResult[] = (ts.testcase ?? []).map((tc) => {
+      const title = tc.name ?? 'unknown test';
+      const ancestorTitles: string[] = [suiteName];
+      if (tc.classname && tc.classname !== suiteName) ancestorTitles.push(tc.classname);
+
+      const problems: JUnitProblem[] = [...(tc.failure ?? []), ...(tc.error ?? [])];
+      let status: AssertionResult['status'] = 'passed';
+      let failureMessages: string[] = [];
+      let failureTypes: string[] = [];
+
+      if (problems.length > 0) {
+        status = 'failed';
+        failureMessages = problems.map(
+          (f) =>
+            ((f.message ? `${f.message}\n` : '') + (f['#text'] ?? '')).trim() || 'Unknown failure',
+        );
+        failureTypes = problems.map((f) => {
+          const p = f as JUnitProblem & { '@_type'?: string };
+          return (f.type ?? p['@_type'] ?? 'Unknown').trim() || 'Unknown';
+        });
+      } else if (tc.skipped !== undefined) {
+        status = 'pending';
+      }
+
+      return {
+        title,
+        fullName: `${ancestorTitles.join(' ')} ${title}`,
+        status,
+        ancestorTitles,
+        failureMessages,
+        failureTypes,
+      };
+    });
+
+    const failuresCount = parseInt(String(ts.failures ?? '0'), 10);
+    const errorsCount = parseInt(String(ts.errors ?? '0'), 10);
+    const suiteFailed =
+      failuresCount > 0 || errorsCount > 0 || assertionResults.some((a) => a.status === 'failed');
+
+    return { name: suiteName, status: suiteFailed ? 'failed' : 'passed', assertionResults };
+  });
+}
+
+/**
+ * Parses in-memory JUnit XML into AssertionSuiteResult[].
+ * Returns undefined if input is empty or parsing fails.
+ */
+export function parseJUnitXmlString(
+  xml: string | null | undefined,
+): AssertionSuiteResult[] | undefined {
+  if (xml == null || !xml.trim()) return undefined;
   try {
-    const xmlStr = await readUtf8(reportPath);
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '',
-      isArray: (_, jpath) =>
-        [
-          'testsuites',
-          'testsuites.testsuite',
-          'testsuite',
-          'testsuites.testsuite.testcase',
-          'testsuite.testcase',
-          'testsuites.testsuite.testcase.failure',
-          'testsuite.testcase.failure',
-          'testsuites.testsuite.testcase.error',
-          'testsuite.testcase.error',
-        ].includes(jpath),
-    });
-
-    const parsed = parser.parse(xmlStr) as JUnitParsedRoot;
-
-    let rawSuites: JUnitTestSuite[] = [];
-    if (Array.isArray(parsed.testsuites)) {
-      rawSuites = parsed.testsuites[0]?.testsuite ?? [];
-    } else if (parsed.testsuites?.testsuite) {
-      rawSuites = (parsed.testsuites as JUnitTestSuitesObject).testsuite ?? [];
-    } else if (parsed.testsuite) {
-      rawSuites = parsed.testsuite;
-    }
-
-    return rawSuites.map((ts) => {
-      const suiteName = ts.name ?? 'unknown';
-      const assertionResults: AssertionResult[] = (ts.testcase ?? []).map((tc) => {
-        const title = tc.name ?? 'unknown test';
-        const ancestorTitles: string[] = [suiteName];
-        if (tc.classname && tc.classname !== suiteName) ancestorTitles.push(tc.classname);
-
-        const problems: JUnitProblem[] = [...(tc.failure ?? []), ...(tc.error ?? [])];
-        let status: AssertionResult['status'] = 'passed';
-        let failureMessages: string[] = [];
-        let failureTypes: string[] = [];
-
-        if (problems.length > 0) {
-          status = 'failed';
-          failureMessages = problems.map(
-            (f) =>
-              ((f.message ? `${f.message}\n` : '') + (f['#text'] ?? '')).trim() ||
-              'Unknown failure',
-          );
-          failureTypes = problems.map((f) => {
-            const p = f as JUnitProblem & { '@_type'?: string };
-            return (f.type ?? p['@_type'] ?? 'Unknown').trim() || 'Unknown';
-          });
-        } else if (tc.skipped !== undefined) {
-          status = 'pending';
-        }
-
-        return {
-          title,
-          fullName: `${ancestorTitles.join(' ')} ${title}`,
-          status,
-          ancestorTitles,
-          failureMessages,
-          failureTypes,
-        };
-      });
-
-      const failuresCount = parseInt(String(ts.failures ?? '0'), 10);
-      const errorsCount = parseInt(String(ts.errors ?? '0'), 10);
-      const suiteFailed =
-        failuresCount > 0 || errorsCount > 0 || assertionResults.some((a) => a.status === 'failed');
-
-      return { name: suiteName, status: suiteFailed ? 'failed' : 'passed', assertionResults };
-    });
+    return parseJUnitXmlStringInternal(xml);
   } catch (err) {
-    consola.warn(
-      `[test-parser] Failed to parse JUnit XML report from ${reportPath}: ${String(err)}`,
-    );
+    consola.warn(`[test-parser] Failed to parse JUnit XML string: ${String(err)}`);
     return undefined;
   }
 }

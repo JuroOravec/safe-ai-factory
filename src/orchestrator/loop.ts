@@ -14,7 +14,6 @@ import type {
   NormalizedCodingEnvironment,
   NormalizedStagingEnvironment,
 } from '../config/schema.js';
-import { getSaifRoot } from '../constants.js';
 import { runDesignTests } from '../design-tests/design.js';
 import { TestCatalogSchema } from '../design-tests/schema.js';
 import { generateTests } from '../design-tests/write.js';
@@ -28,6 +27,7 @@ import {
   type RunTestsOpts,
   type TestsResult,
 } from '../provisioners/types.js';
+import { parseJUnitXmlString } from '../provisioners/utils/test-parser.js';
 import {
   activeOnceRuleIds,
   appendMissingRunRules,
@@ -53,6 +53,8 @@ import type { TestProfile } from '../test-profiles/types.js';
 import type { CleanupRegistry } from '../utils/cleanup.js';
 import { git, gitClean, gitResetHard } from '../utils/git.js';
 import { appendUtf8, pathExists, readUtf8, writeUtf8 } from '../utils/io.js';
+import { filterAgentEnv } from './agent-env.js';
+import { buildTaskPrompt } from './agent-task.js';
 import { runVagueSpecsChecker } from './agents/vague-specs-check.js';
 import { createAgentStdoutPipe, createDefaultAgentLog } from './logs.js';
 import type { OrchestratorOpts } from './modes.js';
@@ -393,8 +395,7 @@ export async function runStagingTestVerification(params: {
           stagingEnvironment,
           feature,
           projectName,
-          startupPath: sandbox.startupPath,
-          stagePath: sandbox.stagePath,
+          saifacPath: sandbox.saifacPath,
           onLog: defaultProvisionerLog,
         });
 
@@ -405,7 +406,6 @@ export async function runStagingTestVerification(params: {
           runId: lastRunId,
           feature,
           projectName,
-          reportPath: join(sandbox.sandboxBasePath, 'results.xml'),
           onLog: defaultProvisionerLog,
         });
       } finally {
@@ -435,12 +435,13 @@ export async function runStagingTestVerification(params: {
     //    We use AI agent to determine if the spec is ambiguous:
     //    - yes, we ask the human (or AI) for clarification and update specs and tests.
     //    - no, we treat errors as genuine code errors and continue the loop.
-    if (resolveAmbiguity !== 'off' && result.testSuites) {
+    const testSuites = parseJUnitXmlString(result.rawJunitXml);
+    if (resolveAmbiguity !== 'off' && testSuites) {
       const vagueResult = await runVagueSpecsCheckerForFailure({
         projectName,
         projectDir,
         feature,
-        testSuites: result.testSuites,
+        testSuites,
         resolveAmbiguity,
         testProfile,
         overrides,
@@ -532,7 +533,6 @@ export async function runIterativeLoop(
     reviewerEnabled && !dangerousDebug
       ? {
           llmConfig: resolveAgentLlmConfig('reviewer', overrides),
-          scriptPath: join(getSaifRoot(), 'src', 'orchestrator', 'scripts', 'reviewer.sh'),
           argusBinaryPath: await getArgusBinaryPath(),
         }
       : null;
@@ -822,23 +822,26 @@ export async function runIterativeLoop(
           }),
         });
 
+        const taskPrompt = await buildTaskPrompt({
+          codePath: sandbox.codePath,
+          task,
+          saifDir,
+          feature,
+          errorFeedback,
+        });
+
         await codingProvisioner.runAgent({
           codePath: sandbox.codePath,
           sandboxBasePath: sandbox.sandboxBasePath,
-          task,
-          errorFeedback,
+          taskPrompt,
           llmConfig: coderLlmConfig,
-          saifDir,
-          feature,
           dangerousDebug,
           dangerousNoLeash,
           cedarPolicyPath,
           coderImage,
           gateRetries,
-          startupPath: sandbox.startupPath,
-          agentInstallPath: sandbox.agentInstallPath,
-          agentPath: sandbox.agentPath,
-          agentEnv,
+          saifacPath: sandbox.saifacPath,
+          agentEnv: filterAgentEnv(agentEnv),
           onAgentStdout,
           onAgentStdoutEnd,
           onLog: defaultProvisionerLog,

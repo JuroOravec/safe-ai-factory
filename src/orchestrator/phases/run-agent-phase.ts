@@ -11,10 +11,7 @@
  * even when Hatchet cancels the step (ctx.abortController.signal fires).
  */
 
-import { join } from 'node:path';
-
 import { resolveAgentProfile } from '../../agent-profiles/index.js';
-import { getSaifRoot } from '../../constants.js';
 import { resolveAgentLlmConfig } from '../../llm-config.js';
 import { consola } from '../../logger.js';
 import { createProvisioner } from '../../provisioners/index.js';
@@ -22,6 +19,8 @@ import { defaultProvisionerLog } from '../../provisioners/logs.js';
 import type { RunCommit } from '../../runs/types.js';
 import type { CleanupRegistry } from '../../utils/cleanup.js';
 import { git } from '../../utils/git.js';
+import { filterAgentEnv } from '../agent-env.js';
+import { buildTaskPrompt } from '../agent-task.js';
 import { createAgentStdoutPipe, createDefaultAgentLog } from '../logs.js';
 import type { IterativeLoopOpts } from '../loop.js';
 import {
@@ -103,7 +102,6 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
     reviewerEnabled && !dangerousDebug
       ? {
           llmConfig: resolveAgentLlmConfig('reviewer', overrides),
-          scriptPath: join(getSaifRoot(), 'src', 'orchestrator', 'scripts', 'reviewer.sh'),
           argusBinaryPath: await getArgusBinaryPath(),
         }
       : null;
@@ -131,23 +129,26 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
       }),
     });
 
+    const taskPrompt = await buildTaskPrompt({
+      codePath: sandbox.codePath,
+      task,
+      saifDir,
+      feature,
+      errorFeedback,
+    });
+
     await codingProvisioner.runAgent({
       codePath: sandbox.codePath,
       sandboxBasePath: sandbox.sandboxBasePath,
-      task,
-      errorFeedback,
+      taskPrompt,
       llmConfig: coderLlmConfig,
-      saifDir,
-      feature,
       dangerousDebug,
       dangerousNoLeash,
       cedarPolicyPath,
       coderImage,
       gateRetries,
-      startupPath: sandbox.startupPath,
-      agentInstallPath: sandbox.agentInstallPath,
-      agentPath: sandbox.agentPath,
-      agentEnv,
+      saifacPath: sandbox.saifacPath,
+      agentEnv: filterAgentEnv(agentEnv),
       onAgentStdout,
       onAgentStdoutEnd,
       onLog: defaultProvisionerLog,

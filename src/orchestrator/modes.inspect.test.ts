@@ -139,12 +139,8 @@ const sandbox: Sandbox = {
   runId: 'sb-run1',
   sandboxBasePath: '/tmp/saifac/sandboxes/proj-my-feat-sb-run1',
   codePath: '/tmp/saifac/sandboxes/proj-my-feat-sb-run1/code',
-  gatePath: '/tmp/saifac/sandboxes/proj-my-feat-sb-run1/gate.sh',
+  saifacPath: '/tmp/saifac/sandboxes/proj-my-feat-sb-run1/saifac',
   hostBasePatchPath: '',
-  startupPath: '/tmp/saifac/sandboxes/proj-my-feat-sb-run1/startup.sh',
-  agentInstallPath: '/tmp/saifac/sandboxes/proj-my-feat-sb-run1/agent-install.sh',
-  agentPath: '/tmp/saifac/sandboxes/proj-my-feat-sb-run1/agent.sh',
-  stagePath: '/tmp/saifac/sandboxes/proj-my-feat-sb-run1/stage.sh',
 };
 
 const {
@@ -262,6 +258,10 @@ vi.mock('./loop.js', async (importOriginal) => {
     logIterativeLoopSettings: vi.fn(),
   };
 });
+
+vi.mock('./task-prompt.js', () => ({
+  buildTaskPrompt: vi.fn().mockResolvedValue('inspect task prompt'),
+}));
 
 describe('runInspect', () => {
   let projectDir: string;

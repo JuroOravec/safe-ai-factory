@@ -466,16 +466,22 @@ describe('createSandbox + destroySandbox (integration)', () => {
       // 6. Assert .git from source was NOT copied (fresh init), and code has .git
       expect(await pathExists(join(codePath, '.git'))).toBe(true);
 
-      // 7. Assert mounted scripts exist with correct content and are executable
+      // 7. Assert saifac/ bundle scripts exist with correct content and are executable
+      const saif = paths.saifacPath;
       const scripts: [string, string][] = [
-        [paths.gatePath, GATE_SCRIPT],
-        [paths.startupPath, STARTUP_SCRIPT],
-        [paths.agentInstallPath, AGENT_INSTALL_SCRIPT],
-        [paths.agentPath, AGENT_SCRIPT],
-        [paths.stagePath, STAGE_SCRIPT],
+        [join(saif, 'gate.sh'), GATE_SCRIPT],
+        [join(saif, 'startup.sh'), STARTUP_SCRIPT],
+        [join(saif, 'agent-install.sh'), AGENT_INSTALL_SCRIPT],
+        [join(saif, 'agent.sh'), AGENT_SCRIPT],
+        [join(saif, 'stage.sh'), STAGE_SCRIPT],
       ];
       for (const [p, content] of scripts) {
         expect(await readUtf8(p)).toBe(content);
+        expect(((await stat(p)).mode & 0o111) !== 0).toBe(true);
+      }
+      for (const name of ['coder-start.sh', 'staging-start.sh', 'reviewer.sh'] as const) {
+        const p = join(saif, name);
+        expect(await pathExists(p)).toBe(true);
         expect(((await stat(p)).mode & 0o111) !== 0).toBe(true);
       }
 

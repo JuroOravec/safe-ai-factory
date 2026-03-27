@@ -39,7 +39,7 @@ export interface StagingHandle {
 /** Outcome of a test run (mutually exclusive). */
 export type TestRunStatus = 'passed' | 'failed' | 'aborted';
 
-/** Parsed test result (same shape whether Docker or K8s). */
+/** Raw test result from a provisioner. */
 export interface TestsResult {
   status: TestRunStatus;
   stderr: string;
@@ -49,7 +49,11 @@ export interface TestsResult {
    * (e.g. missing test files, syntax errors, missing imports).
    */
   runnerError?: string;
-  testSuites?: AssertionSuiteResult[];
+  /**
+   * Raw JUnit XML from the test report file, if read successfully.
+   * Orchestrator parses with `parseJUnitXmlString`.
+   */
+  rawJunitXml: string | null;
 }
 
 export interface AssertionSuiteResult {
@@ -114,16 +118,10 @@ export interface StartStagingOpts {
   feature: Feature;
   projectName: string;
   /**
-   * Absolute host path to startup.sh.
-   * Mounted read-only at /saifac/startup.sh and run once at container start
-   * to install workspace dependencies.
+   * Absolute host path to the sandbox `saifac/` bundle directory.
+   * Mounted read-only at `/saifac` in the staging container (same layout as coder).
    */
-  startupPath: string;
-  /**
-   * Absolute host path to stage.sh.
-   * Mounted read-only at /saifac/stage.sh; starts the app (or keeps container alive).
-   */
-  stagePath: string;
+  saifacPath: string;
   /** Infra log lines from the staging container "follow" (-f) stream (stdout/stderr). */
   onLog: ProvisionerOnLog;
 }
@@ -136,11 +134,6 @@ export interface RunTestsOpts {
    * (bind-mounted to /test-runner-output inside the container).
    */
   reportDir: string;
-  /**
-   * Absolute path on the host to the JUnit XML file the test runner writes.
-   * Read by the provisioner after the container exits to populate testSuites.
-   */
-  reportPath: string;
   /** Test runner image tag (e.g. 'saifac-test-node-vitest:latest'). */
   testImage: string;
   /**
@@ -169,17 +162,16 @@ export interface RunAgentOpts {
   codePath: string;
   /**
    * Absolute path to the sandbox base directory (host path).
-   * Used to derive the Leash workspace id and locate gate.sh.
+   * Used to derive the Leash workspace id.
    */
   sandboxBasePath: string;
-  /** Full task description (plan + error feedback). */
-  task: string;
-  /** Error feedback from the previous test run (may be empty). */
-  errorFeedback?: string;
+  /**
+   * Full task prompt for the agent (orchestrator-built: plan + error feedback).
+   * Injected as `SAIFAC_INITIAL_TASK`.
+   */
+  taskPrompt: string;
   /** Resolved LLM config injected as LLM_* env vars into the coder container. */
   llmConfig: LlmConfig;
-  saifDir: string;
-  feature?: Feature;
   /** When true, run the agent on the host instead of inside a Leash container. */
   dangerousDebug: boolean;
   /**
@@ -193,15 +185,12 @@ export interface RunAgentOpts {
   coderImage: string;
   /** Maximum gate iterations per agent run. Forwarded as SAIFAC_GATE_RETRIES. */
   gateRetries: number;
-  /** Absolute host path to startup.sh. Mounted at /saifac/startup.sh. */
-  startupPath: string;
-  /** Absolute host path to agent-install.sh. Mounted at /saifac/agent-install.sh. */
-  agentInstallPath: string;
-  /** Absolute host path to agent.sh. Mounted at /saifac/agent.sh. */
-  agentPath: string;
   /**
-   * User-supplied extra env vars. Reserved SAIFAC_* and LLM_* keys are silently
-   * filtered out by the runner before forwarding.
+   * Absolute host path to the sandbox `saifac/` bundle (mounted read-only at `/saifac` in the container).
+   */
+  saifacPath: string;
+  /**
+   * User-supplied extra env vars. Must already be filtered by the orchestrator (`filterAgentEnv`).
    */
   agentEnv: Record<string, string>;
   /**
@@ -218,10 +207,10 @@ export interface RunAgentOpts {
   onLog: ProvisionerOnLog;
   /**
    * Settings for the semantic reviewer (argus-ai). null = reviewer disabled.
+   * When set, `SAIFAC_REVIEWER_ENABLED=1` is injected; script is always `/saifac/reviewer.sh`.
    */
   reviewer: {
     llmConfig: LlmConfig;
-    scriptPath: string;
     argusBinaryPath: string;
   } | null;
   /**
@@ -234,24 +223,17 @@ export interface RunAgentOpts {
 
 /**
  * Options for {@link Provisioner.startInspect}.
- * Use the same `task` and `errorFeedback` as the first coding round in `runIterativeLoop` / `run resume`:
- * `task` from `buildInitialTask`, `errorFeedback` from `initialErrorFeedback` (artifact `lastFeedback` on resume).
+ * Use the same `taskPrompt` as the first coding round in `runIterativeLoop` / `run resume`.
  */
 export interface StartInspectOpts {
   codePath: string;
   sandboxBasePath: string;
-  saifDir: string;
-  feature?: Feature;
-  /** Base task string — same as passed to {@link Provisioner.runAgent}. */
-  task: string;
-  /** Test failure feedback for the prompt — same as the resume loop’s first-round `errorFeedback`. */
-  errorFeedback?: string;
+  /** Same orchestrator-built prompt as {@link RunAgentOpts.taskPrompt}. */
+  taskPrompt: string;
   coderImage: string;
   dangerousNoLeash: boolean;
   cedarPolicyPath: string;
-  startupPath: string;
-  agentInstallPath: string;
-  agentPath: string;
+  saifacPath: string;
   agentEnv: Record<string, string>;
   reviewer: RunAgentOpts['reviewer'];
   gateRetries: number;
@@ -312,8 +294,8 @@ export interface Provisioner {
    * 3. Run the black-box test suite (Container B) to completion.
    *
    * Docker: Creates and starts the Test Runner container, waits for it to
-   * exit, demuxes the log stream, parses the JUnit XML report, and returns
-   * the structured TestsResult.
+   * exit, demuxes the log stream, reads raw JUnit XML from the report file, and returns
+   * {@link TestsResult} (orchestrator parses XML).
    */
   runTests(opts: RunTestsOpts): Promise<TestsResult>;
 

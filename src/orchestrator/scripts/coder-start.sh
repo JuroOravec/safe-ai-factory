@@ -28,9 +28,9 @@
 #                                 agent invocation (default: /workspace/.saifac/task.md).
 #                                 Agent scripts should read from this file rather than from
 #                                 command-line arguments to avoid escaping and length issues.
-#   SAIFAC_REVIEWER_SCRIPT     — (optional) path to semantic reviewer script. When set and
-#                                 present, runs after the gate passes. If it fails, the round
-#                                 is treated as a gate failure and the agent retries.
+#   SAIFAC_REVIEWER_ENABLED    — when set to a non-empty value, run /saifac/reviewer.sh after
+#                                 the gate passes. If the reviewer fails, the round is treated
+#                                 as a gate failure and the agent retries.
 #   SAIFAC_ROUNDS_STATS_PATH     — (optional) JSONL path for inner-round summaries (default:
 #                                 `${SAIFAC_TASK_PATH}/stats.jsonl`).
 #   SAIFAC_PENDING_RULES_PATH    — (optional) markdown file the host appends with human feedback
@@ -234,16 +234,16 @@ main() {
     # User-supplied gate script succeeded, now let's run the semantic reviewer (argus-ai) if enabled.
     if [ "$gate_exit" -eq 0 ]; then
       # Success branch: No reviewer configured.
-      if [ -z "${SAIFAC_REVIEWER_SCRIPT:-}" ] || [ ! -f "${SAIFAC_REVIEWER_SCRIPT}" ]; then
+      if [ -z "${SAIFAC_REVIEWER_ENABLED:-}" ]; then
         log_inner_round_summary gate_passed ""
         echo "[coder-start] Gate PASSED."
         exit 0
       fi
 
-      # Run the reviewer
-      # Use explicit sh: reviewer.sh is mounted read-only from the repo and may not be +x.
-      echo "[coder-start] Running semantic reviewer: $SAIFAC_REVIEWER_SCRIPT"
-      gate_output=$(sh "$SAIFAC_REVIEWER_SCRIPT" 2>&1) && gate_exit=0 || gate_exit=$?
+      REVIEWER_SCRIPT="/saifac/reviewer.sh"
+      # Use explicit sh: reviewer.sh is mounted read-only and may not be +x.
+      echo "[coder-start] Running semantic reviewer: $REVIEWER_SCRIPT"
+      gate_output=$(sh "$REVIEWER_SCRIPT" 2>&1) && gate_exit=0 || gate_exit=$?
 
       # Print captured output from reviewer.sh if not empty.
       if [ -n "${gate_output:-}" ]; then

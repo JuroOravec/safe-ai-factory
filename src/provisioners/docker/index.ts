@@ -9,14 +9,14 @@
  * Lifecycle per run:
  *   setup()        → create bridge network + `docker compose up`
  *   startStaging() → docker build + createContainer + putArchive + start + health-wait
- *   runTests()     → createContainer + start + wait + demux logs + parse JUnit XML
+ *   runTests()     → createContainer + start + wait + demux logs + read JUnit XML bytes
  *   runAgent()     → spawn Leash CLI + network-attach workaround
  *   startInspect() → idle coder container for `run inspect` (`sleep infinity`)
  *   teardown()     → containers + images + compose down + network
  */
 
 import { spawn } from 'node:child_process';
-import { copyFile, mkdir, realpath } from 'node:fs/promises';
+import { realpath } from 'node:fs/promises';
 import { arch } from 'node:os';
 import { join, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -30,7 +30,6 @@ import {
   resolveSandboxCoderDockerfilePath,
   type SupportedSandboxProfileId,
 } from '../../sandbox-profiles/index.js';
-import type { Feature } from '../../specs/discover.js';
 import { createTarArchive } from '../../utils/archive.js';
 import {
   pathExists,
@@ -54,8 +53,11 @@ import type {
   StartStagingOpts,
   TestsResult,
 } from '../types.js';
-import { detectRunnerError, parseJUnitXmlFromFile } from '../utils/test-parser.js';
+import { detectRunnerError } from '../utils/test-parser.js';
 import { resolveLeashCliPath } from './resolve-leash-cli.js';
+
+/** In-container workspace path that Leash bind-mounts the sandbox into. */
+const CONTAINER_WORKSPACE = '/workspace';
 
 // Docker client singleton
 const docker = new Docker();
@@ -93,68 +95,6 @@ async function runDocker(
     throw new Error(msg);
   }
   return { stdout: r.stdout, stderr: r.stderr };
-}
-
-// ---------------------------------------------------------------------------
-// Embedded scripts and binaries loaded at module init
-// ---------------------------------------------------------------------------
-
-let stagingStartScriptPromise: Promise<string> | null = null;
-
-function loadStagingStartScript(): Promise<string> {
-  if (!stagingStartScriptPromise) {
-    stagingStartScriptPromise = readUtf8(
-      join(getSaifRoot(), 'src', 'orchestrator', 'scripts', 'staging-start.sh'),
-    );
-  }
-  return stagingStartScriptPromise;
-}
-
-const CODER_START_SCRIPT = join(getSaifRoot(), 'src', 'orchestrator', 'scripts', 'coder-start.sh');
-
-let sidecarBinaryCache: Buffer | null = null;
-
-/** In-container workspace path that Leash bind-mounts the sandbox into. */
-const CONTAINER_WORKSPACE = '/workspace';
-
-/**
- * Assemble all per-run orchestration scripts into a single directory so they
- * can be mounted as one directory volume (`--volume <dir>:/saifac:ro`).
- *
- * The directory is placed inside `sandboxBasePath` and is therefore cleaned up
- * for free by `destroySandbox`.
- */
-async function assembleSaifacDir(opts: {
-  sandboxBasePath: string;
-  coderStartScript: string;
-  gatePath: string;
-  startupPath: string;
-  agentInstallPath: string;
-  agentPath: string;
-  reviewerScriptPath?: string;
-}): Promise<string> {
-  const {
-    sandboxBasePath,
-    coderStartScript,
-    gatePath,
-    startupPath,
-    agentInstallPath,
-    agentPath,
-    reviewerScriptPath,
-  } = opts;
-  const saifacDir = join(sandboxBasePath, 'saifac');
-  await mkdir(saifacDir, { recursive: true });
-
-  await copyFile(coderStartScript, join(saifacDir, 'coder-start.sh'));
-  await copyFile(gatePath, join(saifacDir, 'gate.sh'));
-  await copyFile(startupPath, join(saifacDir, 'startup.sh'));
-  await copyFile(agentInstallPath, join(saifacDir, 'agent-install.sh'));
-  await copyFile(agentPath, join(saifacDir, 'agent.sh'));
-  if (reviewerScriptPath) {
-    await copyFile(reviewerScriptPath, join(saifacDir, 'reviewer.sh'));
-  }
-
-  return saifacDir;
 }
 
 // ---------------------------------------------------------------------------
@@ -236,8 +176,7 @@ export class DockerProvisioner implements Provisioner {
       stagingEnvironment,
       feature,
       projectName,
-      startupPath,
-      stagePath,
+      saifacPath,
       onLog,
     } = opts;
 
@@ -267,11 +206,7 @@ export class DockerProvisioner implements Provisioner {
       Cmd: ['/bin/sh', '/saifac/staging-start.sh'],
       HostConfig: {
         NetworkMode: this.networkName,
-        Binds: [
-          `${codePath}:/workspace`,
-          `${startupPath}:/saifac/startup.sh:ro`,
-          `${stagePath}:/saifac/stage.sh:ro`,
-        ],
+        Binds: [`${codePath}:/workspace`, `${saifacPath}:/saifac:ro`],
         SecurityOpt: ['no-new-privileges'],
         CapDrop: ['ALL'],
       },
@@ -291,12 +226,10 @@ export class DockerProvisioner implements Provisioner {
       WorkingDir: '/workspace',
     });
 
-    // Inject sidecar binary and staging-start.sh via putArchive (preserves +x bit)
+    // Inject sidecar binary only via putArchive (not baked into user images).
     const sidecarBinary = await getSidecarBinary();
-    const stagingStartScript = await loadStagingStartScript();
     const tarBuffer = createTarArchive([
       { filename: 'sidecar', content: sidecarBinary, mode: '0000755' },
-      { filename: 'staging-start.sh', content: stagingStartScript, mode: '0000755' },
     ]);
     await container.putArchive(tarBuffer, { path: '/saifac' });
 
@@ -334,7 +267,6 @@ export class DockerProvisioner implements Provisioner {
     const {
       testsDir,
       reportDir,
-      reportPath,
       testImage,
       testScriptPath,
       stagingHandle,
@@ -350,6 +282,7 @@ export class DockerProvisioner implements Provisioner {
     const containerName = `saifac-test-${projectName}-${runId}`;
     const containerTestsDir = '/tests';
     const containerOutputFile = '/test-runner-output/results.xml';
+    const reportPath = join(reportDir, 'results.xml');
 
     const publicDir = join(testsDir, 'public');
     const hiddenDir = join(testsDir, 'hidden');
@@ -402,7 +335,7 @@ export class DockerProvisioner implements Provisioner {
     // Bail out before starting if already cancelled — avoids a start + immediate stop cycle.
     if (signal?.aborted) {
       await container.remove({ force: true }).catch(() => {});
-      return { status: 'aborted', stdout: '', stderr: '' };
+      return { status: 'aborted', stdout: '', stderr: '', rawJunitXml: null };
     }
 
     await container.start();
@@ -458,7 +391,7 @@ export class DockerProvisioner implements Provisioner {
     }
 
     if (aborted) {
-      return { status: 'aborted', stdout, stderr };
+      return { status: 'aborted', stdout, stderr, rawJunitXml: null };
     }
 
     const runnerError = detectRunnerError({ exitCode: StatusCode, stdout, stderr });
@@ -466,17 +399,22 @@ export class DockerProvisioner implements Provisioner {
       consola.error(`[docker] Test runner error detected: ${runnerError}`);
     }
 
-    const testSuites =
-      reportPath && (await pathExists(reportPath))
-        ? await parseJUnitXmlFromFile(reportPath)
-        : undefined;
+    // Extract raw JUnit XML from the report file.
+    let rawJunitXml: string | null = null;
+    if (await pathExists(reportPath)) {
+      try {
+        rawJunitXml = await readUtf8(reportPath);
+      } catch {
+        rawJunitXml = null;
+      }
+    }
 
     return {
       status: StatusCode === 0 ? 'passed' : 'failed',
       stdout,
       stderr,
       runnerError,
-      testSuites,
+      rawJunitXml,
     };
   }
 
@@ -486,19 +424,14 @@ export class DockerProvisioner implements Provisioner {
     const {
       codePath,
       sandboxBasePath,
-      task,
-      errorFeedback,
+      taskPrompt,
       llmConfig,
-      saifDir,
-      feature,
       dangerousDebug,
       dangerousNoLeash,
       cedarPolicyPath,
       coderImage,
       gateRetries,
-      startupPath,
-      agentInstallPath,
-      agentPath,
+      saifacPath,
       agentEnv,
       reviewer,
       signal,
@@ -511,8 +444,6 @@ export class DockerProvisioner implements Provisioner {
     /** Set for `--dangerous-no-leash` so abort/error can `docker rm -f` the named container. */
     let dockerDirectRunContainerToRemove: string | null = null;
 
-    const safeAgentEnv = filterAgentEnv(agentEnv);
-    const taskPrompt = await buildTaskPrompt({ codePath, task, saifDir, feature, errorFeedback });
     const llmModel = llmConfig.fullModelString;
     const llmApiKey = llmConfig.apiKey;
     const llmProvider = llmConfig.provider;
@@ -524,16 +455,17 @@ export class DockerProvisioner implements Provisioner {
     let spawnCwd: string;
     let spawnEnv: Record<string, string>;
 
+    const coderStartHost = join(saifacPath, 'coder-start.sh');
     if (dangerousDebug) {
       cmd = 'bash';
-      args = [CODER_START_SCRIPT];
-      argsForPrint = [CODER_START_SCRIPT];
+      args = [coderStartHost];
+      argsForPrint = [coderStartHost];
       spawnCwd = codePath;
       spawnEnv = {
         ...Object.fromEntries(
           Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
         ),
-        ...safeAgentEnv,
+        ...agentEnv,
         LLM_MODEL: llmModel,
         LLM_API_KEY: llmApiKey,
         ...(llmProvider ? { LLM_PROVIDER: llmProvider } : {}),
@@ -541,28 +473,30 @@ export class DockerProvisioner implements Provisioner {
         SAIFAC_WORKSPACE_BASE: codePath,
         SAIFAC_INITIAL_TASK: taskPrompt,
         SAIFAC_GATE_RETRIES: String(gateRetries),
-        SAIFAC_STARTUP_SCRIPT: startupPath,
-        SAIFAC_AGENT_INSTALL_SCRIPT: agentInstallPath,
-        SAIFAC_GATE_SCRIPT: `${sandboxBasePath}/gate.sh`,
-        SAIFAC_AGENT_SCRIPT: agentPath,
+        SAIFAC_STARTUP_SCRIPT: join(saifacPath, 'startup.sh'),
+        SAIFAC_AGENT_INSTALL_SCRIPT: join(saifacPath, 'agent-install.sh'),
+        SAIFAC_GATE_SCRIPT: join(saifacPath, 'gate.sh'),
+        SAIFAC_AGENT_SCRIPT: join(saifacPath, 'agent.sh'),
         SAIFAC_TASK_PATH: saifacTaskFilePath(codePath),
         SAIFAC_RUN_ID: runId,
+        ...(reviewer
+          ? {
+              SAIFAC_REVIEWER_ENABLED: '1',
+              REVIEWER_LLM_PROVIDER: reviewer.llmConfig.provider,
+              REVIEWER_LLM_MODEL: reviewer.llmConfig.modelId,
+              REVIEWER_LLM_API_KEY: reviewer.llmConfig.apiKey,
+              ...(reviewer.llmConfig.baseURL
+                ? { REVIEWER_LLM_BASE_URL: reviewer.llmConfig.baseURL }
+                : {}),
+            }
+          : {}),
       };
       consola.log('[agent-runner] Mode: dangerous-debug (host execution, filesystem sandbox only)');
     } else if (dangerousNoLeash) {
       assertSafeImageTag(coderImage);
-      const saifacDir = await assembleSaifacDir({
-        sandboxBasePath,
-        coderStartScript: CODER_START_SCRIPT,
-        gatePath: join(sandboxBasePath, 'gate.sh'),
-        startupPath,
-        agentInstallPath,
-        agentPath,
-        reviewerScriptPath: reviewer?.scriptPath,
-      });
 
       const codePathHost = await dockerHostBindPath(codePath);
-      const saifacDirHost = await dockerHostBindPath(saifacDir);
+      const saifacDirHost = await dockerHostBindPath(saifacPath);
       const containerName = leashTargetContainerName(sandboxBasePath);
 
       const envForward: Record<string, string> = {
@@ -571,7 +505,7 @@ export class DockerProvisioner implements Provisioner {
         ...(llmProvider ? { LLM_PROVIDER: llmProvider } : {}),
         ...(llmBaseUrl ? { LLM_BASE_URL: llmBaseUrl } : {}),
         OPENHANDS_WORK_DIR: '/tmp/openhands-state',
-        ...safeAgentEnv,
+        ...agentEnv,
       };
 
       for (const key of [
@@ -586,7 +520,7 @@ export class DockerProvisioner implements Provisioner {
       }
 
       if (reviewer) {
-        envForward.SAIFAC_REVIEWER_SCRIPT = '/saifac/reviewer.sh';
+        envForward.SAIFAC_REVIEWER_ENABLED = '1';
         envForward.REVIEWER_LLM_PROVIDER = reviewer.llmConfig.provider;
         envForward.REVIEWER_LLM_MODEL = reviewer.llmConfig.modelId;
         envForward.REVIEWER_LLM_API_KEY = reviewer.llmConfig.apiKey;
@@ -672,18 +606,8 @@ export class DockerProvisioner implements Provisioner {
       dockerDirectRunContainerToRemove = containerName;
     } else {
       // Leash mode
-      const saifacDir = await assembleSaifacDir({
-        sandboxBasePath,
-        coderStartScript: CODER_START_SCRIPT,
-        gatePath: join(sandboxBasePath, 'gate.sh'),
-        startupPath,
-        agentInstallPath,
-        agentPath,
-        reviewerScriptPath: reviewer?.scriptPath,
-      });
-
       const codePathHost = await dockerHostBindPath(codePath);
-      const saifacDirHost = await dockerHostBindPath(saifacDir);
+      const saifacDirHost = await dockerHostBindPath(saifacPath);
 
       const envForward: Record<string, string> = {
         LLM_MODEL: llmModel,
@@ -691,7 +615,7 @@ export class DockerProvisioner implements Provisioner {
         ...(llmProvider ? { LLM_PROVIDER: llmProvider } : {}),
         ...(llmBaseUrl ? { LLM_BASE_URL: llmBaseUrl } : {}),
         OPENHANDS_WORK_DIR: '/tmp/openhands-state',
-        ...safeAgentEnv,
+        ...agentEnv,
       };
 
       for (const key of [
@@ -720,7 +644,7 @@ export class DockerProvisioner implements Provisioner {
       if (reviewer) {
         const argusBinaryHost = await dockerHostBindPath(reviewer.argusBinaryPath);
         leashArgs.push('--volume', `${argusBinaryHost}:/usr/local/bin/argus:ro`);
-        envForward.SAIFAC_REVIEWER_SCRIPT = '/saifac/reviewer.sh';
+        envForward.SAIFAC_REVIEWER_ENABLED = '1';
         envForward.REVIEWER_LLM_PROVIDER = reviewer.llmConfig.provider;
         envForward.REVIEWER_LLM_MODEL = reviewer.llmConfig.modelId;
         envForward.REVIEWER_LLM_API_KEY = reviewer.llmConfig.apiKey;
@@ -911,16 +835,11 @@ export class DockerProvisioner implements Provisioner {
     const {
       codePath,
       sandboxBasePath,
-      task,
-      errorFeedback,
-      saifDir,
-      feature,
+      taskPrompt,
       coderImage,
       dangerousNoLeash,
       cedarPolicyPath,
-      startupPath,
-      agentInstallPath,
-      agentPath,
+      saifacPath,
       agentEnv,
       reviewer,
       gateRetries,
@@ -933,14 +852,7 @@ export class DockerProvisioner implements Provisioner {
     } = opts;
 
     let dockerDirectRunContainerToRemove: string | null = null;
-    const safeAgentEnv = filterAgentEnv(agentEnv);
-    const taskPrompt = await buildTaskPrompt({
-      codePath,
-      task,
-      saifDir,
-      feature,
-      errorFeedback,
-    });
+
     const llmModel = llmConfig.fullModelString;
     const llmApiKey = llmConfig.apiKey;
     const llmProvider = llmConfig.provider;
@@ -955,18 +867,9 @@ export class DockerProvisioner implements Provisioner {
 
     if (dangerousNoLeash) {
       assertSafeImageTag(coderImage);
-      const saifacDir = await assembleSaifacDir({
-        sandboxBasePath,
-        coderStartScript: CODER_START_SCRIPT,
-        gatePath: join(sandboxBasePath, 'gate.sh'),
-        startupPath,
-        agentInstallPath,
-        agentPath,
-        reviewerScriptPath: reviewer?.scriptPath,
-      });
 
       const codePathHost = await dockerHostBindPath(codePath);
-      const saifacDirHost = await dockerHostBindPath(saifacDir);
+      const saifacDirHost = await dockerHostBindPath(saifacPath);
 
       const envForward: Record<string, string> = {
         LLM_MODEL: llmModel,
@@ -974,7 +877,7 @@ export class DockerProvisioner implements Provisioner {
         ...(llmProvider ? { LLM_PROVIDER: llmProvider } : {}),
         ...(llmBaseUrl ? { LLM_BASE_URL: llmBaseUrl } : {}),
         OPENHANDS_WORK_DIR: '/tmp/openhands-state',
-        ...safeAgentEnv,
+        ...agentEnv,
       };
 
       for (const key of [
@@ -989,7 +892,7 @@ export class DockerProvisioner implements Provisioner {
       }
 
       if (reviewer) {
-        envForward.SAIFAC_REVIEWER_SCRIPT = '/saifac/reviewer.sh';
+        envForward.SAIFAC_REVIEWER_ENABLED = '1';
         envForward.REVIEWER_LLM_PROVIDER = reviewer.llmConfig.provider;
         envForward.REVIEWER_LLM_MODEL = reviewer.llmConfig.modelId;
         envForward.REVIEWER_LLM_API_KEY = reviewer.llmConfig.apiKey;
@@ -1070,18 +973,8 @@ export class DockerProvisioner implements Provisioner {
 
       dockerDirectRunContainerToRemove = containerName;
     } else {
-      const saifacDir = await assembleSaifacDir({
-        sandboxBasePath,
-        coderStartScript: CODER_START_SCRIPT,
-        gatePath: join(sandboxBasePath, 'gate.sh'),
-        startupPath,
-        agentInstallPath,
-        agentPath,
-        reviewerScriptPath: reviewer?.scriptPath,
-      });
-
       const codePathHost = await dockerHostBindPath(codePath);
-      const saifacDirHost = await dockerHostBindPath(saifacDir);
+      const saifacDirHost = await dockerHostBindPath(saifacPath);
 
       const envForward: Record<string, string> = {
         LLM_MODEL: llmModel,
@@ -1089,7 +982,7 @@ export class DockerProvisioner implements Provisioner {
         ...(llmProvider ? { LLM_PROVIDER: llmProvider } : {}),
         ...(llmBaseUrl ? { LLM_BASE_URL: llmBaseUrl } : {}),
         OPENHANDS_WORK_DIR: '/tmp/openhands-state',
-        ...safeAgentEnv,
+        ...agentEnv,
       };
 
       for (const key of [
@@ -1118,7 +1011,7 @@ export class DockerProvisioner implements Provisioner {
       if (reviewer) {
         const argusBinaryHost = await dockerHostBindPath(reviewer.argusBinaryPath);
         leashArgs.push('--volume', `${argusBinaryHost}:/usr/local/bin/argus:ro`);
-        envForward.SAIFAC_REVIEWER_SCRIPT = '/saifac/reviewer.sh';
+        envForward.SAIFAC_REVIEWER_ENABLED = '1';
         envForward.REVIEWER_LLM_PROVIDER = reviewer.llmConfig.provider;
         envForward.REVIEWER_LLM_MODEL = reviewer.llmConfig.modelId;
         envForward.REVIEWER_LLM_API_KEY = reviewer.llmConfig.apiKey;
@@ -1421,19 +1314,6 @@ function assertSafeImageTag(tag: string): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Utility: staging image tag helper
-// ---------------------------------------------------------------------------
-
-export function getStagingImageTag(
-  stagingApp: { build?: { dockerfile?: string } | undefined },
-  opts: { projectName: string; featureName: string; runId: string },
-): string | null {
-  if (stagingApp.build?.dockerfile === null) return null;
-  const { projectName, featureName, runId } = opts;
-  return `saifac-stage-${projectName}-${featureName}-img-${runId}`;
-}
-
 async function buildStagingImage(opts: {
   sandboxProfileId: SupportedSandboxProfileId;
   codePath: string;
@@ -1611,53 +1491,10 @@ function startLeashNetworkAttach(networkName: string, workspaceId: string): Netw
 }
 
 // ---------------------------------------------------------------------------
-// Utility: task prompt builder
-// ---------------------------------------------------------------------------
-
-interface BuildTaskPromptOpts {
-  codePath: string;
-  task: string;
-  saifDir: string;
-  feature?: Feature;
-  errorFeedback?: string;
-}
-
-async function buildTaskPrompt(opts: BuildTaskPromptOpts): Promise<string> {
-  const { codePath, task, saifDir, feature, errorFeedback } = opts;
-  let planContent = '';
-
-  const planCandidates: string[] = [];
-  if (feature) planCandidates.push(join(codePath, feature.relativePath, 'plan.md'));
-  planCandidates.push(join(codePath, 'plan.md'));
-
-  for (const p of planCandidates) {
-    if (await pathExists(p)) {
-      planContent = await readUtf8(p);
-      break;
-    }
-  }
-
-  const parts: string[] = [task];
-  if (planContent) parts.push('', '## Implementation Plan', '', planContent);
-  if (errorFeedback?.trim()) {
-    parts.push(
-      '',
-      '## Previous Attempt Failed — Fix These Errors',
-      '',
-      '```',
-      errorFeedback.trim(),
-      '```',
-      '',
-      `Analyze the errors above and fix the code. Do NOT modify files in the /${saifDir}/ directory.`,
-    );
-  }
-
-  return parts.join('\n');
-}
-
-// ---------------------------------------------------------------------------
 // Sidecar binary loader
 // ---------------------------------------------------------------------------
+
+let sidecarBinaryCache: Buffer | null = null;
 
 async function getSidecarBinary(): Promise<Buffer> {
   // Loaded lazily to avoid blocking startup.
@@ -1811,47 +1648,6 @@ async function waitForContainerReady(opts: {
 // ---------------------------------------------------------------------------
 // Other utilities
 // ---------------------------------------------------------------------------
-
-/**
- * Reserved env var prefixes and keys that must not be overridden by agentEnv.
- */
-const RESERVED_ENV_KEYS = new Set([
-  'SAIFAC_INITIAL_TASK',
-  'SAIFAC_GATE_RETRIES',
-  'SAIFAC_GATE_SCRIPT',
-  'SAIFAC_REVIEWER_SCRIPT',
-  'SAIFAC_STARTUP_SCRIPT',
-  'SAIFAC_AGENT_INSTALL_SCRIPT',
-  'SAIFAC_AGENT_SCRIPT',
-  'SAIFAC_TASK_PATH',
-  'SAIFAC_WORKSPACE_BASE',
-  'LLM_API_KEY',
-  'LLM_MODEL',
-  'LLM_PROVIDER',
-  'LLM_BASE_URL',
-  'REVIEWER_LLM_PROVIDER',
-  'REVIEWER_LLM_MODEL',
-  'REVIEWER_LLM_API_KEY',
-  'REVIEWER_LLM_BASE_URL',
-]);
-
-/**
- * Filters agentEnv, emitting warnings for any keys that shadow reserved
- * factory variables. Returns a safe copy.
- */
-export function filterAgentEnv(agentEnv: Record<string, string>): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const [key, val] of Object.entries(agentEnv)) {
-    if (key.startsWith('SAIFAC_') || RESERVED_ENV_KEYS.has(key)) {
-      consola.warn(
-        `[agent-runner] WARNING: --agent-env ${key} is a reserved factory variable and will be ignored.`,
-      );
-      continue;
-    }
-    result[key] = val;
-  }
-  return result;
-}
 
 /**
  * Resolve symlinks on the host path before passing to `docker run -v`.
