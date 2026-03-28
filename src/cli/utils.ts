@@ -163,7 +163,6 @@ export interface FeatRunArgs extends OrchestratorArgs {
   'sandbox-base-dir'?: string;
   project?: string;
   'resolve-ambiguity'?: string;
-  'dangerous-debug'?: boolean;
   'dangerous-no-leash'?: boolean;
   cedar?: string;
   'coder-image'?: string;
@@ -181,6 +180,7 @@ export interface FeatRunArgs extends OrchestratorArgs {
   branch?: string;
   'git-provider'?: string;
   verbose?: boolean;
+  infra?: string;
 }
 
 /** Path segment: kebab-case or (group) */
@@ -318,9 +318,10 @@ export function readCoderImageTagFromCli(args: FeatRunArgs): string | undefined 
   return undefined;
 }
 
-/** CLI-only: `true` if `--dangerous-debug` was passed; `undefined` if omitted. */
-export function readDangerousDebugFromCli(args: FeatRunArgs): boolean | undefined {
-  return args['dangerous-debug'] === true ? true : undefined;
+/** CLI-only: trimmed non-empty `--infra`, or `undefined` if omitted / empty. */
+export function readInfraCliFromCli(args: Pick<FeatRunArgs, 'infra'>): string | undefined {
+  const raw = typeof args.infra === 'string' ? args.infra.trim() : '';
+  return raw !== '' ? raw : undefined;
 }
 
 /** CLI-only: trimmed `--designer`, or `undefined` if omitted / empty. */
@@ -1105,13 +1106,7 @@ export async function buildOrchestratorCliInputFromFeatArgs(
     resolveAmbiguity = undefined;
   }
 
-  const dangerousDebug = runArgs['dangerous-debug'] === true ? true : undefined;
   const dangerousNoLeash = runArgs['dangerous-no-leash'] === true ? true : undefined;
-
-  if (dangerousDebug && dangerousNoLeash) {
-    consola.error('Error: --dangerous-debug and --dangerous-no-leash cannot be used together.');
-    process.exit(1);
-  }
 
   const cedarPolicyPath =
     typeof runArgs.cedar === 'string' && runArgs.cedar.trim() ? runArgs.cedar.trim() : undefined;
@@ -1310,7 +1305,6 @@ export async function buildOrchestratorCliInputFromFeatArgs(
     testImage: testImageCli,
     resolveAmbiguity,
     testRetries,
-    dangerousDebug,
     dangerousNoLeash,
     cedarPolicyPath,
     coderImage,

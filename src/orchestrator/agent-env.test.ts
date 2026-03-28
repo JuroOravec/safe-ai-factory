@@ -218,6 +218,7 @@ describe('buildCoderContainerEnv + agentSecretKeys', () => {
         agentEnv: {},
         projectDir: process.cwd(),
         agentSecretKeys: [key],
+        agentSecretFiles: [],
         taskPrompt: 't',
         gateRetries: 1,
         runId: 'r',

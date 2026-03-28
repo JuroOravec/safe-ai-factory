@@ -219,7 +219,8 @@ const CONTAINER_WORKSPACE = '/workspace';
 
 export type CoderContainerEnvMode =
   | { kind: 'container' }
-  | { kind: 'dangerousDebug'; codePath: string; saifacPath: string };
+  /** Host-side agent spawn (`--infra local`): workspace paths are host directories, not `/workspace`. */
+  | { kind: 'host'; codePath: string; saifacPath: string };
 
 /**
  * Builds the full coder container environment for {@link RunAgentOpts.containerEnv} /
@@ -294,8 +295,6 @@ export async function buildCoderContainerEnv(opts: {
       SAIFAC_AGENT_SCRIPT: '/saifac/agent.sh',
     });
   } else {
-    // TODO - Move dangerousDebug to "LocalProvisioner", and map env vars above
-    //        to values below. Then remove the `mode` parameter and all its uses.
     const { codePath, saifacPath } = mode;
     Object.assign(env, {
       SAIFAC_WORKSPACE_BASE: codePath,
@@ -303,9 +302,6 @@ export async function buildCoderContainerEnv(opts: {
       SAIFAC_AGENT_INSTALL_SCRIPT: join(saifacPath, 'agent-install.sh'),
       SAIFAC_GATE_SCRIPT: join(saifacPath, 'gate.sh'),
       SAIFAC_AGENT_SCRIPT: join(saifacPath, 'agent.sh'),
-      // TODO - Temporary: only host-side dangerousDebug needs an absolute task path; in-container
-      // flows derive `.saifac/task.md` from SAIFAC_WORKSPACE_BASE. Remove when dangerousDebug
-      // becomes a dedicated local provisioner (see DockerProvisioner TODO).
       SAIFAC_TASK_PATH: saifacTaskFilePath(codePath),
     });
   }

@@ -40,7 +40,6 @@ function makeOrchestratorOpts(): OrchestratorOpts {
     testImage: 'test:latest',
     resolveAmbiguity: 'ai',
     testRetries: 1,
-    dangerousDebug: false,
     dangerousNoLeash: false,
     cedarPolicyPath: '/policy.cedar',
     coderImage: 'coder:latest',
@@ -99,7 +98,6 @@ const baseArtifact: RunArtifact = {
     projectName: 'proj',
     testImage: 'test:latest',
     resolveAmbiguity: 'ai',
-    dangerousDebug: false,
     dangerousNoLeash: false,
     cedarPolicyPath: '',
     coderImage: '',
@@ -337,6 +335,7 @@ describe('runInspect', () => {
         runStorage: null as unknown as RunStorage,
         cli: {} as unknown as OrchestratorCliInput,
         cliModelDelta: undefined,
+        infraCli: undefined,
       }),
     ).rejects.toThrow(/run storage/i);
   });
@@ -353,6 +352,7 @@ describe('runInspect', () => {
       cli: {} as unknown as OrchestratorCliInput,
       cliModelDelta: undefined,
       inspectLeash: true,
+      infraCli: undefined,
     });
     await finishWithSigint();
     await p;
@@ -374,6 +374,7 @@ describe('runInspect', () => {
         runStorage: storage,
         cli: {} as unknown as OrchestratorCliInput,
         cliModelDelta: undefined,
+        infraCli: undefined,
       }),
     ).rejects.toThrow(/Run not found/);
   });
@@ -392,6 +393,7 @@ describe('runInspect', () => {
         runStorage: storage,
         cli: {} as unknown as OrchestratorCliInput,
         cliModelDelta: undefined,
+        infraCli: undefined,
       }),
     ).rejects.toThrow(/already running/);
   });
@@ -407,6 +409,7 @@ describe('runInspect', () => {
       runStorage: storage,
       cli: {} as unknown as OrchestratorCliInput,
       cliModelDelta: undefined,
+      infraCli: undefined,
     });
     await finishWithSigint();
     await p;
@@ -451,6 +454,7 @@ describe('runInspect', () => {
       runStorage: storage,
       cli: {} as unknown as OrchestratorCliInput,
       cliModelDelta: undefined,
+      infraCli: undefined,
     });
     await finishWithSigint();
     await p;
@@ -501,6 +505,7 @@ describe('runInspect', () => {
       runStorage: storage,
       cli: {} as unknown as OrchestratorCliInput,
       cliModelDelta: undefined,
+      infraCli: undefined,
     });
     await finishWithSigint();
     await p;
@@ -536,6 +541,7 @@ describe('runInspect', () => {
       runStorage: storage,
       cli: {} as unknown as OrchestratorCliInput,
       cliModelDelta: undefined,
+      infraCli: undefined,
     });
     await finishWithSigint();
     await expect(p).rejects.toThrow('disk full');

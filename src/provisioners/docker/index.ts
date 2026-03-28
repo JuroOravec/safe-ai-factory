@@ -1,10 +1,17 @@
 /**
  * DockerProvisioner — the single Docker-aware implementation of the Provisioner interface.
  *
- * Encapsulates all Docker API calls, `docker compose` CLI invocations, log demuxing,
- * sidecar injection, and the Leash network attachment workaround.
- * The orchestrator (loop.ts, modes.ts) never imports dockerode or child_process for Docker purposes
- * (Docker CLI here uses `spawnAsync`/`spawnWait`; the Leash agent still uses `spawn` for streaming I/O).
+ * Encapsulates Docker Engine usage, selected CLI usage, log demuxing, sidecar injection,
+ * and the Leash network attachment workaround.
+ *
+ * Preferably use the Dockerode — a typed Docker Engine API wrapper. However,
+ * there are cases where other options fit better:
+ * - `docker compose` is not available through Dockerode
+ * - `docker build` would require us to pack the build context into a tar stream
+ *    and then consume a progress stream to detect errors. CLI is simpler.
+ * - `docker run` - When Leash is enabled, Docker is called indirectly via Leash CLI.
+ *   Thus, to keep the overall flow identical, and only swapping the `leash xxx` command
+ *   for `docker run`, we invoke `docker run` via CLI.
  *
  * Lifecycle per run:
  *   setup()        → create bridge network + `docker compose up`
@@ -64,7 +71,7 @@ const CONTAINER_WORKSPACE = '/workspace';
 const docker = new Docker();
 
 // ---------------------------------------------------------------------------
-// runDocker — async spawn wrapper (no shell, avoids injection)
+// runDocker — compose + build only (no shell, avoids injection)
 // ---------------------------------------------------------------------------
 
 interface RunDockerOptions {
@@ -73,8 +80,9 @@ interface RunDockerOptions {
 }
 
 /**
- * Runs a docker CLI command via spawn. No shell invocation — avoids injection.
- * Throws on non-zero exit. Returns { stdout, stderr } when stdio is 'pipe'.
+ * Runs Docker CLI commands that have no good dockerode equivalent: `docker compose`, `docker build`.
+ * No shell invocation — avoids injection. Throws on non-zero exit.
+ * Returns { stdout, stderr } when stdio is 'pipe'.
  */
 async function runDocker(
   args: string[],
@@ -427,7 +435,6 @@ export class DockerProvisioner implements Provisioner {
       codePath,
       sandboxBasePath,
       containerEnv,
-      dangerousDebug,
       dangerousNoLeash,
       cedarPolicyPath,
       coderImage,
@@ -448,21 +455,7 @@ export class DockerProvisioner implements Provisioner {
     let spawnCwd: string;
     let spawnEnv: Record<string, string>;
 
-    const coderStartHost = join(saifacPath, 'coder-start.sh');
-    if (dangerousDebug) {
-      cmd = 'bash';
-      args = [coderStartHost];
-      argsForPrint = [coderStartHost];
-      spawnCwd = codePath;
-      spawnEnv = {
-        ...Object.fromEntries(
-          Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
-        ),
-        ...containerEnv.env,
-        ...containerEnv.secretEnv,
-      };
-      consola.log('[agent-runner] Mode: dangerous-debug (host execution, filesystem sandbox only)');
-    } else if (dangerousNoLeash) {
+    if (dangerousNoLeash) {
       assertSafeImageTag(coderImage);
 
       const codePathHost = await dockerHostBindPath(codePath);
@@ -512,9 +505,7 @@ export class DockerProvisioner implements Provisioner {
       consola.log(`[agent-runner] Container name: ${containerName}`);
       consola.log(`[agent-runner] Sandbox mount: ${codePathHost} → ${CONTAINER_WORKSPACE}`);
 
-      await runDocker(['rm', '-f', containerName], { stdio: 'pipe' }).catch(() => {
-        /* stale name from a previous run */
-      });
+      await removeDockerContainerForce(containerName);
       dockerDirectRunContainerToRemove = containerName;
     } else {
       // Leash mode
@@ -586,12 +577,8 @@ export class DockerProvisioner implements Provisioner {
       `[agent-runner] Command: ${cmd} ${argsForPrint.map((s) => s.slice(0, 100)).join(' ')}`,
     );
 
-    if (!dangerousDebug && !dangerousNoLeash) {
-      await runDocker(['rm', '-f', leashTargetContainerName(sandboxBasePath)], {
-        stdio: 'pipe',
-      }).catch(() => {
-        /* stale leash-target-* from a prior run */
-      });
+    if (!dangerousNoLeash) {
+      await removeDockerContainerForce(leashTargetContainerName(sandboxBasePath));
     }
 
     const timeoutMs = 20 * 60 * 1000;
@@ -600,14 +587,14 @@ export class DockerProvisioner implements Provisioner {
     // Leash doesn't support a --network flag, so we poll `docker inspect` until the target
     // container appears and then call `docker network connect` to put it on our network.
     const networkAttach =
-      !dangerousDebug && !dangerousNoLeash && this.networkName
+      !dangerousNoLeash && this.networkName
         ? startLeashNetworkAttach(this.networkName, leashWorkspaceId(sandboxBasePath))
         : null;
 
     const removeDirectDockerContainer = (): void => {
       if (!dockerDirectRunContainerToRemove) return;
       const n = dockerDirectRunContainerToRemove;
-      void runDocker(['rm', '-f', n], { stdio: 'pipe' }).catch(() => {});
+      void removeDockerContainerForce(n);
     };
 
     const { exitCode, output } = await new Promise<{ exitCode: number; output: string }>(
@@ -819,9 +806,7 @@ export class DockerProvisioner implements Provisioner {
       `[inspect-session] Command: ${cmd} ${argsForPrint.map((s) => s.slice(0, 100)).join(' ')}`,
     );
 
-    await runDocker(['rm', '-f', containerName], { stdio: 'pipe' }).catch(() => {
-      /* stale leash-target-* from a prior inspect/agent session */
-    });
+    await removeDockerContainerForce(containerName);
 
     if (signal?.aborted) {
       throw new Error('inspect-session: aborted before start');
@@ -835,7 +820,7 @@ export class DockerProvisioner implements Provisioner {
     const removeDirectDocker = (): void => {
       if (!dockerDirectRunContainerToRemove) return;
       const n = dockerDirectRunContainerToRemove;
-      void runDocker(['rm', '-f', n], { stdio: 'pipe' }).catch(() => {});
+      void removeDockerContainerForce(n);
     };
 
     const child = spawn(cmd, args, {
@@ -913,11 +898,7 @@ export class DockerProvisioner implements Provisioner {
       networkAttach?.cancel();
       const directName = dockerDirectRunContainerToRemove;
       if (directName) {
-        try {
-          await runDocker(['rm', '-f', directName], { stdio: 'pipe' });
-        } catch {
-          // Container may already be gone (--rm) or removal races with docker CLI — ignore
-        }
+        await removeDockerContainerForce(directName);
         dockerDirectRunContainerToRemove = null;
       }
       if (child.exitCode === null && !child.killed) {
@@ -935,11 +916,7 @@ export class DockerProvisioner implements Provisioner {
       }
       // Leash path does not set dockerDirectRunContainerToRemove; ensure the target is gone
       // so teardown can remove the bridge (same name as no-leash for Dev Container parity).
-      try {
-        await runDocker(['rm', '-f', containerName], { stdio: 'pipe' });
-      } catch {
-        /* already removed */
-      }
+      await removeDockerContainerForce(containerName);
     };
 
     return {
@@ -989,59 +966,8 @@ export class DockerProvisioner implements Provisioner {
 }
 
 // ---------------------------------------------------------------------------
-// Utility: Resource management
+// Staging container/image
 // ---------------------------------------------------------------------------
-
-async function ensureCreateNetwork(name: string): Promise<void> {
-  try {
-    await docker.createNetwork({ Name: name, Driver: 'bridge' });
-  } catch (err: unknown) {
-    const isConflict =
-      err instanceof Error &&
-      (err.message.includes('409') || err.message.includes('already exists'));
-    if (!isConflict) throw err;
-
-    consola.warn(
-      `[docker] Network ${name} already exists (leftover from prior run) — removing and recreating.`,
-    );
-    await removeDockerNetwork(name);
-    await docker.createNetwork({ Name: name, Driver: 'bridge' });
-  }
-}
-
-async function removeDockerNetwork(networkName: string): Promise<void> {
-  try {
-    const networks = await docker.listNetworks({ filters: { name: [networkName] } });
-    for (const net of networks) {
-      const n = docker.getNetwork(net.Id);
-      await n.remove();
-    }
-  } catch (err) {
-    consola.warn(`[docker] Warning: could not remove network ${networkName}: ${String(err)}`);
-  }
-}
-
-async function removeDockerImage(imageTag: string): Promise<void> {
-  try {
-    const image = docker.getImage(imageTag);
-    await image.remove({ force: true });
-  } catch {
-    // Image not found or already removed — not an error
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Utility: image tag safety
-// ---------------------------------------------------------------------------
-
-function assertSafeImageTag(tag: string): void {
-  if (!/^[a-zA-Z0-9_.\-:/@]+$/.test(tag)) {
-    throw new Error(
-      `[docker] Unsafe image tag rejected: "${tag}". ` +
-        `Tags must contain only letters, digits, hyphens, underscores, dots, colons, slashes, and @ signs.`,
-    );
-  }
-}
 
 async function buildStagingImage(opts: {
   sandboxProfileId: SupportedSandboxProfileId;
@@ -1085,7 +1011,7 @@ async function buildStagingImage(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Utility: Leash workspace id derivation
+// Leash
 // ---------------------------------------------------------------------------
 
 function leashWorkspaceId(sandboxBasePath: string): string {
@@ -1103,6 +1029,110 @@ function leashWorkspaceId(sandboxBasePath: string): string {
  */
 function leashTargetContainerName(sandboxBasePath: string): string {
   return `leash-target-${leashWorkspaceId(sandboxBasePath)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Utility: Networks
+// ---------------------------------------------------------------------------
+
+async function ensureCreateNetwork(name: string): Promise<void> {
+  try {
+    await docker.createNetwork({ Name: name, Driver: 'bridge' });
+  } catch (err: unknown) {
+    const isConflict =
+      err instanceof Error &&
+      (err.message.includes('409') || err.message.includes('already exists'));
+    if (!isConflict) throw err;
+
+    consola.warn(
+      `[docker] Network ${name} already exists (leftover from prior run) — removing and recreating.`,
+    );
+    await removeDockerNetwork(name);
+    await docker.createNetwork({ Name: name, Driver: 'bridge' });
+  }
+}
+
+async function removeDockerNetwork(networkName: string): Promise<void> {
+  try {
+    const networks = await docker.listNetworks({ filters: { name: [networkName] } });
+    for (const net of networks) {
+      const n = docker.getNetwork(net.Id);
+      await n.remove();
+    }
+  } catch (err) {
+    consola.warn(`[docker] Warning: could not remove network ${networkName}: ${String(err)}`);
+  }
+}
+
+async function resolveDockerNetworkByName(networkName: string) {
+  const listed = await docker.listNetworks({ filters: { name: [networkName] } });
+  const match = listed.find((n) => n.Name === networkName) ?? listed[0];
+  if (!match) return null;
+  return docker.getNetwork(match.Id);
+}
+
+// ---------------------------------------------------------------------------
+// Utility: Containers
+// ---------------------------------------------------------------------------
+
+/** Best-effort `docker rm -f` equivalent (ignores missing container / races). */
+async function removeDockerContainerForce(nameOrId: string): Promise<void> {
+  try {
+    await docker.getContainer(nameOrId).remove({ force: true });
+  } catch {
+    /* absent, --rm race, etc. */
+  }
+}
+
+async function isDockerContainerRunning(nameOrId: string): Promise<boolean> {
+  try {
+    const info = await docker.getContainer(nameOrId).inspect();
+    return Boolean(info.State?.Running);
+  } catch {
+    return false;
+  }
+}
+
+async function connectContainerToBridgeNetwork(opts: {
+  networkName: string;
+  containerIdOrName: string;
+  aliases?: string[];
+}): Promise<void> {
+  const { networkName, containerIdOrName, aliases } = opts;
+  const net = await resolveDockerNetworkByName(networkName);
+  if (!net) {
+    throw new Error(`[docker] Network not found: "${networkName}"`);
+  }
+  if (aliases?.length) {
+    await net.connect({
+      Container: containerIdOrName,
+      EndpointConfig: { Aliases: aliases },
+    });
+  } else {
+    await net.connect({ Container: containerIdOrName });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Utility: Images
+// ---------------------------------------------------------------------------
+
+function assertSafeImageTag(tag: string): void {
+  if (!/^[a-zA-Z0-9_.\-:/@]+$/.test(tag)) {
+    throw new Error(
+      `[docker] Unsafe image tag rejected: "${tag}". ` +
+        `Tags must contain only letters, digits, hyphens, underscores, dots, colons, slashes, and @ signs.`,
+    );
+  }
+}
+
+async function removeDockerImage(imageTag: string): Promise<void> {
+  try {
+    const image = docker.getImage(imageTag);
+    await image.remove({ force: true });
+  } catch {
+    // Image not found or already removed — not an error
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1160,14 +1190,16 @@ async function attachComposeSvcToNetwork(opts: {
         '-q',
         service,
       ]);
-      const containerName = stdout.trim();
-      if (!containerName) continue;
+      const containerId = stdout.trim();
+      if (!containerId) continue;
 
-      await runDocker(['network', 'connect', '--alias', service, networkName, containerName], {
-        stdio: 'inherit',
+      await connectContainerToBridgeNetwork({
+        networkName,
+        containerIdOrName: containerId,
+        aliases: [service],
       });
       consola.log(
-        `[docker] Connected compose service "${service}" (${containerName}) to network "${networkName}"`,
+        `[docker] Connected compose service "${service}" (${containerId}) to network "${networkName}"`,
       );
     } catch (err) {
       consola.warn(
@@ -1200,19 +1232,16 @@ function startLeashNetworkAttach(networkName: string, workspaceId: string): Netw
   const poll = async () => {
     if (cancelled) return;
     try {
-      const { stdout } = await runDocker(['inspect', '-f', '{{.State.Running}}', containerName]);
-      const out = stdout.trim();
-
-      if (out === 'true') {
+      if (await isDockerContainerRunning(containerName)) {
         consola.log(
           `[agent-runner] Attaching container "${containerName}" to network "${networkName}"...`,
         );
-        await runDocker(['network', 'connect', networkName, containerName], { stdio: 'inherit' });
+        await connectContainerToBridgeNetwork({ networkName, containerIdOrName: containerName });
         consola.log(`[agent-runner] Container "${containerName}" attached to "${networkName}".`);
         return;
       }
     } catch {
-      // Container doesn't exist yet — retry
+      // Container doesn't exist yet or connect failed — retry
     }
     if (!cancelled) timer = setTimeout(() => void poll(), 500);
   };
@@ -1270,21 +1299,14 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Polls `docker inspect` until the container exists and `State.Running` is true.
+ * Polls container inspect (dockerode) until `State.Running` is true.
  * Used right after `docker run` / Leash starts the coder target: the process may return before
  * the container transitions to running, and inspect can briefly fail if the name is not visible yet.
  */
 async function waitForContainerRunning(containerName: string, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    try {
-      const { stdout } = await runDocker(['inspect', '-f', '{{.State.Running}}', containerName], {
-        stdio: 'pipe',
-      });
-      if (stdout.trim() === 'true') return;
-    } catch {
-      /* container may not exist yet */
-    }
+    if (await isDockerContainerRunning(containerName)) return;
     await sleep(300);
   }
   throw new Error(
@@ -1380,24 +1402,6 @@ async function waitForContainerReady(opts: {
   }
 
   consola.warn(`[docker] ${containerName} did not become ready within ${timeoutMs}ms`);
-}
-
-// ---------------------------------------------------------------------------
-// Other utilities
-// ---------------------------------------------------------------------------
-
-/**
- * Resolve symlinks on the host path before passing to `docker run -v`.
- * On macOS, `/tmp` often symlinks to `/private/tmp`; mixing non-canonical paths with
- * Colima/Docker Desktop bind mounts can yield empty mounts (e.g. `/saifac/startup.sh` missing).
- * Leash also uses `getcwd()` as `callerDir`; keep {@link spawn} `cwd` aligned with the same path.
- */
-async function dockerHostBindPath(hostPath: string): Promise<string> {
-  try {
-    return await realpath(hostPath);
-  } catch {
-    return hostPath;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1687,4 +1691,22 @@ function redactLeashArgsForPrint(leashArgs: string[], c: ContainerEnv): string[]
     if (k === 'SAIFAC_INITIAL_TASK') return `${k}=<task (${a.length - eq - 1} chars)>`;
     return a;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Other utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve symlinks on the host path before passing to `docker run -v`.
+ * On macOS, `/tmp` often symlinks to `/private/tmp`; mixing non-canonical paths with
+ * Colima/Docker Desktop bind mounts can yield empty mounts (e.g. `/saifac/startup.sh` missing).
+ * Leash also uses `getcwd()` as `callerDir`; keep {@link spawn} `cwd` aligned with the same path.
+ */
+async function dockerHostBindPath(hostPath: string): Promise<string> {
+  try {
+    return await realpath(hostPath);
+  } catch {
+    return hostPath;
+  }
 }

@@ -50,6 +50,7 @@ import {
   type FeatRunArgs,
   getFeatNameFromArgs,
   parseRunId,
+  readInfraCliFromCli,
   readProjectDirFromCli,
   readSaifDirFromCli,
   readStorageStringFromCli,
@@ -66,6 +67,7 @@ async function parseResumeOrchestratorCli(args: FeatRunArgs): Promise<{
   config: SaifacConfig;
   cli: OrchestratorCliInput;
   cliModelDelta: ModelOverrides | undefined;
+  infraCli: string | undefined;
 }> {
   const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
   const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
@@ -73,7 +75,8 @@ async function parseResumeOrchestratorCli(args: FeatRunArgs): Promise<{
   setVerboseLogging(args.verbose === true);
   const cli = await buildOrchestratorCliInputFromFeatArgs(args, { projectDir, saifDir, config });
   const cliModelDelta = parseModelOverridesCliDelta(args);
-  return { projectDir, saifDir, config, cli, cliModelDelta };
+  const infraCli = readInfraCliFromCli(args);
+  return { projectDir, saifDir, config, cli, cliModelDelta, infraCli };
 }
 
 const commonRunArgs = {
@@ -264,7 +267,7 @@ const inspectCommand = defineCommand({
   },
   args: {
     ...commonRunArgs,
-    ...omit(featResumeArgs, ['dangerous-debug', 'dangerous-no-leash']),
+    ...omit(featResumeArgs, ['dangerous-no-leash']),
     leash: {
       type: 'boolean' as const,
       description:
@@ -431,6 +434,7 @@ const testCommand = defineCommand({
       config,
     });
     const cliModelDelta = parseModelOverridesCliDelta(runArgs);
+    const infraCli = readInfraCliFromCli(runArgs);
 
     consola.log(`\nRe-testing stored run: ${runId}`);
 
@@ -442,6 +446,7 @@ const testCommand = defineCommand({
       config,
       cli,
       cliModelDelta,
+      infraCli,
     });
 
     consola.log(`\n${result.message}`);
@@ -484,6 +489,7 @@ const applyCommand = defineCommand({
       config,
     });
     const cliModelDelta = parseModelOverridesCliDelta(runArgs);
+    const infraCli = readInfraCliFromCli(runArgs);
 
     consola.log(`\nApplying stored run to host: ${runId}`);
 
@@ -495,6 +501,7 @@ const applyCommand = defineCommand({
       config,
       cli,
       cliModelDelta,
+      infraCli,
     });
 
     consola.log(`\n${result.message}`);

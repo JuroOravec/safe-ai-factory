@@ -85,7 +85,7 @@ export interface OrchestratorOpts extends IterativeLoopOpts {
   /**
    * Content of the gate script to run after each OpenHands round. In leash mode the script is
    * written to sandboxBasePath/gate.sh and mounted read-only at /saifac/gate.sh inside the
-   * container. In --dangerous-debug mode it runs directly on the host via bash.
+   * container. In `--infra local` it runs on the host via bash.
    *
    * It must exit 0 to pass; non-zero causes the inner loop to retry with the output as feedback.
    *
@@ -95,7 +95,7 @@ export interface OrchestratorOpts extends IterativeLoopOpts {
   /**
    * Content of the startup script to run once before the agent loop begins.
    * Written to sandboxBasePath/startup.sh and mounted read-only at /saifac/startup.sh
-   * inside the coder container (or run directly on the host in --dangerous-debug mode).
+   * inside the coder container (or on the host with `--infra local`).
    *
    * Use for workspace setup that requires the workspace to be mounted first:
    * pnpm install, pip install -r requirements.txt, cargo fetch, etc.
@@ -578,6 +578,7 @@ export interface ResumeOpts {
   runStorage: RunStorage;
   cli: OrchestratorCliInput;
   cliModelDelta: ModelOverrides | undefined;
+  infraCli: string | undefined;
 }
 
 /**
@@ -591,16 +592,8 @@ async function runResumeCore(
   opts: ResumeOpts & { testOnly?: boolean },
   registry: CleanupRegistry,
 ): Promise<OrchestratorResult> {
-  const {
-    runId,
-    projectDir,
-    runStorage,
-    cli,
-    cliModelDelta,
-    config,
-    saifDir,
-    testOnly = false,
-  } = opts;
+  const { runId, projectDir, runStorage, cli, cliModelDelta, config, saifDir, testOnly, infraCli } =
+    opts;
 
   const artifact = await runStorage.getRun(runId);
   if (!artifact) {
@@ -641,6 +634,7 @@ async function runResumeCore(
     cli,
     cliModelDelta,
     artifact,
+    infraCli,
   });
 
   mergedOpts.resume = {
@@ -673,7 +667,7 @@ async function runResumeCore(
 // Mode 3b: inspect (stored run → resume worktree + sandbox + idle coder container)
 // ---------------------------------------------------------------------------
 
-export type InspectOpts = Omit<ResumeOpts, 'dangerousDebug'> & {
+export type InspectOpts = ResumeOpts & {
   /**
    * When true, run the inspect container under Leash/Cedar like the coding agent.
    * Default (false/omitted) uses plain `docker run` so operations blocked by Cedar (e.g. git commit) work.
@@ -691,7 +685,17 @@ export type InspectOpts = Omit<ResumeOpts, 'dangerousDebug'> & {
  * runs a controlled teardown (save + destroy) instead of the global registry exit path.
  */
 export async function runInspect(opts: InspectOpts): Promise<void> {
-  const { runId, projectDir, runStorage, cli, cliModelDelta, config, saifDir, inspectLeash } = opts;
+  const {
+    runId,
+    projectDir,
+    runStorage,
+    cli,
+    cliModelDelta,
+    config,
+    saifDir,
+    inspectLeash,
+    infraCli,
+  } = opts;
   const inspectDangerousNoLeash = inspectLeash !== true;
 
   if (!runStorage) {
@@ -739,13 +743,14 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
       cli,
       cliModelDelta,
       artifact,
+      infraCli,
     });
 
-    if (mergedOpts.dangerousDebug) {
-      consola.warn(
-        '[inspect] Run inspect does not support --dangerous-debug (host-based coding); ignoring.',
+    if (mergedOpts.codingEnvironment.provisioner === 'local') {
+      throw new Error(
+        'Run inspect does not support coding provisioner "local" (host-based agent). ' +
+          'Use environments.coding with docker (or omit --infra local) for inspect.',
       );
-      mergedOpts.dangerousDebug = false;
     }
 
     mergedOpts.resume = {
@@ -798,13 +803,12 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
     const errorFeedback = artifact.lastFeedback ?? '';
 
     const coderLlmConfig = resolveAgentLlmConfig('coder', mergedOpts.overrides);
-    const reviewer =
-      mergedOpts.reviewerEnabled && !mergedOpts.dangerousDebug
-        ? {
-            llmConfig: resolveAgentLlmConfig('reviewer', mergedOpts.overrides),
-            argusBinaryPath: await getArgusBinaryPath(),
-          }
-        : null;
+    const reviewer = mergedOpts.reviewerEnabled
+      ? {
+          llmConfig: resolveAgentLlmConfig('reviewer', mergedOpts.overrides),
+          argusBinaryPath: await getArgusBinaryPath(),
+        }
+      : null;
 
     const taskPrompt = await buildTaskPrompt({
       codePath: sandbox.codePath,
@@ -966,7 +970,7 @@ async function runApplyCore(
   opts: ResumeOpts,
   _registry: CleanupRegistry,
 ): Promise<OrchestratorResult> {
-  const { runId, projectDir, runStorage, cli, cliModelDelta, config, saifDir } = opts;
+  const { runId, projectDir, runStorage, cli, cliModelDelta, config, saifDir, infraCli } = opts;
   if (!runStorage) {
     throw new Error('Run storage is disabled (--storage none). Cannot apply a stored run.');
   }
@@ -1005,6 +1009,7 @@ async function runApplyCore(
     cli,
     cliModelDelta,
     artifact,
+    infraCli,
   });
 
   const branchName = resolveHostApplyBranchName({

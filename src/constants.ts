@@ -54,9 +54,6 @@ export const DEFAULT_ORCHESTRATOR_GATE_RETRIES = 10;
 /** Ambiguous-spec handling when not set via CLI or config. */
 export const DEFAULT_RESOLVE_AMBIGUITY: 'off' | 'prompt' | 'ai' = 'ai';
 
-/** Host-side dangerous debug when not set via CLI or config. */
-export const DEFAULT_DANGEROUS_DEBUG = false;
-
 /** Run the coder container with plain `docker run` (no Leash) when not set via CLI or config. */
 export const DEFAULT_DANGEROUS_NO_LEASH = false;
 

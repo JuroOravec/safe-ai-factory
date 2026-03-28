@@ -49,8 +49,15 @@ export const dockerEnvironmentSchema = z.object({
 /** Helm provisioner — points at a chart. */
 export const helmEnvironmentSchema = z.object({
   provisioner: z.literal('helm'),
-  chart: z.string(),
+  /** Helm chart path or reference; required at runtime when using Helm. */
+  chart: z.string().optional(),
   namespacePrefix: z.string().optional(),
+  agentEnvironment: z.record(z.string(), z.string()).optional(),
+});
+
+/** Local provisioner — agent runs on the host (coding only; staging must use docker or helm). */
+export const localEnvironmentSchema = z.object({
+  provisioner: z.literal('local'),
   agentEnvironment: z.record(z.string(), z.string()).optional(),
 });
 
@@ -68,6 +75,7 @@ const stagingExtension = {
 const codingEnvironmentSchema = z.discriminatedUnion('provisioner', [
   dockerEnvironmentSchema,
   helmEnvironmentSchema,
+  localEnvironmentSchema,
 ]);
 
 const stagingEnvironmentSchema = z.discriminatedUnion('provisioner', [
@@ -83,6 +91,7 @@ export const environmentsSchema = z.object({
 export type StagingAppConfig = z.infer<typeof stagingAppSchema>;
 export type DockerEnvironment = z.infer<typeof dockerEnvironmentSchema>;
 export type HelmEnvironment = z.infer<typeof helmEnvironmentSchema>;
+export type LocalEnvironment = z.infer<typeof localEnvironmentSchema>;
 export type EnvironmentsConfig = z.infer<typeof environmentsSchema>;
 
 type RawStagingEnvironment = NonNullable<EnvironmentsConfig['staging']>;
@@ -106,8 +115,6 @@ export const saifacConfigDefaultsSchema = z.object({
   maxRuns: z.number().int().positive().optional(),
   testRetries: z.number().int().positive().optional(),
   resolveAmbiguity: z.enum(['off', 'prompt', 'ai']).optional(),
-  /** Run the coder on the host instead of inside a Leash container. */
-  dangerousDebug: z.boolean().optional(),
   /** Skip Leash; run the coder image with `docker run` (same mounts/env as Leash, no Cedar/eBPF). */
   dangerousNoLeash: z.boolean().optional(),
   cedarPolicyPath: z.string().optional(),

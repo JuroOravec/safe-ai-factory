@@ -24,7 +24,6 @@ const minimalArtifact: RunArtifact = {
     projectName: 'proj',
     testImage: 'img',
     resolveAmbiguity: 'ai',
-    dangerousDebug: false,
     dangerousNoLeash: false,
     cedarPolicyPath: '',
     coderImage: '',

@@ -18,12 +18,12 @@ import {
 } from '../cli/utils.js';
 import {
   DEFAULT_STAGING_APP,
+  type NormalizedCodingEnvironment,
   type NormalizedStagingEnvironment,
   type SaifacConfig,
   type StagingAppConfig,
 } from '../config/schema.js';
 import {
-  DEFAULT_DANGEROUS_DEBUG,
   DEFAULT_DANGEROUS_NO_LEASH,
   DEFAULT_ORCHESTRATOR_GATE_RETRIES,
   DEFAULT_ORCHESTRATOR_MAX_RUNS,
@@ -182,7 +182,6 @@ const ORCHESTRATOR_MERGE_KEYS = [
   'testImage',
   'resolveAmbiguity',
   'testRetries',
-  'dangerousDebug',
   'dangerousNoLeash',
   'cedarPolicyPath',
   'coderImage',
@@ -273,7 +272,6 @@ async function applyOrchestratorBaseline(
   const testImage = resolveTestImageTag(noCli, testProfile.id, config);
   const resolveAmbiguity = config?.defaults?.resolveAmbiguity ?? DEFAULT_RESOLVE_AMBIGUITY;
   const testRetries = config?.defaults?.testRetries ?? DEFAULT_ORCHESTRATOR_TEST_RETRIES;
-  const dangerousDebug = config?.defaults?.dangerousDebug ?? DEFAULT_DANGEROUS_DEBUG;
   const dangerousNoLeash = config?.defaults?.dangerousNoLeash ?? DEFAULT_DANGEROUS_NO_LEASH;
   const cedarPolicyPath = config?.defaults?.cedarPolicyPath ?? defaultCedarPolicyPath();
   const sandboxProfile = pickSandboxProfile(noCli, config);
@@ -342,7 +340,6 @@ async function applyOrchestratorBaseline(
     testImage,
     resolveAmbiguity,
     testRetries,
-    dangerousDebug,
     dangerousNoLeash,
     cedarPolicyPath,
     coderImage,
@@ -391,6 +388,12 @@ export interface ResolveOrchestratorOptsParams {
   cli: OrchestratorCliInput;
   cliModelDelta: ModelOverrides | undefined;
   artifact: RunArtifact | null;
+  /**
+   * Optional `--infra` string: global `docker` | `helm` | `local`, or `coding=…,staging=…`.
+   * Overrides `codingEnvironment` / `stagingEnvironment` after config/artifact/CLI merge;
+   * reuses file config for a phase when its provisioner matches the target.
+   */
+  infraCli: string | undefined;
 }
 
 /**
@@ -400,7 +403,7 @@ export interface ResolveOrchestratorOptsParams {
 export async function resolveOrchestratorOpts(
   params: ResolveOrchestratorOptsParams,
 ): Promise<OrchestratorOpts> {
-  const { projectDir, saifDir, config, feature, cli, cliModelDelta, artifact } = params;
+  const { projectDir, saifDir, config, feature, cli, cliModelDelta, artifact, infraCli } = params;
 
   const defaults = await applyOrchestratorBaseline({
     feature,
@@ -432,13 +435,17 @@ export async function resolveOrchestratorOpts(
     merged.runStorage = cli.runStorage;
   }
 
-  if (merged.pr && !merged.push) {
-    consola.error('Error: --pr requires --push <target>.');
-    process.exit(1);
+  const infraTrimmed = infraCli?.trim();
+  if (infraTrimmed) {
+    applyInfraCliToOrchestratorOpts(merged, config, infraTrimmed);
   }
 
-  if (merged.dangerousDebug && merged.dangerousNoLeash) {
-    consola.error('Error: --dangerous-debug and --dangerous-no-leash cannot be used together.');
+  if (merged.codingEnvironment.provisioner === 'local') {
+    merged.dangerousNoLeash = false;
+  }
+
+  if (merged.pr && !merged.push) {
+    consola.error('Error: --pr requires --push <target>.');
     process.exit(1);
   }
 
@@ -619,11 +626,165 @@ export function resolveStagingEnvironment(
   config: SaifacConfig | undefined,
 ): NormalizedStagingEnvironment {
   const raw = config?.environments?.staging ?? { provisioner: 'docker' as const };
+  return normalizeStagingEnvironmentRaw(raw);
+}
+
+// ---------------------------------------------------------------------------
+// Provisioner resolution
+// ---------------------------------------------------------------------------
+
+/** Coding phases allowed in --infra coding=.. */
+export type InfraCodingKind = 'docker' | 'helm' | 'local';
+
+/** Staging phases allowed in --infra staging=.. */
+export type InfraStagingKind = 'docker' | 'helm';
+
+export interface InfraCliSpec {
+  coding?: InfraCodingKind;
+  staging?: InfraStagingKind;
+}
+
+const INFRA_CODING_SET = new Set<string>(['docker', 'helm', 'local']);
+const INFRA_STAGING_SET = new Set<string>(['docker', 'helm']);
+
+/** Applies parsed --infra to merged opts using file config for reuse vs minimal provisioner objects. */
+/* eslint-disable-next-line max-params -- (merged, config, infra string) */
+export function applyInfraCliToOrchestratorOpts(
+  merged: OrchestratorOpts,
+  config: SaifacConfig,
+  infraRaw: string,
+): void {
+  const spec = parseInfraCliSpec(infraRaw);
+  if (spec.coding !== undefined) {
+    merged.codingEnvironment = pickCodingEnvironmentForInfra(spec.coding, config);
+  }
+  if (spec.staging !== undefined) {
+    merged.stagingEnvironment = pickStagingEnvironmentForInfra(spec.staging, config);
+  }
+}
+
+/**
+ * Parses `--infra docker` or `--infra coding=docker,staging=helm`.
+ * Global `local` sets coding=local and staging=docker (staging cannot be local).
+ */
+export function parseInfraCliSpec(raw: string, errorPrefix = '--infra'): InfraCliSpec {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+
+  const parts = trimmed
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const hasKv = parts.some((p) => KEY_EQ_PATTERN.test(p));
+
+  // Single global value (docker, local, helm)
+  if (!hasKv) {
+    if (parts.length !== 1) {
+      consola.error(
+        `${errorPrefix} expected a single value (e.g. docker) or comma-separated coding=…,staging=… pairs.`,
+      );
+      process.exit(1);
+    }
+    const g = parts[0];
+    if (g === 'local') {
+      return { coding: 'local', staging: 'docker' };
+    }
+    if (!INFRA_CODING_SET.has(g) || !INFRA_STAGING_SET.has(g)) {
+      consola.error(
+        `${errorPrefix} unknown provisioner "${g}". Use 'docker', 'helm', or 'local' (use coding=staging form for mixed).`,
+      );
+      process.exit(1);
+    }
+    return { coding: g as InfraCodingKind, staging: g as InfraStagingKind };
+  }
+
+  // Key-value pairs (coding=docker,staging=helm)
+  const parsed = parseCommaSeparatedOverrides({
+    raw: trimmed,
+    isKeyValue: (p) => KEY_EQ_PATTERN.test(p),
+    /* eslint-disable-next-line max-params -- matches parseCommaSeparatedOverrides callback shape */
+    validateKeyValue: (key, value, exit) => {
+      const v = value.trim();
+      if (!v) exit('empty value; expected e.g. coding=docker.');
+      if (key !== 'coding' && key !== 'staging') {
+        exit(`unknown phase "${key}". Use coding or staging.`);
+      }
+      if (key === 'staging' && v === 'local') {
+        exit('staging cannot use "local"; use docker or helm.');
+      }
+      if (key === 'coding' && !INFRA_CODING_SET.has(v)) {
+        exit(`unknown provisioner "${v}". Use docker, helm, or local.`);
+      }
+      if (key === 'staging' && !INFRA_STAGING_SET.has(v)) {
+        exit(`unknown provisioner "${v}". Use docker or helm.`);
+      }
+    },
+    errorPrefix,
+  });
+
+  const out: InfraCliSpec = {
+    coding: parsed.keys?.coding as InfraCodingKind,
+    staging: parsed.keys?.staging as InfraStagingKind,
+  };
+  return out;
+}
+
+/**
+ * Picks coding environment from config using file config.
+ * If provider came from CLI, use minimal provisioner object.
+ */
+export function pickCodingEnvironmentForInfra(
+  target: InfraCodingKind,
+  config: SaifacConfig,
+): NormalizedCodingEnvironment {
+  const fromFile = config.environments?.coding;
+  if (fromFile && fromFile.provisioner === target) {
+    return { ...fromFile };
+  }
+  if (target === 'docker') return { provisioner: 'docker' };
+  if (target === 'local') return { provisioner: 'local' };
+  consola.error(
+    'Error: --infra coding=helm requires environments.coding with provisioner "helm" and chart in saifac config.',
+  );
+  process.exit(1);
+}
+
+/**
+ * Picks staging environment from config using file config.
+ * If provider came from CLI, use minimal provisioner object.
+ */
+export function pickStagingEnvironmentForInfra(
+  target: InfraStagingKind,
+  config: SaifacConfig,
+): NormalizedStagingEnvironment {
+  const fromFile = config.environments?.staging;
+  if (fromFile && fromFile.provisioner === target) {
+    return normalizeStagingEnvironmentRaw(fromFile);
+  }
+  if (target === 'docker') {
+    return normalizeStagingEnvironmentRaw({ provisioner: 'docker' });
+  }
+  consola.error(
+    'Error: --infra staging=helm requires environments.staging with provisioner "helm" and chart in saifac config.',
+  );
+  process.exit(1);
+}
+
+type StagingConfigRaw =
+  | NonNullable<NonNullable<SaifacConfig['environments']>['staging']>
+  | {
+      provisioner: 'docker';
+    };
+
+/** Normalize staging env (defaults for `app` / `appEnvironment`) from a raw config object. */
+export function normalizeStagingEnvironmentRaw(
+  raw: StagingConfigRaw,
+): NormalizedStagingEnvironment {
   const app: StagingAppConfig = {
     ...DEFAULT_STAGING_APP,
-    ...('app' in raw ? raw.app : undefined),
+    ...('app' in raw && raw.app ? raw.app : {}),
   };
-  const appEnvironment: Record<string, string> =
-    ('appEnvironment' in raw ? raw.appEnvironment : undefined) ?? {};
+  const appEnvironment =
+    ('appEnvironment' in raw && raw.appEnvironment ? raw.appEnvironment : undefined) ?? {};
   return { ...raw, app, appEnvironment };
 }

@@ -177,29 +177,22 @@ export interface IterativeLoopOpts {
    */
   resolveAmbiguity: 'off' | 'prompt' | 'ai';
   /**
-   * When true, skip Leash and run coding agent directly on the host.
-   * Isolation is filesystem-only (rsync sandbox). No Cedar enforcement.
-   * Default: false (Leash is enabled by default).
-   */
-  dangerousDebug: boolean;
-  /**
    * When true, skip Leash and run the coder container with `docker run` instead of the Leash CLI.
    * Uses the same image, bind mounts, env vars, and container name as Leash (`leash-target-…`),
    * but no Cedar policy or Leash network proxy — useful to isolate Leash-related failures.
-   * Mutually exclusive with {@link dangerousDebug}.
    */
   dangerousNoLeash: boolean;
   /**
    * Absolute path to a Cedar policy file for Leash.
    *
    * Defaults to default.cedar in src/orchestrator/policies/.
-   * Ignored when dangerousDebug=true or dangerousNoLeash=true.
+   * Ignored when dangerousNoLeash=true or with `--infra local`.
    */
   cedarPolicyPath: string;
   /**
    * Docker image for the coder container.
    * Resolved from the sandbox profile (default: node-pnpm-python). Override via --coder-image.
-   * Ignored when dangerousDebug=true.
+   * Ignored when the coding provisioner is local (no container).
    */
   coderImage: string;
   /**
@@ -236,8 +229,7 @@ export interface IterativeLoopOpts {
    */
   gateRetries: number;
   /**
-   * Extra environment variables to forward into the agent container (Leash mode)
-   * or inject into the host process env (--dangerous-debug mode).
+   * Extra environment variables to forward into the agent container (Leash / docker run)
    *
    * Parsed from --agent-env KEY=VALUE flags and --agent-env-file <path> by the CLI.
    * Reserved factory variables (SAIFAC_*, LLM_*, REVIEWER_LLM_*) are stripped in
@@ -513,7 +505,6 @@ export async function runIterativeLoop(
     saifDir,
     projectName,
     registry,
-    dangerousDebug,
     dangerousNoLeash,
     cedarPolicyPath,
     coderImage,
@@ -547,8 +538,9 @@ export async function runIterativeLoop(
 
   // Resolve the coder agent's LLM config once per loop.
   const coderLlmConfig = resolveAgentLlmConfig('coder', overrides);
+  const codingIsLocal = codingEnvironment.provisioner === 'local';
   const reviewer =
-    reviewerEnabled && !dangerousDebug
+    reviewerEnabled && !codingIsLocal
       ? {
           llmConfig: resolveAgentLlmConfig('reviewer', overrides),
           argusBinaryPath: await getArgusBinaryPath(),
@@ -849,8 +841,8 @@ export async function runIterativeLoop(
         });
 
         const containerEnv = await buildCoderContainerEnv({
-          mode: dangerousDebug
-            ? { kind: 'dangerousDebug', codePath: sandbox.codePath, saifacPath: sandbox.saifacPath }
+          mode: codingIsLocal
+            ? { kind: 'host', codePath: sandbox.codePath, saifacPath: sandbox.saifacPath }
             : { kind: 'container' },
           llmConfig: coderLlmConfig,
           reviewer: reviewer ? { llmConfig: reviewer.llmConfig } : null,
@@ -867,7 +859,6 @@ export async function runIterativeLoop(
           codePath: sandbox.codePath,
           sandboxBasePath: sandbox.sandboxBasePath,
           containerEnv,
-          dangerousDebug,
           dangerousNoLeash,
           cedarPolicyPath,
           coderImage,
@@ -1380,7 +1371,7 @@ export function logIterativeLoopSettings(opts: OrchestratorOpts, meta?: { runId?
   consola.log(`  Test retries: ${opts.testRetries}`);
   consola.log(`  Spec ambiguity resolution: ${opts.resolveAmbiguity}`);
   consola.log(`  Test image: ${opts.testImage}`);
-  if (opts.dangerousDebug) {
+  if (opts.codingEnvironment.provisioner === 'local') {
     consola.log('  Leash: disabled (host execution)');
   } else if (opts.dangerousNoLeash) {
     consola.log(`  Leash: disabled (direct docker run; image: ${opts.coderImage})`);

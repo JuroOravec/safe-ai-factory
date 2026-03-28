@@ -1,8 +1,8 @@
 /**
  * Phase: run-agent-phase
  *
- * Runs the coder agent inside the coding provisioner (Leash + OpenHands or
- * --dangerous-debug direct). Returns the raw patch content produced by the agent.
+ * Runs the coder agent inside the coding container (Leash)
+ * or with '--infra local' on the host). Returns the raw patch content produced by the agent.
  *
  * This is the inner atom for a single attempt:
  *   setup provisioner → runAgent → teardown provisioner → extractIncrementalRoundPatch
@@ -48,7 +48,6 @@ export interface RunAgentPhaseInput {
     | 'projectDir'
     | 'projectName'
     | 'feature'
-    | 'dangerousDebug'
     | 'dangerousNoLeash'
     | 'cedarPolicyPath'
     | 'coderImage'
@@ -86,7 +85,6 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
     projectDir,
     projectName,
     feature,
-    dangerousDebug,
     dangerousNoLeash,
     cedarPolicyPath,
     coderImage,
@@ -102,8 +100,9 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
 
   const agentProfile = resolveAgentProfile(agentProfileId);
   const coderLlmConfig = resolveAgentLlmConfig('coder', overrides);
+  const codingIsLocal = codingEnvironment.provisioner === 'local';
   const reviewer =
-    reviewerEnabled && !dangerousDebug
+    reviewerEnabled && !codingIsLocal
       ? {
           llmConfig: resolveAgentLlmConfig('reviewer', overrides),
           argusBinaryPath: await getArgusBinaryPath(),
@@ -142,8 +141,8 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
     });
 
     const containerEnv = await buildCoderContainerEnv({
-      mode: dangerousDebug
-        ? { kind: 'dangerousDebug', codePath: sandbox.codePath, saifacPath: sandbox.saifacPath }
+      mode: codingIsLocal
+        ? { kind: 'host', codePath: sandbox.codePath, saifacPath: sandbox.saifacPath }
         : { kind: 'container' },
       llmConfig: coderLlmConfig,
       reviewer: reviewer ? { llmConfig: reviewer.llmConfig } : null,
@@ -160,7 +159,6 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
       codePath: sandbox.codePath,
       sandboxBasePath: sandbox.sandboxBasePath,
       containerEnv,
-      dangerousDebug,
       dangerousNoLeash,
       cedarPolicyPath,
       coderImage,

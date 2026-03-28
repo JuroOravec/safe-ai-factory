@@ -56,7 +56,6 @@ export type SerializedLoopOpts = {
   projectName: string;
   testImage: string;
   resolveAmbiguity: 'off' | 'prompt' | 'ai';
-  dangerousDebug: boolean;
   dangerousNoLeash: boolean;
   cedarPolicyPath: string;
   coderImage: string;
@@ -122,7 +121,8 @@ export function serializeArtifactConfig(
 }
 
 /**
- * Converts SerializedLoopOpts back to the shape expected by runIterativeLoop.
+ * Converts SerializedLoopOpts (persisted config JSON) back to the shape
+ * expected by runIterativeLoop.
  */
 export function deserializeArtifactConfig(serialized: SerializedLoopOpts): Omit<
   SerializedLoopOpts,

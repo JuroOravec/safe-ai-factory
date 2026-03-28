@@ -36,7 +36,6 @@ function makeSourceArtifact(runId: string): RunArtifact {
       projectName: 'proj',
       testImage: 'test:latest',
       resolveAmbiguity: 'ai',
-      dangerousDebug: false,
       dangerousNoLeash: false,
       cedarPolicyPath: '',
       coderImage: '',
@@ -100,6 +99,7 @@ describe('forkStoredRun', () => {
         runStorage: storage,
         cli,
         cliModelDelta: undefined,
+        infraCli: undefined,
       });
 
       expect(newRunId).not.toBe('srcrun9');

@@ -177,16 +177,13 @@ export interface RunAgentOpts {
    * The provisioner only forwards it into Docker/Leash.
    */
   containerEnv: ContainerEnv;
-  /** When true, run the agent on the host instead of inside a Leash container. */
-  dangerousDebug: boolean;
   /**
    * When true, run the coder container via `docker run` (no Leash CLI). Same mounts/env/name as Leash.
-   * Ignored when dangerousDebug=true.
    */
   dangerousNoLeash: boolean;
-  /** Absolute path to the Cedar policy file. Ignored when dangerousDebug=true or dangerousNoLeash=true. */
+  /** Absolute path to the Cedar policy file. Ignored when dangerousNoLeash=true. */
   cedarPolicyPath: string;
-  /** Docker image for the coder container. Ignored when dangerousDebug=true. */
+  /** Docker image for the coder container. */
   coderImage: string;
   /**
    * Absolute host path to the sandbox `saifac/` bundle (mounted read-only at `/saifac` in the container).
@@ -297,8 +294,6 @@ export interface Provisioner {
    * starts a background polling loop to attach the Leash target container to the
    * SAIFAC network (workaround for missing --network flag in Leash CLI),
    * and resolves when the process exits.
-   *
-   * dangerous-debug: Runs `bash coder-start.sh` directly on the host.
    */
   runAgent(opts: RunAgentOpts): Promise<AgentResult>;
 
@@ -307,7 +302,6 @@ export interface Provisioner {
    * {@link runAgent}, but the container runs `sleep infinity` (no agent loop).
    *
    * Requires {@link setup} first. Call {@link CoderInspectSessionHandle.stop}, then {@link teardown}.
-   * {@link RunAgentOpts.dangerousDebug} is not supported — reject before calling.
    */
   startInspect(opts: StartInspectOpts): Promise<CoderInspectSessionHandle>;
 

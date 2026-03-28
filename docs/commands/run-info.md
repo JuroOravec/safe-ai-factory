@@ -60,7 +60,7 @@ Example of the default **pretty-printed** output:
     "projectName": "my-app",
     "testImage": "safe-ai-factory-test:latest",
     "resolveAmbiguity": "ai",
-    "dangerousDebug": false,
+    "dangerousNoLeash": false,
     "cedarPolicyPath": "",
     "coderImage": "",
     "push": null,

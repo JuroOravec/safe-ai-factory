@@ -94,6 +94,11 @@ export const modelOverrideArgs = {
 // Tests-only args — used by design-fail2pass, test (staging + test runner, no coder agent)
 export const featTestsArgs = {
   'sandbox-base-dir': sandboxBaseDirArg,
+  infra: {
+    type: 'string' as const,
+    description:
+      'Provisioners: `docker`, `local`, or `coding=docker,staging=helm`. Overrides environments.*.provisioner.',
+  },
   profile: profileArg,
   'test-script': testScriptArg,
   'test-image': testImageArg,
@@ -185,15 +190,10 @@ const featRunCoreArgs = {
     type: 'string' as const,
     description: 'Max full pipeline runs before giving up (default: 5).',
   },
-  'dangerous-debug': {
-    type: 'boolean' as const,
-    description:
-      'Skip Leash; run OpenHands directly on the host. Use only for development/debugging.',
-  },
   'dangerous-no-leash': {
     type: 'boolean' as const,
     description:
-      'Skip Leash; run the coder container with plain docker run (same image, mounts, env, and container name as Leash — no Cedar / Leash proxy). Mutually exclusive with --dangerous-debug.',
+      'Skip Leash; run the coder container with plain docker run (same image, mounts, env, and container name as Leash — no Cedar / Leash proxy). For no container, use `--infra local`',
   },
   cedar: {
     type: 'string' as const,

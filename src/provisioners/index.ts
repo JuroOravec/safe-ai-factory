@@ -25,6 +25,7 @@ import type {
   NormalizedStagingEnvironment,
 } from '../config/schema.js';
 import { DockerProvisioner } from './docker/index.js';
+import { LocalProvisioner } from './local/index.js';
 import type { Provisioner } from './types.js';
 
 export type { ProvisionerLogEvent, ProvisionerLogSource, ProvisionerOnLog } from './logs.js';
@@ -43,11 +44,14 @@ export function createProvisioner(
   switch (env.provisioner) {
     case 'docker':
       return new DockerProvisioner(env as DockerEnvironment);
-    case 'helm':
+    case 'local':
+      return new LocalProvisioner();
+    case 'helm': {
       throw new Error(
         `[provisioner] Helm provisioner is not yet implemented. ` +
           `Remove environments.*.provisioner = "helm" from saifac/config.ts or implement HelmProvisioner.`,
       );
+    }
     default: {
       const exhaustive: never = env;
       throw new Error(`[provisioner] Unknown provisioner: ${JSON.stringify(exhaustive)}`);

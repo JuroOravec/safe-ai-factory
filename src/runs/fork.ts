@@ -28,7 +28,16 @@ async function allocateUnusedRunId(runStorage: RunStorage): Promise<string> {
  * Does not create a worktree, sandbox, or agent loop — use `saifac run resume <newId>` next.
  */
 export async function forkStoredRun(opts: ForkStoredRunOpts): Promise<{ newRunId: string }> {
-  const { runId: sourceRunId, projectDir, saifDir, runStorage, cli, cliModelDelta, config } = opts;
+  const {
+    runId: sourceRunId,
+    projectDir,
+    saifDir,
+    runStorage,
+    cli,
+    cliModelDelta,
+    config,
+    infraCli,
+  } = opts;
 
   const source = await runStorage.getRun(sourceRunId);
   if (!source) {
@@ -50,6 +59,7 @@ export async function forkStoredRun(opts: ForkStoredRunOpts): Promise<{ newRunId
     cli,
     cliModelDelta,
     artifact: source,
+    infraCli,
   });
 
   const { runStorage: _rs, resume: _resume, ...artifactLoopOpts } = mergedOpts;

@@ -76,7 +76,7 @@ The `environments` block defines external service infrastructure (databases, que
   - `app`: Configuration for the main application under test (`sidecarPort`, `sidecarPath`, `baseUrl`, and an optional `build.dockerfile`).
   - `appEnvironment`: Environment variables injected into the staging application container to reach its services.
 
-See [Environments and Infrastructure](services.md) for a user guide. See [Software Factory Services](development/v0/swf-services.md) for the architectural rationale.
+See [Environments and Infrastructure](services.md) for a user guide. See [Infrastructure engines](infra.md) for engine types, fields, and `--infra`.
 
 ## Supported fields
 
@@ -94,7 +94,6 @@ See [Environments and Infrastructure](services.md) for a user guide. See [Softwa
 | `maxRuns`          | number                      | `5`                       | `--max-runs`                              |
 | `testRetries`      | number                      | `2`                       | `--test-retries`                          |
 | `resolveAmbiguity` | `"off" \| "prompt" \| "ai"` | `"ai"`                    | `--resolve-ambiguity`                     |
-| `dangerousDebug`   | boolean                     | `false`                   | `--dangerous-debug`                       |
 | `cedarPolicyPath`  | string                      | `"/path/to/policy.cedar"` | `--cedar`                                 |
 | `coderImage`       | string                      | `"saifac-coder-node-pnpm-python:latest"` (or GHCR path) | `--coder-image` (overrides profile default) |
 | `gateRetries`      | number                      | `10`                      | `--gate-retries`                          |
@@ -104,6 +103,7 @@ See [Environments and Infrastructure](services.md) for a user guide. See [Softwa
 | `agentEnv`         | object                      | `{"KEY": "value"}`        | `--agent-env` (single or comma-separated) |
 | `agentSecretKeys`  | string array                | `["MY_TOKEN"]`            | Host env var **names** only; values never stored in config (see [`--agent-secret`](commands/feat-run.md)) |
 | `agentSecretFiles` | string array                | `["./secrets/a.env", "./secrets/b.env"]` | Project-relative paths to `.env` files with `KEY=value` secret pairs — same format as `--agent-env-file` |
+| `dangerousNoLeash` | boolean                     | `false`                   | `--dangerous-no-leash`                    |
 
 
 ### LLM config

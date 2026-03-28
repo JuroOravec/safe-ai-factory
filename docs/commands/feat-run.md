@@ -44,7 +44,7 @@ saifac feature run [options]
 | `--max-runs`           | —     | string  | Max full pipeline runs before giving up (default: 5)                                                                                                                |
 | `--test-retries`       | —     | string  | How many times to retry when tests fail (default: 1)                                                                                                                |
 | `--resolve-ambiguity`  | —     | string  | How to handle spec ambiguity on failures. `ai` \| `prompt` \| `off` (default: `ai`)                                                                                 |
-| `--dangerous-debug`    | —     | boolean | Skip Leash; run OpenHands directly on the host. Use only for development/debugging.                                                                                 |
+| `--infra`              | —     | string  | Provisioners: `docker`, `local`, or `helm`, or `coding=…,staging=…`. |
 | `--cedar`              | —     | string  | Absolute path to Cedar policy file for Leash (default: `src/orchestrator/policies/default.cedar` in the package)                                                  |
 | `--coder-image`        | —     | string  | Docker image for the coder container (default: from `--profile`)                                                                                                    |
 | `--gate-retries`       | —     | string  | Max gate retries per run (default: 10)                                                                                                                              |
@@ -60,6 +60,7 @@ saifac feature run [options]
 | `--model`              | —     | string  | LLM model. Single global or comma-separated `agent=model` (e.g. `anthropic/claude-opus-4-5` or `pr-summarizer=openai/gpt-4o-mini`). At most one global.             |
 | `--base-url`           | —     | string  | LLM base URL. Single global (e.g. `http://localhost:11434/v1`) or comma-separated `agent=url` (e.g. `pr-summarizer=https://api.openai.com/v1`). At most one global. |
 | `--verbose`            | `-v`  | boolean | Verbose CLI logging; also shows full `git commit` output (omits `-q`). Default: quiet.                                                                              |
+| `--dangerous-no-leash` | —     | boolean | Skip Leash and Cedar; run the coder image with `docker run` (same mounts/env as Leash). For host execution without Docker, use `--infra local` instead.            |
 
 ## Examples
 
@@ -87,10 +88,10 @@ Resolve spec ambiguity with human confirmation:
 saifac feat run -n add-login --resolve-ambiguity prompt
 ```
 
-Skip Leash (run OpenHands on host; development/debugging only):
+Run the agent on the host (for development/debugging):
 
 ```bash
-saifac feat run -n add-login --dangerous-debug
+saifac feat run -n add-login --infra local
 ```
 
 Use a custom coder image or agent:
@@ -123,7 +124,7 @@ saifac feat run -n add-login --push origin --pr
 ## What it does
 
 1. Creates an isolated sandbox from the current codebase (rsync copy).
-2. Starts the coder container (via Leash by default) or runs the agent on the host with `--dangerous-debug`.
+2. Starts the coder via the configured coding provisioner (Leash + container by default, or run on your machine with `--infra local`).
 3. In a loop: runs the agent → runs the gate script → assesses with the test runner. Repeats until tests pass or max runs are exceeded.
 4. On failure due to spec ambiguity (when `--resolve-ambiguity` is `ai` or `prompt`), the Vague Specs Checker may update the spec and regenerate tests, then retry.
 5. On success, applies the winning patch to a new local branch, then optionally pushes and opens a PR. The branch name is `saifac/<feature>-<runId>-<diffHash>` by default, or `--branch`.

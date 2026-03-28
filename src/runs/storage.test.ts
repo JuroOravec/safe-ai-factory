@@ -26,7 +26,6 @@ const dummyArtifact: RunArtifact = {
     projectName: 'test',
     testImage: 'test:latest',
     resolveAmbiguity: 'ai',
-    dangerousDebug: false,
     dangerousNoLeash: false,
     cedarPolicyPath: '',
     coderImage: '',

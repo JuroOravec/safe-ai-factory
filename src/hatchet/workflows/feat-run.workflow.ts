@@ -242,7 +242,6 @@ export function createFeatRunIterationWorkflow() {
           projectDir: opts.projectDir,
           projectName: opts.projectName,
           feature: opts.feature,
-          dangerousDebug: opts.dangerousDebug,
           dangerousNoLeash: opts.dangerousNoLeash,
           cedarPolicyPath: opts.cedarPolicyPath,
           coderImage: opts.coderImage,

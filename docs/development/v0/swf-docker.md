@@ -36,7 +36,7 @@ Both the **Test Runner** and the **Staging Container** use pre-built or per-run 
 | **Default**        | `saifac-coder-node-pnpm-python:latest` (or profile-specific) from GHCR; Docker pulls automatically when not local |
 | **Build manually** | `pnpm docker build coder` — build from the sandbox profile's Dockerfile.coder                                      |
 | **Override**       | `saifac feat run --coder-image ghcr.io/JuroOravec/safe-ai-factory/saifac-coder-node-pnpm-python:latest` (or the image for your `--profile`) |
-| **Disable**        | `saifac feat run --dangerous-debug` — run OpenHands on host, no Leash container, agent runs on host                |
+| **Host coding**    | `saifac feat run --infra local` — LocalProvisioner runs OpenHands on the host (no Leash coder container for coding) |
 
 When Leash is enabled (default), the orchestrator runs the **Leash CLI** (`@strongdm/leash`) with `--image saifac-coder-node-pnpm-python:latest ...` (or profile-specific tag), wrapping OpenHands in this image. The sandbox code dir is mounted at `/workspace`. See [swf-comp-d-leash.md](./swf-comp-d-leash.md) for details.
 
@@ -264,7 +264,7 @@ export default {
 | `pnpm docker build test [--all]`            | Build test runner image(s) locally (for development or offline use)                          |
 | `pnpm docker build coder`                   | Build (or rebuild) the coder image from the sandbox profile's `Dockerfile.coder`             |
 | `saifac feat run --test-image my-test:v2`   | Use a custom test runner image                                                               |
-| `saifac feat run --dangerous-debug`         | Skip Leash; run OpenHands on host                                                            |
+| `saifac feat run --infra local`             | LocalProvisioner: run OpenHands on host (coding phase)                                       |
 | `saifac feat run --coder-image my-coder:v2` | Use a custom coder image (also used for the staging container)                               |
 
 ---
