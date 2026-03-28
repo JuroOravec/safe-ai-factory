@@ -1,0 +1,19 @@
+{
+  "name": "saifctl",
+  "version": "1.0.0",
+  "description": "Tombstone: official CLI is published as @safe-ai-factory/saifctl.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JuroOravec/safe-ai-factory.git"
+  },
+  "homepage": "https://www.npmjs.com/package/@safe-ai-factory/saifctl",
+  "bugs": {
+    "url": "https://github.com/JuroOravec/safe-ai-factory/issues"
+  },
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "README.md"
+  ]
+}

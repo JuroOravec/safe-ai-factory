@@ -30,7 +30,7 @@ export async function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(configChangeListener);
 
-  consola.log('Safe AI Factory extension is now active!');
+  consola.log('SaifCTL extension is now active!');
 
   const cliService = new SaifctlCliService();
 
@@ -62,10 +62,15 @@ export async function activate(context: vscode.ExtensionContext) {
     return async (...args: T) => {
       if (!isCliCurrentlyInstalled) {
         const selection = await vscode.window.showWarningMessage(
-          'The SaifCTL CLI is required to perform this action.',
-          'Install SaifCTL',
+          'The SaifCTL CLI is required. Install with: npm install -g @safe-ai-factory/saifctl',
+          'Open npm',
+          'Open GitHub',
         );
-        if (selection === 'Install SaifCTL') {
+        if (selection === 'Open npm') {
+          await vscode.env.openExternal(
+            vscode.Uri.parse('https://www.npmjs.com/package/@safe-ai-factory/saifctl'),
+          );
+        } else if (selection === 'Open GitHub') {
           await vscode.env.openExternal(
             vscode.Uri.parse('https://github.com/JuroOravec/safe-ai-factory'),
           );

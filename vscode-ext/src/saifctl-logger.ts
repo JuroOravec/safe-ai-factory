@@ -1,5 +1,5 @@
 /**
- * VS Code extension logger — mirrors `safe-ai-factory/src/logger.ts` defaults.
+ * VS Code extension logger — mirrors the main package `src/logger.ts` defaults.
  * Kept local because the extension bundle is CommonJS while the main package logger is ESM.
  *
  * Uses consola/basic (plain reporter) because the extension host is not a TTY;
@@ -22,7 +22,7 @@ export function setVerboseLogging(verbose: boolean): void {
   logger.level = verbose ? LogLevels.debug : baselineLogLevel;
 }
 
-/** Mirrors `safe-ai-factory/src/logger.ts` — plain stdout for pipe/copy-friendly CLI output. */
+/** Mirrors the main package `src/logger.ts` — plain stdout for pipe/copy-friendly CLI output. */
 export function outputCliData(message: string): void {
   process.stdout.write(message);
   process.stdout.write('\n');

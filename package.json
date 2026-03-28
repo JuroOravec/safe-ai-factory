@@ -1,8 +1,11 @@
 {
-  "name": "safe-ai-factory",
+  "name": "@safe-ai-factory/saifctl",
   "version": "0.0.1",
   "description": "Safety harness for autonomous AI agents: Spec-driven AI factory. Use with any agentic CLI. Language-agnostic. Safe by design.",
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "license": "MIT",
   "homepage": "https://safeaifactory.com",

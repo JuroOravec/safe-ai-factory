@@ -39,3 +39,10 @@ Example: *SaifCTL* is documented here; use `saifctl run start` to launch a run.
 - Splitting display vs CLI avoids awkward typography (e.g. “SaifCTL” in a `$` prompt block).
 
 When in doubt: **headlines and prose → SaifCTL; commands and backticks → `saifctl`.**
+
+## Repo layout names (this codebase)
+
+- **Project metadata directory** in a consumer repo: `saifctl/` (Cosmiconfig module `saifctl`, default `--saifctl-dir saifctl`).
+- **Local run state**: `.saifctl/` (e.g. `.saifctl/runs/`).
+
+Defensive **tombstone** packages for the unscoped names `safe-ai-factory` and `saifctl` live under `npm-tombstones/`; see `npm-tombstones/README.md` for publish steps.

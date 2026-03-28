@@ -307,7 +307,7 @@ saifctl feat design-fail2pass -n add-login
 
 After the tests successfully failed, you can start your coding agent.
 
-**Infra vs genuine failures:** When tests fail at `fail2pass`, you can be certain it's genuine errors. Tests run in containers, which means tests can fail due to infra or network errors. However, `safe-ai-factory` handles this with health checks from the test runner to the staging container.
+**Infra vs genuine failures:** When tests fail at `fail2pass`, you can be certain it's genuine errors. Tests run in containers, which means tests can fail due to infra or network errors. However, SaifCTL handles this with health checks from the test runner to the staging container.
 
 ## Guides
 

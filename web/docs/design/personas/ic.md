@@ -80,7 +80,7 @@ When speaking to the IC on the landing page or in the README, the messaging must
 
 ## Reality check (feedback)
 
-I love this concept. SaifCTL (Safe AI Factory) is positioning itself perfectly against the chaotic, "shoot from the hip" autonomous agents on the market. The "zero-trust, spec-driven" angle is incredibly strong.
+I love this concept. SaifCTL (`@safe-ai-factory/saifctl` on npm) is positioning itself perfectly against the chaotic, "shoot from the hip" autonomous agents on the market. The "zero-trust, spec-driven" angle is incredibly strong.
 
 However, as a seasoned marketer looking at this through the lens of a highly skeptical, pragmatic Senior IC, this persona document has some critical blind spots. We are drinking our own Kool-Aid a bit too much.
 
@@ -231,7 +231,7 @@ If SaifCTL can pull a closed Jira ticket, navigate their actual repo, write test
 - **The "Aha!" Onboarding Moment:** The very first step in the getting-started guide shouldn't be "Create a new project." It should be:
 
   ```bash
-  $ npm install -g safe-ai-factory
+  $ npm install -g @safe-ai-factory/saifctl
   $ cd my-massive-legacy-repo
   $ saifctl prove --issue 1234
   ```

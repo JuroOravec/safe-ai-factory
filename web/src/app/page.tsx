@@ -656,9 +656,7 @@ export default function Home() {
               <span className="w-3 h-3 rounded-full bg-red-500/70" />
               <span className="w-3 h-3 rounded-full bg-yellow-500/70" />
               <span className="w-3 h-3 rounded-full bg-green-500/70" />
-              <span className="ml-2 text-xs text-gray-500 font-mono">
-                VS Code — safe-ai-factory
-              </span>
+              <span className="ml-2 text-xs text-gray-500 font-mono">VS Code — SaifCTL</span>
             </div>
             <div className="flex min-h-[400px]">
               {/* Activity bar */}

@@ -32,6 +32,7 @@ import {
   type TestProfile,
 } from '../src/test-profiles/index.js';
 import { pathExists, readUtf8, spawnAsync, spawnCapture, spawnWait } from '../src/utils/io.js';
+import { npmPackageNameToProjectSlug } from '../src/utils/package.js';
 
 async function dockerImageExistsLocally(imageRef: string): Promise<boolean> {
   const r = await spawnWait({
@@ -63,7 +64,9 @@ async function parseProjectName(opts: { project?: string }): Promise<string> {
     const pkg = JSON.parse(await readUtf8(resolve(repoRoot, 'package.json'))) as {
       name?: unknown;
     };
-    if (typeof pkg.name === 'string' && pkg.name.trim()) return pkg.name.trim();
+    if (typeof pkg.name === 'string' && pkg.name.trim()) {
+      return npmPackageNameToProjectSlug(pkg.name.trim());
+    }
   } catch {
     throw new Error(
       `Cannot determine project name. Specify --project or ensure package.json exists at ${repoRoot}.`,

@@ -46,6 +46,7 @@ import {
 } from '../test-profiles/index.js';
 import { validateImageTag } from '../utils/docker.js';
 import { pathExists, readUtf8 } from '../utils/io.js';
+import { npmPackageNameToProjectSlug } from '../utils/package.js';
 
 ////////////////////////
 // CLI Parsing
@@ -622,7 +623,9 @@ export async function resolveProjectName(opts: {
     const pkg = JSON.parse(await readUtf8(resolve(projectDir, 'package.json'))) as {
       name?: unknown;
     };
-    if (typeof pkg.name === 'string' && pkg.name.trim()) return pkg.name.trim();
+    if (typeof pkg.name === 'string' && pkg.name.trim()) {
+      return npmPackageNameToProjectSlug(pkg.name.trim());
+    }
   } catch {
     throw new Error(
       `Cannot determine project name: no package.json found at ${resolve(projectDir, 'package.json')}. ` +

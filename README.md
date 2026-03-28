@@ -1,9 +1,9 @@
 # SaifCTL — safety harness for autonomous AI agents
 
 [![Website](https://img.shields.io/badge/Website-safeaifactory.com-blue)](https://safeaifactory.com)
-[![license](https://img.shields.io/npm/l/safe-ai-factory)](https://github.com/JuroOravec/safe-ai-factory/blob/main/LICENSE)
-[![npm version](https://img.shields.io/npm/v/safe-ai-factory)](https://www.npmjs.com/package/safe-ai-factory)
-[![npm downloads](https://img.shields.io/npm/dm/safe-ai-factory)](https://www.npmjs.com/package/safe-ai-factory)
+[![license](https://img.shields.io/npm/l/%40safe-ai-factory%2Fsaifctl)](https://github.com/JuroOravec/safe-ai-factory/blob/main/LICENSE)
+[![npm version](https://img.shields.io/npm/v/%40safe-ai-factory%2Fsaifctl)](https://www.npmjs.com/package/@safe-ai-factory/saifctl)
+[![npm downloads](https://img.shields.io/npm/dm/%40safe-ai-factory%2Fsaifctl)](https://www.npmjs.com/package/@safe-ai-factory/saifctl)
 [![GitHub stars](https://img.shields.io/github/stars/JuroOravec/safe-ai-factory)](https://github.com/JuroOravec/safe-ai-factory)
 
 **Spec-driven AI factory. Use with any agentic CLI. Language-agnostic. Safe by design.**
@@ -22,7 +22,7 @@ Full feature preview at:
 
 ## Stop Coding. Start Spec'ing.
 
-**`safe-ai-factory` implements state-of-the-art (early 2026) architecture for Agentic engineering.**
+**SaifCTL implements state-of-the-art (early 2026) architecture for Agentic engineering.**
 
 **SaifCTL guarantee:**
 

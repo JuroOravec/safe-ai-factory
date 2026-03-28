@@ -21,6 +21,7 @@
     "coding",
     "containerized",
     "saifctl",
+    "@safe-ai-factory/saifctl",
     "safe-ai-factory",
     "spec-driven"
   ],
@@ -103,12 +104,12 @@
     "viewsWelcome": [
       {
         "view": "saifctl-features",
-        "contents": "The SaifCTL CLI (`saifctl`) is not installed or not in your PATH.\n\n[Install SaifCTL](https://github.com/JuroOravec/safe-ai-factory)\n[Refresh Status](command:saifctl.recheckInstall)",
+        "contents": "The SaifCTL CLI (`saifctl`) is not installed or not in your PATH.\n\nInstall globally:\n`npm install -g @safe-ai-factory/saifctl`\n\n[npm package](https://www.npmjs.com/package/@safe-ai-factory/saifctl)\n[GitHub](https://github.com/JuroOravec/safe-ai-factory)\n[Refresh Status](command:saifctl.recheckInstall)",
         "when": "!saifctl.isCliInstalled"
       },
       {
         "view": "saifctl-runs",
-        "contents": "No CLI detected. Install SaifCTL to view and manage your agent runs.\n\n[Install SaifCTL](https://github.com/JuroOravec/safe-ai-factory)\n[Refresh Status](command:saifctl.recheckInstall)",
+        "contents": "No CLI detected. Install SaifCTL to view and manage your agent runs.\n\nInstall globally:\n`npm install -g @safe-ai-factory/saifctl`\n\n[npm package](https://www.npmjs.com/package/@safe-ai-factory/saifctl)\n[GitHub](https://github.com/JuroOravec/safe-ai-factory)\n[Refresh Status](command:saifctl.recheckInstall)",
         "when": "!saifctl.isCliInstalled"
       },
       {
