@@ -92,7 +92,7 @@ export function modelOverridesFromSaifacConfig(config?: SaifacConfig): ModelOver
  * Parses **only** `--model` / `--base-url` from the current CLI invocation — the “CLI delta” layer.
  *
  * Unlike {@link mergeModelOverridesLayers} with a config baseline, this does **not** merge `config.defaults` model fields.
- * That matters for **resume** and **test-from-run**: final LLM overrides are built in
+ * That matters for **from-artifact** and **test-from-run**: final LLM overrides are built in
  * {@link mergeModelOverridesLayers} as **config baseline → stored run artifact → CLI delta**.
  * If the user omits both flags here, returning `undefined` means the delta layer adds nothing.
  */
@@ -212,11 +212,11 @@ const ORCHESTRATOR_MERGE_KEYS = [
   'stagingEnvironment',
   'codingEnvironment',
   'patchExclude',
-  'resume',
+  'fromArtifact',
   'verbose',
 ] as const satisfies readonly (keyof OrchestratorOpts)[];
 
-/** CLI payload: every key may appear; `undefined` means “do not override” (resume / merge). */
+/** CLI payload: every key may appear; `undefined` means “do not override” (merge). */
 export type OrchestratorCliInput = {
   [K in keyof OrchestratorOpts]: OrchestratorOpts[K] | undefined;
 };
@@ -369,7 +369,7 @@ async function applyOrchestratorBaseline(
     runStorage,
     stagingEnvironment,
     codingEnvironment,
-    resume: null,
+    fromArtifact: null,
     verbose: false,
     testOnly: false,
   };
@@ -383,7 +383,7 @@ export interface ResolveOrchestratorOptsParams {
   projectDir: string;
   saifDir: string;
   config: SaifacConfig;
-  /** Resolved feature (prompt/CLI for start; from artifact for resume/test-from-run). */
+  /** Resolved feature (prompt/CLI for start; from artifact for from-artifact/test-from-run). */
   feature: Feature;
   cli: OrchestratorCliInput;
   cliModelDelta: ModelOverrides | undefined;
@@ -465,7 +465,7 @@ async function mergeArtifactOntoDefaults(
     feature: ctx.feature,
     projectDir: ctx.projectDir,
     saifDir: d.saifDir,
-    resume: null,
+    fromArtifact: null,
     testOnly: false,
     runStorage: defaults.runStorage,
     sandboxBaseDir: defaults.sandboxBaseDir,

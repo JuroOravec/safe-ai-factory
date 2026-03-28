@@ -1335,7 +1335,7 @@ export async function buildOrchestratorCliInputFromFeatArgs(
     stagingEnvironment: undefined,
     codingEnvironment: undefined,
     patchExclude: undefined,
-    resume: undefined,
+    fromArtifact: undefined,
     verbose: runArgs.verbose === true ? true : undefined,
   };
   return out;

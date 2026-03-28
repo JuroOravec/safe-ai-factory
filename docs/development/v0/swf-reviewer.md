@@ -161,7 +161,7 @@ The reviewer is **skipped** in these cases:
 | `saifac feat run --no-reviewer`     | No                                     |
 | `saifac feat run --engine local`     | No                                     |
 | `saifac feat design-fail2pass`      | No (no coder agent)                    |
-| `saifac run resume`                 | Same as initial run (from stored opts) |
+| `saifac run start`                 | Same as initial run (from stored opts) |
 | `saifac run test <runId>`           | No (no coder agent)                    |
 
 ---

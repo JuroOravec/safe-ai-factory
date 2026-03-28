@@ -1,6 +1,6 @@
-# Fix agent mistakes with inspect and resume
+# Fix agent mistakes: inspect, then run start
 
-Step into the agent's container, edit the code, and resume the run with the agent.
+Step into the agent's container, edit the code, then run `saifac run start` so the agent continues from your fixes.
 
 **You need:** Docker, [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) (VS Code), and a **Run ID**.
 
@@ -13,7 +13,7 @@ Step into the agent's container, edit the code, and resume the run with the agen
 ## Before you start
 
 - **Run id** — First column of `saifac run list`, or the id printed when a run stops.
-- **Same git repo** as the original run; base commit must still exist ([run resume notes](../commands/run-resume.md#notes)).
+- **Same git repo** as the original run; base commit must still exist ([run start notes](../commands/run-start.md#notes)).
 - **Saved runs enabled** — not `runs=none` ([Runs](../runs.md)).
 
 Running `saifac run list` will show you the list of runs:
@@ -28,7 +28,7 @@ saifac run list
   07l9q00  create-user  completed  2026-03-24T23:41:39.378Z  2026-03-24T23:45:50.384Z
 ```
 
-Run ID is also included in the output of `feat run` and `run resume`:
+Run ID is also included in the output of `feat run` and `run start`:
 
 ```bash
 saifac feat run -n add-login
@@ -36,8 +36,8 @@ saifac feat run -n add-login
 ...
 
 Feature implemented successfully in 1 attempt(s).
-Resume again with:
-  saifac run resume eed5lz6
+Start again with:
+  saifac run start eed5lz6
 ```
 
 ## 1. Start inspect
@@ -65,13 +65,13 @@ Keep this terminal open. Note the **container name** and **workspace path** from
 
 Via VSCode command palette:
 
-![Attach to Running Container](./assets/inspect-and-resume--palette.png)
+![Attach to Running Container](./assets/inspect-and-start--palette.png)
 
-![Select container](./assets/inspect-and-resume--palette-select-container.png)
+![Select container](./assets/inspect-and-start--palette-select-container.png)
 
 Via Dev Containers extension:
 
-![Dev Containers list](./assets/inspect-and-resume--dev-containers.png)
+![Dev Containers list](./assets/inspect-and-start--dev-containers.png)
 
 ## 3. Open the workspace folder
 
@@ -81,13 +81,13 @@ By default, the workspace path is `/workspace`.
 
 Now you're in the agent's sandbox. This is a **copy** of your host repo.
 
-![Workspace folder](./assets/inspect-and-resume--explorer.png)
+![Workspace folder](./assets/inspect-and-start--explorer.png)
 
 ## 4. Make edit, run checks
 
 Change files; run tests or installs **inside the container** if you want a quick check.
 
-![Make edit, run checks](./assets/inspect-and-resume--edit.png)
+![Make edit, run checks](./assets/inspect-and-start--edit.png)
 
 ## 5. Git history
 
@@ -111,7 +111,7 @@ ef903a9 Base state
 
 Explore diffs in the UI:
 
-![Git history](./assets/inspect-and-resume--git-history.png)
+![Git history](./assets/inspect-and-start--git-history.png)
 
 ## 6. Stop inspect
 
@@ -127,12 +127,12 @@ Cleanup message:
 
 <!-- # TODO ADD GIF ~20s: Ctrl+C through cleanup. -->
 
-## 7. Resume
+## 7. Start again with the agent
 
-Resume the run with the same ID from step 1. See [`run resume`](../commands/run-resume.md) for more details.
+Use the same run ID from step 1. See [`run start`](../commands/run-start.md) for more details.
 
 ```bash
-saifac run resume <runId>
+saifac run start <runId>
 ```
 
 The agent's container will now include your changes from step 4.
@@ -140,18 +140,18 @@ The agent's container will now include your changes from step 4.
 Your agent should now successfully implement the feature:
 
 ```bash
-saifac run resume eed5lz6 
+saifac run start eed5lz6 
 
-[orchestrator] MODE: resume — dummy (run eed5lz6)
+[orchestrator] MODE: fromArtifact — dummy (run eed5lz6)
 [orchestrator] Preparing workspace from storage...
-Preparing worktree (new branch 'saifac-resume-eed5lz6')
+Preparing worktree (new branch 'saifac-run-eed5lz6')
 HEAD is now at 7b5d1c6 refactor: rename `run inspect` to `run info`
 
 ...
 
 Feature implemented successfully in 1 attempt(s).
-Resume again with:
-  saifac run resume eed5lz6
+Start again with:
+  saifac run start eed5lz6
 ```
 
 ## If something goes wrong
@@ -162,7 +162,7 @@ Resume again with:
 
 ## Recap
 
-`run list` → Run ID → `run inspect` → attach → open folder → edit → **Ctrl+C** → `run resume`
+`run list` → Run ID → `run inspect` → attach → open folder → edit → **Ctrl+C** → `run start`
 
 ## Notes
 
@@ -172,6 +172,6 @@ Resume again with:
 
 ## See also
 
-- [`run inspect`](../commands/run-inspect.md) · [`run resume`](../commands/run-resume.md) · [`run test`](../commands/run-test.md) · [`run apply`](../commands/run-apply.md)  
+- [`run inspect`](../commands/run-inspect.md) · [`run start`](../commands/run-start.md) · [`run test`](../commands/run-test.md) · [`run apply`](../commands/run-apply.md)  
 - [Provide user feedback to the agent](providing-user-feedback.md) — steer via `run rules` instead of hand-editing the sandbox  
 - [Runs](../runs.md) · [Usage](../usage.md) · [Troubleshooting](../troubleshooting.md)

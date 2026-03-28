@@ -65,10 +65,10 @@ export type SerializedLoopOpts = {
   gitProviderId: string;
   gateRetries: number;
   agentEnv: Record<string, string>;
-  /** Host env var names only; values are re-read from `process.env` on resume. */
+  /** Host env var names only; values are re-read from `process.env` when starting from a stored run. */
   agentSecretKeys: string[];
   /**
-   * Project-relative secret file paths (`KEY=value` .env files). Re-read on resume; values are not
+   * Project-relative secret file paths (`KEY=value` .env files). Re-read when starting from a stored run; values are not
    * stored in the artifact.
    */
   agentSecretFiles?: string[];
@@ -87,7 +87,7 @@ export type SerializedLoopOpts = {
   stagingEnvironment: NormalizedStagingEnvironment;
   /**
    * Normalized coding environment — always present (defaults to `{ engine: 'docker' }`).
-   * Persisted so that the coding engine stack can be re-used correctly on resume.
+   * Persisted so that the coding engine stack can be re-used correctly when starting from a stored run.
    */
   codingEnvironment: NormalizedCodingEnvironment;
   /** When true, verbose logs are enabled. */
@@ -97,7 +97,7 @@ export type SerializedLoopOpts = {
 export function serializeArtifactConfig(
   opts: IterativeLoopOpts & PersistedScriptBundle,
 ): SerializedLoopOpts {
-  // Ephemeral CLI mode — never persist (resume must run the full agent loop).
+  // Ephemeral CLI mode — never persist (`run start` must run the full agent loop).
   const {
     feature,
     gitProvider,

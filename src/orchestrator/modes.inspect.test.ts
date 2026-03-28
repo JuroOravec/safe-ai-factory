@@ -1,5 +1,5 @@
 /**
- * Unit tests for {@link runInspect} — mocked engine, sandbox, resume, and I/O.
+ * Unit tests for {@link runInspect} — mocked engine, sandbox, worktree helpers, and I/O.
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -73,9 +73,10 @@ function makeOrchestratorOpts(): OrchestratorOpts {
     agentInstallScriptFile: 'agent-install.sh',
     agentScriptFile: 'agent.sh',
     runStorage: null,
-    resume: null,
+    fromArtifact: null,
     patchExclude: undefined,
     verbose: false,
+    testOnly: false,
   };
 }
 
@@ -146,8 +147,8 @@ const sandbox: Sandbox = {
 };
 
 const {
-  createResumeWorktreeMock,
-  cleanupResumeWorkspaceMock,
+  createArtifactRunWorktreeMock,
+  cleanupArtifactRunWorktreeMock,
   createSandboxMock,
   destroySandboxMock,
   extractIncrementalRoundPatchMock,
@@ -167,8 +168,8 @@ const {
   });
   const mockEngine = { setup, teardown, startInspect };
   return {
-    createResumeWorktreeMock: vi.fn(),
-    cleanupResumeWorkspaceMock: vi.fn().mockResolvedValue(undefined),
+    createArtifactRunWorktreeMock: vi.fn(),
+    cleanupArtifactRunWorktreeMock: vi.fn().mockResolvedValue(undefined),
     createSandboxMock: vi.fn(),
     destroySandboxMock: vi.fn().mockResolvedValue(undefined),
     extractIncrementalRoundPatchMock: vi.fn(),
@@ -180,12 +181,12 @@ const {
   };
 });
 
-vi.mock('./resume.js', async (importOriginal) => {
+vi.mock('./worktree.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
-    createResumeWorktree: createResumeWorktreeMock,
-    cleanupResumeWorkspace: cleanupResumeWorkspaceMock,
+    createArtifactRunWorktree: createArtifactRunWorktreeMock,
+    cleanupArtifactRunWorktree: cleanupArtifactRunWorktreeMock,
   };
 });
 
@@ -271,9 +272,9 @@ describe('runInspect', () => {
   beforeEach(async () => {
     projectDir = await mkdtemp(join(tmpdir(), 'saifac-inspect-'));
     vi.clearAllMocks();
-    createResumeWorktreeMock.mockResolvedValue({
+    createArtifactRunWorktreeMock.mockResolvedValue({
       worktreePath: join(projectDir, 'wt'),
-      branchName: 'saifac-resume-run-inspect-1',
+      branchName: 'saifac-run-run-inspect-1',
       baseSnapshotPath: join(projectDir, 'base-snap'),
     });
     createSandboxMock.mockResolvedValue(sandbox);
@@ -414,7 +415,7 @@ describe('runInspect', () => {
     await finishWithSigint();
     await p;
 
-    expect(createResumeWorktreeMock).toHaveBeenCalled();
+    expect(createArtifactRunWorktreeMock).toHaveBeenCalled();
     expect(createSandboxMock).toHaveBeenCalled();
     expect(mockEngine.setup).toHaveBeenCalled();
     expect(mockEngine.startInspect).toHaveBeenCalledWith(
@@ -422,7 +423,7 @@ describe('runInspect', () => {
     );
     expect(storage.saveRun).not.toHaveBeenCalled();
     expect(destroySandboxMock).toHaveBeenCalledWith(sandbox.sandboxBasePath);
-    expect(cleanupResumeWorkspaceMock).toHaveBeenCalled();
+    expect(cleanupArtifactRunWorktreeMock).toHaveBeenCalled();
   });
 
   it('calls saveRun with ifRevisionEquals when patch changes', async () => {
@@ -547,6 +548,6 @@ describe('runInspect', () => {
     await expect(p).rejects.toThrow('disk full');
 
     expect(destroySandboxMock).toHaveBeenCalled();
-    expect(cleanupResumeWorkspaceMock).toHaveBeenCalled();
+    expect(cleanupArtifactRunWorktreeMock).toHaveBeenCalled();
   });
 });

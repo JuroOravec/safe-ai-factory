@@ -200,10 +200,10 @@ export class SaifCliService {
     ] as RunArtifact[];
   }
 
-  public resumeRun(runId: string, cwd: string): void {
+  public fromArtifact(runId: string, cwd: string): void {
     this.executeInTerminal({
-      command: `saifac run resume ${escapeArg(runId)}`,
-      terminalName: `SAIFAC Resume: ${runId}`,
+      command: `saifac run start ${escapeArg(runId)}`,
+      terminalName: `SAIFAC fromArtifact: ${runId}`,
       cwd,
     });
   }

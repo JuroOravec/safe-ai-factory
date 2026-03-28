@@ -174,17 +174,17 @@ export interface CreateSandboxOpts {
   verbose?: boolean;
   /**
    * When set, rsync the code tree from this directory instead of {@link projectDir}.
-   * Used for resume: base snapshot (before `runCommits`) so the sandbox can replay commits.
+   * Used for from-artifact runs: base snapshot (before `runCommits`) so the sandbox can replay commits.
    */
   codeSourceDir?: string;
   /**
-   * Run commits to replay after the initial "Base state" commit (resume / test-from-run).
+   * Run commits to replay after the initial "Base state" commit (from-artifact / test-from-run).
    */
   runCommits?: RunCommit[];
   /**
    * When false (default), copy only `git archive HEAD` from {@link projectDir} into `code/`.
    * When true, rsync the working tree (respecting `.gitignore`).
-   * Ignored when {@link codeSourceDir} is set (resume): always rsync from that directory.
+   * Ignored when {@link codeSourceDir} is set (from-artifact): always rsync from that directory.
    */
   includeDirty: boolean;
 }
@@ -212,7 +212,7 @@ export async function copyCommittedGitTreeToDir(repoDir: string, destDir: string
 }
 
 /**
- * Builds one combined patch for **untracked** files so host-base.patch (and resume) can
+ * Builds one combined patch for **untracked** files so host-base.patch (and from-artifact runs) can
  * recreate the working tree faithfully.
  *
  * Git does not include untracked paths in `git diff HEAD`, so we list them with
@@ -264,7 +264,7 @@ export async function diffUntrackedFilesVersusDevNull(projectDir: string): Promi
  * Creates an isolated sandbox for the feature.
  *
  * 1. Populate sandboxBasePath/code/ — `git archive HEAD` (default) or rsync when {@link CreateSandboxOpts#includeDirty}
- *    or when {@link CreateSandboxOpts#codeSourceDir} is set (resume snapshot)
+ *    or when {@link CreateSandboxOpts#codeSourceDir} is set (from-artifact snapshot)
  * 2. Remove ALL hidden/ dirs under saifac/features/ so the coder agent cannot see holdout
  *    tests from any feature (current or others)
  * 3. git init + "Base state" commit, then replay {@link CreateSandboxOpts#runCommits}
@@ -308,9 +308,9 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   if (await pathExists(sandboxBasePath)) {
     throw new Error(
       `[sandbox] Sandbox directory already exists: ${sandboxBasePath}\n` +
-        `Another \`feat run\` / \`run resume\` may still be using it, or a previous run exited without cleanup. ` +
+        `Another \`feat run\` / \`run start\` may still be using it, or a previous run exited without cleanup. ` +
         `Stop the other process, remove this directory, or wait until it finishes. ` +
-        `Use \`saifac run fork <runId>\` to clone the stored run to a new ID, then \`saifac run resume <newId>\`.`,
+        `Use \`saifac run fork <runId>\` to clone the stored run to a new ID, then \`saifac run start <newId>\`.`,
     );
   }
 
@@ -324,11 +324,11 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
   if (!(await pathExists(projectDir))) {
     throw new Error(
       `[sandbox] Source directory does not exist (cannot run git here). ` +
-        `Resume: the worktree path may be stale — try resume again. Path: ${projectDir}`,
+        `From-artifact worktree path may be stale — try \`saifac run start\` again. Path: ${projectDir}`,
     );
   }
 
-  // host-base.patch: only needed when the sandbox tree can differ from baseCommitSha (dirty or resume).
+  // host-base.patch: only needed when the sandbox tree can differ from baseCommitSha (dirty or from-artifact).
   if (!copyWorkingTree) {
     // Case: Copying codebase from git archive HEAD (no uncommitted changes). No patch needed.
     await writeUtf8(hostBasePatchPath, '');
@@ -339,7 +339,7 @@ export async function createSandbox(opts: CreateSandboxOpts): Promise<Sandbox> {
     // `git diff HEAD` only covers tracked files; untracked files (e.g. a new CHANGELOG.md that
     // exists on the host but is not committed) must be included separately, otherwise the agent's
     // modification diff will fail with "No such file or directory" in the worktree when it's applied.
-    // Always use projectDir — resume uses a snapshot dir without .git for the tree copy.
+    // Always use projectDir — from-artifact uses a snapshot dir without .git for the tree copy.
     const trackedPatch = await gitDiff({ cwd: projectDir, args: ['--binary', 'HEAD'] });
     const untrackedPatch = await diffUntrackedFilesVersusDevNull(projectDir);
     const parts: string[] = [];

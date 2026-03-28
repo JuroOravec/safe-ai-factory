@@ -140,7 +140,7 @@ saifac feat run --startup-script ./scripts/my-startup.sh
 For a resume (continue):
 
 ```bash
-saifac run resume <runId> --startup-script ./scripts/my-startup.sh
+saifac run start <runId> --startup-script ./scripts/my-startup.sh
 ```
 
 ---
@@ -252,14 +252,14 @@ saifac feat run \
 
 | Flag               | Subcommands                        | Description                                                                                                                                                                              |
 | ------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--model`          | saifac feat run, saifac run resume | LLM model override (e.g. anthropic/claude-sonnet-4-5). Falls back to `LLM_MODEL` env.                                                                                                    |
-| `--provider`       | saifac feat run, saifac run resume | LLM provider ID (e.g. anthropic, openai, openrouter). Forwarded as `LLM_PROVIDER`. Used by agents like opencode for base URL / routing when `LLM_MODEL` is not in provider/model format. |
-| `--base-url`       | saifac feat run, saifac run resume | LLM base URL override (e.g. https://openrouter.ai/api/v1). Falls back to `LLM_BASE_URL` env.                                                                                             |
-| `--profile`        | saifac feat run, saifac run resume | Sandbox profile; sets the installation script (and other defaults).                                                                                                                      |
-| `--startup-script` | saifac feat run, saifac run resume | Path to script run once before the agent loop (overrides profile).                                                                                                                       |
-| `--gate-script`    | saifac feat run, saifac run resume | Path to script run after each agent round. Default: built-in pnpm check.                                                                                                                 |
-| `--gate-retries`   | saifac feat run, saifac run resume | Max gate retries per run (default: 5).                                                                                                                                                   |
-| `--coder-image`    | saifac feat run, saifac run resume | Docker image for the coder container (default: from profile, e.g. saifac-coder-node-pnpm-python:latest).                                                                                |
+| `--model`          | saifac feat run, saifac run start | LLM model override (e.g. anthropic/claude-sonnet-4-5). Falls back to `LLM_MODEL` env.                                                                                                    |
+| `--provider`       | saifac feat run, saifac run start | LLM provider ID (e.g. anthropic, openai, openrouter). Forwarded as `LLM_PROVIDER`. Used by agents like opencode for base URL / routing when `LLM_MODEL` is not in provider/model format. |
+| `--base-url`       | saifac feat run, saifac run start | LLM base URL override (e.g. https://openrouter.ai/api/v1). Falls back to `LLM_BASE_URL` env.                                                                                             |
+| `--profile`        | saifac feat run, saifac run start | Sandbox profile; sets the installation script (and other defaults).                                                                                                                      |
+| `--startup-script` | saifac feat run, saifac run start | Path to script run once before the agent loop (overrides profile).                                                                                                                       |
+| `--gate-script`    | saifac feat run, saifac run start | Path to script run after each agent round. Default: built-in pnpm check.                                                                                                                 |
+| `--gate-retries`   | saifac feat run, saifac run start | Max gate retries per run (default: 5).                                                                                                                                                   |
+| `--coder-image`    | saifac feat run, saifac run start | Docker image for the coder container (default: from profile, e.g. saifac-coder-node-pnpm-python:latest).                                                                                |
 
 ---
 

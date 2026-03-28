@@ -62,14 +62,14 @@ export interface SerializedOrchestratorOpts extends Record<string, unknown> {
   testScriptFile: string;
   agentInstallScriptFile: string;
   agentScriptFile: string;
-  resume: {
+  fromArtifact: {
     sandboxSourceDir: string;
     baseSnapshotPath?: string;
     seedRunCommits?: RunCommit[];
     seedRoundSummaries?: OuterAttemptSummary[];
     initialErrorFeedback?: string;
     persistedRunId?: string;
-    artifactRevisionAtResume?: number;
+    artifactRevisionWhenFromArtifact?: number;
     runContext: {
       baseCommitSha: string;
       basePatchDiff?: string;
@@ -92,7 +92,7 @@ export function serializeOrchestratorOpts(opts: OrchestratorOpts): SerializedOrc
     testProfile,
     patchExclude,
     runStorage: _rs,
-    resume,
+    fromArtifact,
     ...rest
   } = opts;
   return {
@@ -106,20 +106,20 @@ export function serializeOrchestratorOpts(opts: OrchestratorOpts): SerializedOrc
       type: rule.type,
       pattern: rule.type === 'regex' ? (rule.pattern as RegExp).source : (rule.pattern as string),
     })),
-    resume: resume
+    fromArtifact: fromArtifact
       ? {
-          sandboxSourceDir: resume.sandboxSourceDir,
-          baseSnapshotPath: resume.baseSnapshotPath,
-          seedRunCommits: resume.seedRunCommits,
-          seedRoundSummaries: resume.seedRoundSummaries,
-          initialErrorFeedback: resume.initialErrorFeedback,
-          persistedRunId: resume.persistedRunId,
-          artifactRevisionAtResume: resume.artifactRevisionAtResume,
+          sandboxSourceDir: fromArtifact.sandboxSourceDir,
+          baseSnapshotPath: fromArtifact.baseSnapshotPath,
+          seedRunCommits: fromArtifact.seedRunCommits,
+          seedRoundSummaries: fromArtifact.seedRoundSummaries,
+          initialErrorFeedback: fromArtifact.initialErrorFeedback,
+          persistedRunId: fromArtifact.persistedRunId,
+          artifactRevisionWhenFromArtifact: fromArtifact.artifactRevisionWhenFromArtifact,
           runContext: {
-            baseCommitSha: resume.runContext.baseCommitSha,
-            basePatchDiff: resume.runContext.basePatchDiff,
-            lastErrorFeedback: resume.runContext.lastErrorFeedback,
-            rules: resume.runContext.rules,
+            baseCommitSha: fromArtifact.runContext.baseCommitSha,
+            basePatchDiff: fromArtifact.runContext.basePatchDiff,
+            lastErrorFeedback: fromArtifact.runContext.lastErrorFeedback,
+            rules: fromArtifact.runContext.rules,
           },
         }
       : null,
@@ -186,23 +186,24 @@ export function deserializeOrchestratorOpts(serialized: Record<string, unknown>)
     testScriptFile: s.testScriptFile,
     agentInstallScriptFile: s.agentInstallScriptFile,
     agentScriptFile: s.agentScriptFile,
-    resume: s.resume
+    fromArtifact: s.fromArtifact
       ? {
-          sandboxSourceDir: s.resume.sandboxSourceDir,
-          baseSnapshotPath: s.resume.baseSnapshotPath,
-          seedRunCommits: s.resume.seedRunCommits ?? [],
-          seedRoundSummaries: s.resume.seedRoundSummaries,
-          initialErrorFeedback: s.resume.initialErrorFeedback,
-          persistedRunId: s.resume.persistedRunId,
-          artifactRevisionAtResume: s.resume.artifactRevisionAtResume,
+          sandboxSourceDir: s.fromArtifact.sandboxSourceDir,
+          baseSnapshotPath: s.fromArtifact.baseSnapshotPath,
+          seedRunCommits: s.fromArtifact.seedRunCommits ?? [],
+          seedRoundSummaries: s.fromArtifact.seedRoundSummaries,
+          initialErrorFeedback: s.fromArtifact.initialErrorFeedback,
+          persistedRunId: s.fromArtifact.persistedRunId,
+          artifactRevisionWhenFromArtifact: s.fromArtifact.artifactRevisionWhenFromArtifact,
           runContext: {
-            ...s.resume.runContext,
-            rules: s.resume.runContext.rules ?? [],
+            ...s.fromArtifact.runContext,
+            rules: s.fromArtifact.runContext.rules ?? [],
           },
         }
       : null,
     runStorage: s.runStorageUri ? createRunStorage(s.runStorageUri, s.projectDir) : null,
     verbose: !!s.verbose,
     includeDirty: s.includeDirty ?? false,
+    testOnly: false,
   };
 }

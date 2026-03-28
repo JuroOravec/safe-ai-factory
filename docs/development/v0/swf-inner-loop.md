@@ -132,7 +132,7 @@ The default gate script used when no custom `--gate-script` is provided. Each sa
 
 **`runStart`:** Passes `gateScript`, `agentScript`, and `gateRetries` to `createSandbox` and `runAgent`.
 
-**`runResume`:** Reconstructs workspace from storage, then delegates to `runStartCore` (which uses `createSandbox` and `runAgent`). Effective options are merged from defaults, the stored run artifact, and explicit CLI overrides (see below).
+**`fromArtifact`:** Reconstructs workspace from storage, then delegates to `runStartCore` (which uses `createSandbox` and `runAgent`). Effective options are merged from defaults, the stored run artifact, and explicit CLI overrides (see below).
 
 #### Orchestrator option resolution (feat run, resume, test-from-run)
 
@@ -146,7 +146,7 @@ For modes that need a full `OrchestratorOpts`, resolution is centralized in `src
 
 ### 7. CLI (citty — `src/cli/commands/feat.ts`, `src/cli/commands/run.ts`)
 
-**Flags for `saifac feat run` and `saifac run resume`:**
+**Flags for `saifac feat run` and `saifac run start`:**
 
 | Flag                      | Description                                                                            | Default              |
 | ------------------------- | -------------------------------------------------------------------------------------- | -------------------- |

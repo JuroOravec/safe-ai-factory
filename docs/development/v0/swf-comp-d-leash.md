@@ -64,7 +64,7 @@ Leash is a **CLI wrapper**. You do not pull or run any StrongDM Docker image you
 
 ## Current Integration Status
 
-**Leash is enabled by default** for `saifac feat run` and `saifac run resume`. The integration is complete and working.
+**Leash is enabled by default** for `saifac feat run` and `saifac run start`. The integration is complete and working.
 
 ### Custom Coder Image
 
@@ -104,7 +104,7 @@ We ship default policies under `src/orchestrator/policies/` (`default.cedar`, `d
 - **ProcessExec** — permitted under `Dir::"/"` (system binaries on `PATH`)
 - **Network** — `NetworkConnect` allowed for `Host::"*"`; override with `--cedar` for hostname allowlists (`deny-network.cedar` is one example)
 
-Override with `--cedar <path>` when running `saifac feat run` or `saifac run resume`.
+Override with `--cedar <path>` when running `saifac feat run` or `saifac run start`.
 
 ---
 

@@ -1,7 +1,7 @@
 /**
  * Run storage types for persisting agent run artifacts.
  *
- * Persisted for every run when storage is enabled for `run ls`, resume, and tests.
+ * Persisted for every run when storage is enabled for `run ls`, `run start`, and tests.
  */
 
 import type { SerializedLoopOpts } from './utils/serialize.js';
@@ -30,7 +30,7 @@ export interface RunRule {
 }
 
 /**
- * One recorded commit in the sandbox / resume worktree (message + unified diff + optional author).
+ * One recorded commit in the sandbox / artifact worktree (message + unified diff + optional author).
  * Diffs apply in order on top of `baseCommitSha` + optional `basePatchDiff` + prior run commits.
  */
 export interface RunCommit {

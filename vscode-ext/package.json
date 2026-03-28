@@ -157,8 +157,8 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "saifac.resumeRun",
-        "title": "Resume",
+        "command": "saifac.fromArtifact",
+        "title": "Start from artifact",
         "icon": "$(play)"
       },
       {
@@ -244,7 +244,7 @@
           "group": "inline@2"
         },
         {
-          "command": "saifac.resumeRun",
+          "command": "saifac.fromArtifact",
           "when": "viewItem == run_failed",
           "group": "inline@1"
         },

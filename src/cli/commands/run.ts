@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Run CLI — manage and resume stored runs.
+ * Run CLI — manage stored runs and start again from artifacts.
  *
  * Usage: saifac run <subcommand> [options]
  *   ls, list      List stored runs
@@ -8,7 +8,7 @@
  *   info          Print stored run as JSON
  *   clear         Clear stored runs (optionally filtered)
  *   fork          Clone a stored run to a new ID
- *   resume        Resume a stored run from storage
+ *   start         Start again from a stored run (artifact)
  *   test          Re-test a stored run's patch (no coding agent)
  *   apply         Create git branch with run's changes and optional push/PR
  *   export        Export run's changes as a single diff
@@ -23,10 +23,10 @@ import { type SaifacConfig } from '../../config/schema.js';
 import type { ModelOverrides } from '../../llm-config.js';
 import { consola, outputCliData, setVerboseLogging } from '../../logger.js';
 import {
+  fromArtifact,
   runApply,
   runExport,
   runInspect,
-  runResume,
   runTestsFromRun,
 } from '../../orchestrator/modes.js';
 import {
@@ -38,7 +38,7 @@ import type { RunStatus } from '../../runs/types.js';
 import { toRunInfoJson } from '../../runs/utils/run-info.js';
 import { omit } from '../../utils/omit.js';
 import {
-  featResumeArgs,
+  featFromArtifactArgs,
   featRunArgs,
   projectDirArg,
   runTestArgs,
@@ -60,8 +60,8 @@ import {
 } from '../utils.js';
 import { runRulesCommand } from './run-rules.js';
 
-/** CLI parsing for `saifac run resume` */
-async function parseResumeOrchestratorCli(args: FeatRunArgs): Promise<{
+/** CLI parsing for `saifac run start` */
+async function parseFromArtifactOrchestratorCli(args: FeatRunArgs): Promise<{
   projectDir: string;
   saifDir: string;
   config: SaifacConfig;
@@ -267,7 +267,7 @@ const inspectCommand = defineCommand({
   },
   args: {
     ...commonRunArgs,
-    ...omit(featResumeArgs, ['dangerous-no-leash']),
+    ...omit(featFromArtifactArgs, ['dangerous-no-leash']),
     leash: {
       type: 'boolean' as const,
       description:
@@ -282,7 +282,7 @@ const inspectCommand = defineCommand({
   async run({ args }) {
     // `leash` is a special option for `run inspect` only
     const runArgs = args as FeatRunArgs & { leash?: boolean };
-    const ctx = await parseResumeOrchestratorCli(runArgs);
+    const ctx = await parseFromArtifactOrchestratorCli(runArgs);
     const runStorage = resolveRunStorage(
       readStorageStringFromCli(runArgs),
       ctx.projectDir,
@@ -319,7 +319,7 @@ const forkCommand = defineCommand({
   },
   async run({ args }) {
     const runArgs = args as FeatRunArgs;
-    const ctx = await parseResumeOrchestratorCli(runArgs);
+    const ctx = await parseFromArtifactOrchestratorCli(runArgs);
     const runStorage = resolveRunStorage(
       readStorageStringFromCli(runArgs),
       ctx.projectDir,
@@ -353,39 +353,39 @@ const forkCommand = defineCommand({
 
     consola.log(`\nForked run ${sourceRunId} → ${newRunId}`);
     consola.log(`\nStart the agent with:`);
-    consola.log(`  saifac run resume ${newRunId}`);
+    consola.log(`  saifac run start ${newRunId}`);
   },
 });
 
-const resumeCommand = defineCommand({
+const startCommand = defineCommand({
   meta: {
-    name: 'resume',
-    description: 'Resume a stored run from storage (failed or interrupted)',
+    name: 'start',
+    description: 'Start again from a stored run (failed or interrupted)',
   },
   args: {
     ...commonRunArgs,
-    ...featResumeArgs,
+    ...featFromArtifactArgs,
     runId: {
       type: 'positional' as const,
-      description: 'Run ID to resume',
+      description: 'Run ID to start from',
       required: true,
     },
   },
   async run({ args }) {
     const runArgs = args as FeatRunArgs;
-    const ctx = await parseResumeOrchestratorCli(runArgs);
+    const ctx = await parseFromArtifactOrchestratorCli(runArgs);
     const runStorage = resolveRunStorage(
       readStorageStringFromCli(runArgs),
       ctx.projectDir,
       ctx.config,
     );
     if (!runStorage) {
-      consola.error('Run storage is disabled (--storage none). Cannot resume.');
+      consola.error('Run storage is disabled (--storage none). Cannot start from a stored run.');
       process.exit(1);
     }
     const runId = parseRunId(args);
 
-    const result = await runResume({
+    const result = await fromArtifact({
       ...ctx,
       runId,
       runStorage,
@@ -393,8 +393,8 @@ const resumeCommand = defineCommand({
 
     consola.log(`\n${result.message}`);
     if (result.runId) {
-      consola.log(`\nResume again with:`);
-      consola.log(`  saifac run resume ${result.runId}`);
+      consola.log(`\nStart again with:`);
+      consola.log(`  saifac run start ${result.runId}`);
     }
     if (!result.success) process.exit(1);
   },
@@ -559,7 +559,7 @@ const exportCommand = defineCommand({
 const runCommand = defineCommand({
   meta: {
     name: 'run',
-    description: 'Manage and resume stored runs',
+    description: 'Manage stored runs and start again from artifacts',
   },
   subCommands: {
     ls: lsCommand,
@@ -569,7 +569,7 @@ const runCommand = defineCommand({
     info: infoCommand,
     clear: clearCommand,
     fork: forkCommand,
-    resume: resumeCommand,
+    start: startCommand,
     inspect: inspectCommand,
     test: testCommand,
     apply: applyCommand,

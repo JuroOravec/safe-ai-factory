@@ -50,7 +50,7 @@ You can also list default names in `defaults.agentSecretKeys` in config. If a na
 
 | Data | On resume |
 | ---- | --------- |
-| Merged **public** `agentEnv` | Loaded from the saved run; optional `run resume` flags can override where supported |
+| Merged **public** `agentEnv` | Loaded from the saved run; optional `run start` flags can override where supported |
 | **Secret file** paths | Stored on the artifact; files are **read again** from the project directory |
 | **Name-only** secrets | Values read **again** from the host environment each start/resume (CI must export the same names) |
 
@@ -116,13 +116,13 @@ saifac feat run -n my-feature \
 }
 ```
 
-`feat run` and `run resume` share the same `--agent-env*`, `--agent-secret*`, and related options where applicable; see `saifac feat run --help` and `saifac run resume --help`.
+`feat run` and `run start` share the same `--agent-env*`, `--agent-secret*`, and related options where applicable; see `saifac feat run --help` and `saifac run start --help`.
 
 ## Related documentation
 
 - [Environment variables](env-vars.md) - LLM keys, Git tokens, and factory-injected container vars
 - [Configuration](config.md) - `saifac/config.*` structure and all `defaults` / `environments` fields
 - [`feat run`](commands/feat-run.md) - start new run
-- [`run resume`](commands/run-resume.md) - resuming with stored state
+- [`run start`](commands/run-start.md) - resuming with stored state
 - [Runs](runs.md) - artifacts, storage backends
 - [Usage](usage.md) · [Troubleshooting](troubleshooting.md)

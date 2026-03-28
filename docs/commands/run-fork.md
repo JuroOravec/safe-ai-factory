@@ -4,7 +4,7 @@ Copy an existing stored [Run](../runs.md) to a **new run ID**. The new artifact 
 
 Any flags you pass are **saved as defaults** on the new Run.
 
-After forking, start execution with [`run resume`](run-resume.md) on the **new** ID.
+After forking, start execution with [`run start`](run-start.md) on the **new** ID.
 
 The original run is unchanged.
 
@@ -16,7 +16,7 @@ saifac run fork <sourceRunId> [options]
 
 ## How to obtain the source run ID
 
-Use [`run list`](run-list.md), or use the ID printed when a run ends ([`feat run`](feat-run.md) or [`run resume`](run-resume.md)).
+Use [`run list`](run-list.md), or use the ID printed when a run ends ([`feat run`](feat-run.md) or [`run start`](run-start.md)).
 
 ## Arguments
 
@@ -50,7 +50,7 @@ The CLI prints the new run ID and:
 
 ```text
 Start the agent with:
-  saifac run resume <newRunId>
+  saifac run start <newRunId>
 ```
 
 ## Notes
@@ -60,7 +60,7 @@ Start the agent with:
 
 ## See also
 
-- [`run resume`](run-resume.md) — Start the agent loop
+- [`run start`](run-start.md) — Start the agent loop
 - [`feat run`](feat-run.md) — Full flag list
 - [Runs](../runs.md) — Run storage overview
 - [`run list`](run-list.md) — List run IDs

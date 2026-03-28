@@ -128,11 +128,11 @@ saifac feat run -n add-login --push origin --pr
 3. In a loop: runs the agent → runs the gate script → assesses with the test runner. Repeats until tests pass or max runs are exceeded.
 4. On failure due to spec ambiguity (when `--resolve-ambiguity` is `ai` or `prompt`), the Vague Specs Checker may update the spec and regenerate tests, then retry.
 5. On success, applies the winning patch to a new local branch, then optionally pushes and opens a PR. The branch name is `saifac/<feature>-<runId>-<diffHash>` by default, or `--branch`.
-6. On failure, saves run state to `.saifac/runs/` and prints the `saifac run resume` command to resume.
+6. On failure, saves run state to `.saifac/runs/` and prints the `saifac run start` command to resume.
 
 ## Resuming previous runs
 
-- On failure, run state is saved to `.saifac/runs/`. Resume later with `saifac run resume <runId>`.
+- On failure, run state is saved to `.saifac/runs/`. Resume later with `saifac run start <runId>`.
 
 ## Ambiguity in specs
 
@@ -156,7 +156,7 @@ The Vague Specs Checker is implemented as a single LLM call that internally perf
 
 - [`feat design`](feat-design.md) — Generate specs and tests (run first)
 - [`feat design-fail2pass`](feat-design-fail2pass.md) — Validate tests before running
-- [`run resume`](run-resume.md) — Resume a failed run from storage
+- [`run start`](run-start.md) — Resume a failed run from storage
 - [`run apply`](run-apply.md) — Apply run commits to the host without re-running tests
 - [Semantic reviewer](../reviewer.md) — Reviewer configuration and `--no-reviewer`
 - [Cedar access control](../leash-access-control.md) — Customize Leash policy

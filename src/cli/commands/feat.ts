@@ -722,13 +722,13 @@ const runCommand = defineCommand({
     const runArgs = await parseRunArgs(args);
     const result = await runStart({
       ...runArgs,
-      resume: null,
+      fromArtifact: null,
     });
 
     consola.log(`\n${result.message}`);
     if (result.runId && runArgs.runStorage && !result.success) {
-      consola.log(`\nResume with:`);
-      consola.log(`  saifac run resume ${result.runId}`);
+      consola.log(`\nStart again with:`);
+      consola.log(`  saifac run start ${result.runId}`);
     }
     if (!result.success) process.exit(1);
   },

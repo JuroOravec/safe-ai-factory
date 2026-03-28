@@ -215,7 +215,7 @@ export interface RunAgentOpts {
 
 /**
  * Options for {@link Engine.startInspect}.
- * Use the same `containerEnv` as the first coding round in `runIterativeLoop` / `run resume`.
+ * Use the same `containerEnv` as the first coding round in `runIterativeLoop` / `run start`.
  */
 export interface StartInspectOpts {
   codePath: string;

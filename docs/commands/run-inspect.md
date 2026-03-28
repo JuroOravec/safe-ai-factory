@@ -1,6 +1,6 @@
 # saifac run inspect
 
-Open an **idle** coding environment for a **saved run** — the same kind of isolated workspace and container setup as when you [`run resume`](run-resume.md), but **without** starting the automated agent. The container stays running so you can attach your editor or a shell, edit the code yourself, then finish when you are done.
+Open an **idle** coding environment for a **saved run** — the same kind of isolated workspace and container setup as when you [`run start`](run-start.md), but **without** starting the automated agent. The container stays running so you can attach your editor or a shell, edit the code yourself, then finish when you are done.
 
 When you stop the command (**Ctrl+C**, or the process is stopped with **SIGTERM**), saifac shuts the session down, picks up any edits you made in that workspace, and **updates the saved run** if something actually changed. If nothing changed, the saved run is left as-is.
 
@@ -17,7 +17,7 @@ saifac run inspect <runId> [options]
 
 ## How to obtain the run ID
 
-Same as [`run resume`](run-resume.md): use the id from the end of a run, or from `saifac run list` / `saifac run ls` (first column).
+Same as [`run start`](run-start.md): use the id from the end of a run, or from `saifac run list` / `saifac run ls` (first column).
 
 ```bash
 saifac run list
@@ -62,14 +62,14 @@ saifac run inspect eed5lz6 --leash
 ## What it does
 
 1. Loads the saved run for the ID you gave.
-2. Rebuilds a **temporary copy** of your project in the same way as [`run resume`](run-resume.md).
+2. Rebuilds a **temporary copy** of your project in the same way as [`run start`](run-start.md).
 3. Copies that into the sandbox and starts the **coding container** in an idle mode (waiting for you to attach).
 4. Logs the **container name** and workspace path. Attach with **Dev Containers**, **`docker exec`**, or your usual workflow.
 5. When you stop the command, saifac saves the changes you made into the saved run, and tears the session down.
 
 ## Notes
 
-- Run `inspect` from the **same git repository (and branch history)** as the original run, like resume and [`run test`](run-test.md). If the base commit is gone, you will get a clear error.
+- Run `inspect` from the **same git repository (and branch history)** as the original run, like [`run start`](run-start.md) and [`run test`](run-test.md). If the base commit is gone, you will get a clear error.
 
 - If run storage is disabled (`--storage none` / `runs=none`), the command exits with an error (`Run storage is disabled … Cannot inspect a stored run.`).
 
@@ -78,9 +78,9 @@ saifac run inspect eed5lz6 --leash
 
 ## See also
 
-- [Guide: Fix agent mistakes with inspect + resume](../guides/inspect-and-resume.md) — Step-by-step (VS Code / Cursor)
+- [Guide: Fix agent mistakes: inspect, then run start](../guides/inspect-and-start.md) — Step-by-step (VS Code / Cursor)
 - [Runs](../runs.md) — Saved runs and storage
-- [`run resume`](run-resume.md) — Continue with the agent after a failure
+- [`run start`](run-start.md) — Continue with the agent after a failure
 - [`run list`](run-list.md) — List saved run ids
 - [`run info`](run-info.md) — View a saved run (summary JSON)
 - [`run test`](run-test.md) — Re-run tests for a saved run without the agent

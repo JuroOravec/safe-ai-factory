@@ -26,7 +26,7 @@ The Software Factory uses Git in three distinct phases:
 | Phase       | Where                                                     | Purpose                                                                                                                                                                |
 | ----------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Sandbox** | Isolated `code/` directory inside `/tmp/saifac/sandboxes/` | A _fresh_ Git repo (not a clone) used solely for diffing agent changes against a baseline. The host's `.git` is never mounted or copied, to avoid exposing git history |
-| **Tests**   | Same sandbox                                              | **`feat run` / `run resume`:** after each round, `extractIncrementalRoundPatch` leaves `code/` at a new commit — staging/tests run on that tree (no extra `git apply` of the round diff). **`run test`:** same sandbox layout as resume (base snapshot + replayed `runCommits`); **`runIterativeLoop`** runs in **test-only** mode (no coding agent) and reuses the same staging / test-retry / vague-specs path. |
+| **Tests**   | Same sandbox                                              | **`feat run` / `run start`:** after each round, `extractIncrementalRoundPatch` leaves `code/` at a new commit — staging/tests run on that tree (no extra `git apply` of the round diff). **`run test`:** same sandbox layout as resume (base snapshot + replayed `runCommits`); **`runIterativeLoop`** runs in **test-only** mode (no coding agent) and reuses the same staging / test-retry / vague-specs path. |
 | **Success** | Host repository                                           | A Git worktree is used to create a feature branch, apply the patch, commit, and optionally push/PR—_without ever changing the main working tree's checked-out branch_. |
 
 The host repository's working directory is **never** modified during the loop. All agent edits happen in the sandbox. Only after tests pass does the orchestrator create a separate worktree, apply the patch there, commit it, and optionally push. The user's current branch and uncommitted work remain untouched—enabling safe parallel runs of multiple agents.
@@ -160,11 +160,11 @@ git clean -fd
 
 ## 6. Patch application for tests
 
-**`saifac feat run` / `run resume` (inner loop):** **Location:** `loop.ts` — after `extractIncrementalRoundPatch`, `code/` is already at the round commit; staging mounts that tree. There is **no** `git apply` of `patch.diff` for verification in this path.
+**`saifac feat run` / `run start` (inner loop):** **Location:** `loop.ts` — after `extractIncrementalRoundPatch`, `code/` is already at the round commit; staging mounts that tree. There is **no** `git apply` of `patch.diff` for verification in this path.
 
-**`saifac run test`:** **Location:** `modes.ts` → `runFromStoredRunCore({ testOnly: true })` → `runStartCore` → `loop.ts` → `runIterativeLoop` with **`OrchestratorOpts.testOnly`**. Worktree and sandbox setup match **`run resume`**: `resume.ts` → `createResumeWorktree()`, then `sandbox.ts` → `createSandbox()` with the resume worktree as **`sandboxSourceDir`**, **base snapshot** as **`codeSourceDir`**, and **`seedRunCommits`** replayed into `code/`.
+**`saifac run test`:** **Location:** `modes.ts` → `fromArtifactCore({ testOnly: true })` → `runStartCore` → `loop.ts` → `runIterativeLoop` with **`OrchestratorOpts.testOnly`**. Worktree and sandbox setup match **`run start`**: `worktree.ts` → `createArtifactRunWorktree()`, then `sandbox.ts` → `createSandbox()` with the artifact worktree as **`sandboxSourceDir`**, **base snapshot** as **`codeSourceDir`**, and **`seedRunCommits`** replayed into `code/`.
 
-The stored `basePatchDiff` (tracked/staged vs `HEAD` **plus untracked files**) is applied in the **temporary resume worktree**, then **`saifac: base patch`** is committed, then each stored **`RunCommit`** is applied and committed in order (**same reconstruction as `run resume`**). The sandbox is built by **rsync** from a **base snapshot** (before run commits) plus **replay** of `runCommits` inside `code/` — not via `git clone --local`. There is **no** second code path such as a separate `runTestsCore`: the orchestrator writes **`run-commits.json`** in the sandbox from the stored commits, runs **`runStagingTestVerification`** (staging + test retries + optional vague-specs handling), and persists outcomes through the same **`cleanupAndSaveRun`** path as **`run resume`**.
+The stored `basePatchDiff` (tracked/staged vs `HEAD` **plus untracked files**) is applied in the **temporary resume worktree**, then **`saifac: base patch`** is committed, then each stored **`RunCommit`** is applied and committed in order (**same reconstruction as `run start`**). The sandbox is built by **rsync** from a **base snapshot** (before run commits) plus **replay** of `runCommits` inside `code/` — not via `git clone --local`. There is **no** second code path such as a separate `runTestsCore`: the orchestrator writes **`run-commits.json`** in the sandbox from the stored commits, runs **`runStagingTestVerification`** (staging + test retries + optional vague-specs handling), and persists outcomes through the same **`cleanupAndSaveRun`** path as **`run start`**.
 
 **Host apply:** **`applyPatchToHost`** is called with **`projectDir`** set to the **CLI project directory** (the user’s repo root), **not** the ephemeral resume worktree. The caller passes **`commits`** in memory (the same `RunCommit[]` as written to **`run-commits.json`** in the sandbox) so the apply step does not re-read JSON from disk inside `applyPatchToHost`. `git worktree add` uses **`startCommit`** = the run’s **`baseCommitSha`** when available so the new branch roots at the same commit the sandbox was based on, not necessarily the user’s current `HEAD`. Using the resume worktree as `projectDir` here would replay commits onto a tree that already contains them and can produce errors such as *already exists in working directory* (see [§8](#8-success-path-apply-patch-to-host-via-worktree)).
 
@@ -174,7 +174,7 @@ The stored `basePatchDiff` (tracked/staged vs `HEAD` **plus untracked files**) i
 
 **Location:** `modes.ts` → `runStartCore` → `runIterativeLoop()` (`loop.ts`)
 
-In **saifac feat run** and **saifac run resume**, the flow is:
+In **saifac feat run** and **saifac run start**, the flow is:
 
 1. Remember `preRoundHeadSha` (current `HEAD` in `code/` before the agent runs).
 2. OpenHands runs and modifies files in the sandbox.
@@ -195,7 +195,7 @@ When all tests pass, the orchestrator applies the winning patch to the **host** 
 ### Design goals
 
 - **Never touch the main working tree.** The user may have multiple agents running; each must be able to create its own branch without conflicting.
-- **Branch visibility.** The default branch name ends with a **short hash of the combined patch** so retries and parallel runs are less likely to collide: `saifac/<featureName>-<runId>-<diffHash>` where `<diffHash>` is the first **6** hex digits of SHA-256 over the concatenated `RunCommit` diffs. Override with **`--branch`** on `feat run`, `run resume`, `run test`, or **`saifac run apply`**.
+- **Branch visibility.** The default branch name ends with a **short hash of the combined patch** so retries and parallel runs are less likely to collide: `saifac/<featureName>-<runId>-<diffHash>` where `<diffHash>` is the first **6** hex digits of SHA-256 over the concatenated `RunCommit` diffs. Override with **`--branch`** on `feat run`, `run start`, `run test`, or **`saifac run apply`**.
 - **Optional push and PR.** The user can supply `--push` and `--pr` to push the branch and open a Pull Request (provider-specific API).
 
 ### Flow
@@ -254,7 +254,7 @@ The sandbox and the worktree are populated from different sources. This asymmetr
 
 ### `saifac run apply`
 
-When tests have already passed (or you accept the stored patch) but host apply failed or you deferred push/PR, **[`run apply`](../../commands/run-apply.md)** rebuilds the branch via **`createResumeWorktree()`** under the same **`resume-worktrees/`** path as resume, using **`outputBranchName`** = the final host branch, then drops only the worktree registration so the branch remains. No sandbox tests or agent loop.
+When tests have already passed (or you accept the stored patch) but host apply failed or you deferred push/PR, **[`run apply`](../../commands/run-apply.md)** rebuilds the branch via **`createArtifactRunWorktree()`** under the same **`/tmp/worktrees/`** path as `run start`, using **`outputBranchName`** = the final host branch, then drops only the worktree registration so the branch remains. No sandbox tests or agent loop.
 
 ---
 

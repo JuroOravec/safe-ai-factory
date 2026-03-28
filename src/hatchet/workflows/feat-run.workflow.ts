@@ -15,7 +15,7 @@
  *            └─ run-tests   — staging engine + test suite (raw result + testSuites)
  *            └─ vague-specs-check — optional LLM ambiguity pass; produces sanitizedHint
  *     └─ apply-patch        — commits + pushes + PR (success path only)
- *     └─ on-failure         — persists RunArtifact so `saifac run resume` works
+ *     └─ on-failure         — persists RunArtifact so `saifac run start` works
  *
  * IMPORTANT — Hatchet requires all task inputs/outputs to be JSON-serializable
  * (JsonObject). Types like OrchestratorOpts and Sandbox are serialized to
@@ -32,7 +32,7 @@
  *   The staging step has '30m'. vague-specs-check uses '30m'. The parent convergence-loop step has '24h'.
  *
  * RunArtifact persistence (step 1.8):
- *   apply-patch saves a completed artifact; on-failure saves a failed artifact for `run resume`.
+ *   apply-patch saves a completed artifact; on-failure saves a failed artifact for `run start`.
  */
 
 import { join } from 'node:path';
@@ -367,11 +367,11 @@ export function createFeatRunWorkflow() {
     fn: async (input) => {
       const opts = deserializeOrchestratorOpts(input.serializedOpts);
       const src = getSandboxSourceDir(opts);
-      const persistedRunId = opts.resume?.persistedRunId;
+      const persistedRunId = opts.fromArtifact?.persistedRunId;
       const sandboxRaw = await createSandbox({
         feature: opts.feature,
         projectDir: src,
-        codeSourceDir: opts.resume?.baseSnapshotPath ?? src,
+        codeSourceDir: opts.fromArtifact?.baseSnapshotPath ?? src,
         saifDir: opts.saifDir,
         projectName: opts.projectName,
         sandboxBaseDir: opts.sandboxBaseDir,
@@ -381,7 +381,7 @@ export function createFeatRunWorkflow() {
         agentScript: opts.agentScript,
         stageScript: opts.stageScript,
         verbose: !!opts.verbose,
-        runCommits: opts.resume?.seedRunCommits ?? [],
+        runCommits: opts.fromArtifact?.seedRunCommits ?? [],
         runId: persistedRunId,
         includeDirty: opts.includeDirty,
       });
@@ -390,15 +390,15 @@ export function createFeatRunWorkflow() {
       const runStorage = opts.runStorage;
       if (runStorage) {
         try {
-          const { runStorage: _rs, resume: _res, ...loopOpts } = opts;
+          const { runStorage: _rs, fromArtifact: _fa, ...loopOpts } = opts;
           const runningArtifact = buildRunArtifact({
             runId: sandboxRaw.runId,
             baseCommitSha: input.runContext.baseCommitSha,
             basePatchDiff: input.runContext.basePatchDiff,
-            runCommits: opts.resume?.seedRunCommits ?? [],
+            runCommits: opts.fromArtifact?.seedRunCommits ?? [],
             specRef: opts.feature.relativePath,
             rules: input.runContext.rules,
-            roundSummaries: opts.resume?.seedRoundSummaries,
+            roundSummaries: opts.fromArtifact?.seedRoundSummaries,
             status: 'running',
             opts: loopOpts,
           });
@@ -425,10 +425,11 @@ export function createFeatRunWorkflow() {
     fn: async (input, ctx): Promise<ConvergenceOutput> => {
       const sandboxRaw = await ctx.parentOutput(provisionTask);
       const opts = deserializeOrchestratorOpts(input.serializedOpts);
-      const { maxRuns, feature, saifDir, resume, testOnly } = opts;
+      const { maxRuns, feature, saifDir, fromArtifact, testOnly } = opts;
 
+      const modeLabel = testOnly ? 'test' : fromArtifact ? 'fromArtifact' : 'start';
       consola.log(
-        `\n[orchestrator] MODE: ${testOnly ? 'test' : 'start'} — ${feature.name} (run ${sandboxRaw.runId})`,
+        `\n[orchestrator] MODE: ${modeLabel} — ${feature.name} (run ${sandboxRaw.runId})`,
       );
       logIterativeLoopSettings(opts, { runId: sandboxRaw.runId });
 
@@ -439,7 +440,7 @@ export function createFeatRunWorkflow() {
 
       if (testOnly) {
         consola.log('[hatchet] test-only — skipping agent iterations; running verification tests.');
-        const runCommitsAccum = [...(resume?.seedRunCommits ?? [])];
+        const runCommitsAccum = [...(fromArtifact?.seedRunCommits ?? [])];
         await writeUtf8(
           join(sandboxRaw.sandboxBasePath, 'run-commits.json'),
           JSON.stringify(runCommitsAccum),
@@ -494,11 +495,11 @@ export function createFeatRunWorkflow() {
 
       const rulesState: RunRule[] = rulesFromWire();
 
-      let errorFeedback = resume?.initialErrorFeedback ?? '';
+      let errorFeedback = fromArtifact?.initialErrorFeedback ?? '';
       let lastPatchContent = '';
       let lastErrorFeedback = '';
       let lastRunId = '';
-      let runCommitsAccum: RunCommit[] = [...(resume?.seedRunCommits ?? [])];
+      let runCommitsAccum: RunCommit[] = [...(fromArtifact?.seedRunCommits ?? [])];
       const roundSummaries: OuterAttemptSummary[] = [];
 
       for (let attempt = 1; attempt <= maxRuns; attempt++) {
@@ -721,7 +722,7 @@ export function createFeatRunWorkflow() {
       const runStorage = opts.runStorage;
       if (runStorage) {
         try {
-          const { runStorage: _rs, resume: _res, ...loopOpts } = opts;
+          const { runStorage: _rs, fromArtifact: _fa, ...loopOpts } = opts;
           const artifact = buildRunArtifact({
             runId: sandboxRaw.runId,
             baseCommitSha: input.runContext.baseCommitSha,
@@ -734,7 +735,8 @@ export function createFeatRunWorkflow() {
             opts: loopOpts,
           });
           const expectedArtifactRevision =
-            sandboxRaw.runningArtifactRevision ?? opts.resume?.artifactRevisionAtResume;
+            sandboxRaw.runningArtifactRevision ??
+            opts.fromArtifact?.artifactRevisionWhenFromArtifact;
           await runStorage.saveRun(
             sandboxRaw.runId,
             artifact,
@@ -757,7 +759,7 @@ export function createFeatRunWorkflow() {
     },
   });
 
-  // on-failure: persist RunArtifact for `saifac run resume` (addresses step 1.8), then remove
+  // on-failure: persist RunArtifact for `saifac run start` (addresses step 1.8), then remove
   // the sandbox. Without cleanup here, failures before `apply-patch` never run destroySandbox
   // (that task only runs when convergence-loop completes successfully).
   workflow.onFailure({
@@ -792,7 +794,7 @@ export function createFeatRunWorkflow() {
           loopResult?.lastErrorFeedback ?? input.runContext.lastErrorFeedback ?? '';
 
         try {
-          const { runStorage: _rs, resume: _res, ...loopOpts } = opts;
+          const { runStorage: _rs, fromArtifact: _fa, ...loopOpts } = opts;
           const artifact = buildRunArtifact({
             runId: sandboxRaw.runId,
             baseCommitSha: input.runContext.baseCommitSha,
@@ -806,7 +808,8 @@ export function createFeatRunWorkflow() {
             opts: loopOpts,
           });
           const expectedArtifactRevision =
-            sandboxRaw.runningArtifactRevision ?? opts.resume?.artifactRevisionAtResume;
+            sandboxRaw.runningArtifactRevision ??
+            opts.fromArtifact?.artifactRevisionWhenFromArtifact;
           await runStorage.saveRun(
             sandboxRaw.runId,
             artifact,
@@ -815,7 +818,7 @@ export function createFeatRunWorkflow() {
               : { ifRevisionEquals: expectedArtifactRevision },
           );
           consola.log(
-            `[hatchet] Run artifact saved (failed). Resume with: saifac run resume ${sandboxRaw.runId}`,
+            `[hatchet] Run artifact saved (failed). Start again with: saifac run start ${sandboxRaw.runId}`,
           );
         } catch (err) {
           if (err instanceof StaleArtifactError) {

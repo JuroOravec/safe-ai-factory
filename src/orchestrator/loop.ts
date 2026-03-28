@@ -1,6 +1,6 @@
 /**
  * Iterative agent loop and related utilities.
- * Used by mode 'start' (and 'resume' via runStartCore).
+ * Used by mode 'start' (and 'fromArtifact' via runStartCore).
  */
 
 import { mkdir } from 'node:fs/promises';
@@ -127,14 +127,14 @@ export async function sandboxHasCommitsBeyondInitialImport(codePath: string): Pr
 // ---------------------------------------------------------------------------
 
 /**
- * Options used by runIterativeLoop (modes 'start' and 'resume').
+ * Options used by runIterativeLoop (modes 'start' and 'fromArtifact').
  */
 export interface IterativeLoopOpts {
   /** Sandbox profile id (e.g. 'node-pnpm-python'). Used to resolve Dockerfile.coder for the staging container when tests.json does not specify build.dockerfile. */
   sandboxProfileId: SupportedSandboxProfileId;
   /**
    * Coding agent profile id (e.g. 'openhands', 'debug'). Persisted in run artifacts for accurate
-   * resume/info; scripts are resolved from this profile unless overridden via --agent-script.
+   * from-artifact/info; scripts are resolved from this profile unless overridden via --agent-script.
    */
   agentProfileId: SupportedAgentProfileId;
   /** Resolved feature (name, absolutePath, relativePath). */
@@ -212,7 +212,7 @@ export interface IterativeLoopOpts {
    * When set, use this branch name when tests have passed and we're applying the patch
    * agent's changes to the user's project.
    *
-   * Same as `--branch` on feat run / run resume / run test.
+   * Same as `--branch` on feat run / run start / run test.
    */
   targetBranch: string | null;
   /**
@@ -239,12 +239,12 @@ export interface IterativeLoopOpts {
   /**
    * Host env var **names** whose values are copied from `process.env` into the coder container's
    * secret env (not logged as values). From `config.defaults.agentSecretKeys` and `--agent-secret`.
-   * Persisted in run artifacts as names only; values are re-read from the host on resume.
+   * Persisted in run artifacts as names only; values are re-read from the host when starting from a stored run.
    */
   agentSecretKeys: string[];
   /**
    * Project-relative paths to `.env`-style files with `KEY=value` secret pairs — same format as
-   * `--agent-env-file`. Persisted in run artifacts; on resume the files are read again (values are
+   * `--agent-env-file`. Persisted in run artifacts; when starting from a stored run the files are read again (values are
    * not stored in the artifact).
    */
   agentSecretFiles: string[];
@@ -264,7 +264,7 @@ export interface IterativeLoopOpts {
   testProfile: TestProfile;
   /**
    * How many times to re-run the full test suite on failed tests. Useful for flaky test environments.
-   * Applies to modes 'fail2pass', 'start', 'resume', and 'test'.
+   * Applies to modes 'fail2pass', 'start', 'fromArtifact', and 'test'.
    * Default: 1 (run once; no retries).
    */
   testRetries: number;
@@ -307,11 +307,11 @@ export interface IterativeLoopOpts {
    */
   verbose?: boolean;
   /**
-   * When resuming, seed {@link RunArtifact#runCommits} (replayed in sandbox before the loop).
+   * When starting from a stored run, seed {@link RunArtifact#runCommits} (replayed in sandbox before the loop).
    */
   seedRunCommits?: RunCommit[];
   /**
-   * When resuming, seed {@link RunArtifact#roundSummaries} so new outer attempts append after prior history.
+   * When starting from a stored run, seed {@link RunArtifact#roundSummaries} so new outer attempts append after prior history.
    */
   seedRoundSummaries?: OuterAttemptSummary[];
   /**
@@ -324,7 +324,7 @@ export interface IterativeLoopOpts {
 export interface OrchestratorResult {
   success: boolean;
   attempts: number;
-  /** Run ID for resuming when run storage is enabled (artifact under .saifac/runs/) */
+  /** Run ID for starting again when run storage is enabled (artifact under .saifac/runs/) */
   runId?: string;
   /** Path to the winning patch.diff if success=true */
   patchPath?: string;
@@ -477,7 +477,7 @@ export interface RunStorageContext {
   /** Mutable: set by loop for save-on-Ctrl+C */
   lastErrorFeedback?: string;
   /**
-   * User rules for this run (from artifact on resume; empty on fresh start).
+   * User rules for this run (from artifact when continuing; empty on fresh start).
    * Mutated when `once` rules are consumed after each coding round.
    */
   rules: RunRule[];
@@ -492,7 +492,7 @@ export async function runIterativeLoop(
   sandbox: Sandbox,
   opts: OrchestratorOpts & {
     runContext: RunStorageContext | null;
-    /** When resuming from storage: seed the first agent round with this feedback */
+    /** When starting from a stored run: seed the first agent round with this feedback */
     initialErrorFeedback: string | null;
     registry: CleanupRegistry;
   },
@@ -531,7 +531,7 @@ export async function runIterativeLoop(
 
   const runId = sandbox.runId;
 
-  /** Accumulated run commits (seeded from resume + each successful coding round). */
+  /** Accumulated run commits (seeded from stored run + each successful coding round). */
   let runCommitsAccum: RunCommit[] = [...(seedRunCommits ?? [])];
   let lastErrorFeedback = '';
   let roundSummaries: OuterAttemptSummary[] = [...(seedRoundSummaries ?? [])];
@@ -566,7 +566,7 @@ export async function runIterativeLoop(
         registry: _reg,
         runStorage: _rs,
         runContext: _rc,
-        resume: _resume,
+        fromArtifact: _fromArtifact,
         ...loopOpts
       } = opts;
       const artifact = buildRunArtifact({
@@ -610,7 +610,7 @@ export async function runIterativeLoop(
           registry: _reg,
           runStorage: _rs,
           runContext: _rc,
-          resume: _resume,
+          fromArtifact: _fromArtifact,
           ...loopOpts
         } = opts;
         const artifact = buildRunArtifact({
@@ -635,7 +635,7 @@ export async function runIterativeLoop(
           consola.log(`[orchestrator] Run artifact saved (completed). Run ID: ${runId}`);
         } else {
           consola.log(
-            `[orchestrator] Run artifact saved (failed). Resume with: saifac run resume ${runId}`,
+            `[orchestrator] Run artifact saved (failed). Start again with: saifac run start ${runId}`,
           );
         }
       } catch (err) {
@@ -926,10 +926,10 @@ export async function runIterativeLoop(
         continue;
       }
 
-      // No changes this round, but the sandbox already has commits (e.g. resumed runCommits)
+      // No changes this round, but the sandbox already has commits (e.g. seeded runCommits)
       if (roundPatchEmpty && hasPriorWorkInSandbox) {
         consola.log(
-          '[orchestrator] No new changes this coding round, but the sandbox already has commits (e.g. resumed runCommits) — running tests on the current tree.',
+          '[orchestrator] No new changes this coding round, but the sandbox already has commits (e.g. seeded runCommits) — running tests on the current tree.',
         );
         if (runCommitsAccum.length > 0) {
           await writeUtf8(
@@ -1085,7 +1085,7 @@ export async function runIterativeLoop(
         JSON.stringify(runCommitsAccum),
       );
 
-      // Reset to state at start of this attempt (Ralph: discard failed round only; keep resume seed)
+      // Reset to state at start of this attempt (Ralph: discard failed round only; keep stored-run seed)
       await gitResetHard({ cwd: sandbox.codePath, ref: preRoundHead });
       await gitClean({ cwd: sandbox.codePath });
     }
@@ -1360,7 +1360,7 @@ export async function prepareTestRunnerOpts({
   return { testsDir, reportDir: sandboxBasePath, testScriptPath };
 }
 
-/** Settings banner for `feat run` and `run resume` (after merge), using resolved orchestrator opts. */
+/** Settings banner for `feat run` and `run start` (after merge), using resolved orchestrator opts. */
 export function logIterativeLoopSettings(opts: OrchestratorOpts, meta?: { runId?: string }): void {
   const agentProfile = resolveAgentProfile(opts.agentProfileId);
   consola.log(`\nStarting iterative loop: ${opts.feature.name}`);
@@ -1389,7 +1389,7 @@ export function logIterativeLoopSettings(opts: OrchestratorOpts, meta?: { runId?
     `  Agent secret keys (host → container): ${opts.agentSecretKeys.join(', ') || 'none'}`,
   );
   consola.log(
-    `  Agent secret file(s): ${opts.agentSecretFiles.join(', ') || 'none'} (KEY=value .env format; re-read on resume)`,
+    `  Agent secret file(s): ${opts.agentSecretFiles.join(', ') || 'none'} (KEY=value .env format; re-read when starting from a stored run)`,
   );
   consola.log(`  Gate retries: ${opts.gateRetries}`);
   if (opts.push) {

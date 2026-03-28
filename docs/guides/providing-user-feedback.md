@@ -4,8 +4,8 @@ Add short instructions to an agent's Run. They are merged into the coding agent'
 
 You can do this in two ways:
 
-- **Live feedback** — While a run is still executing (`feat run` or `run resume`), add rules in another terminal; the agent can see them on the **next inner round** (after the current agent step finishes).
-- **Offline feedback** — Add rules after the run has stopped, then [`run resume`](../commands/run-resume.md) so the next agent run includes your feedback.
+- **Live feedback** — While a run is still executing (`feat run` or `run start`), add rules in another terminal; the agent can see them on the **next inner round** (after the current agent step finishes).
+- **Offline feedback** — Add rules after the run has stopped, then [`run start`](../commands/run-start.md) so the next agent run includes your feedback.
 
 **You need:** Docker, and a **Run ID**.
 
@@ -15,7 +15,7 @@ You can do this in two ways:
 - You want a clear constraint in plain language (paths, patterns, "use X, don't add Y").
 - Test output is not enough - you want to say exactly what should change before the next attempt.
 
-**Different problem?** To **edit files yourself** in the agent’s sandbox, use [Fix agent mistakes with inspect and resume](inspect-and-resume.md). You can use both: rules for instructions, inspect for direct code fixes.
+**Different problem?** To **edit files yourself** in the agent’s sandbox, use [Fix agent mistakes: inspect, then run start](inspect-and-start.md). You can use both: rules for instructions, inspect for direct code fixes.
 
 ## Before you start
 
@@ -30,7 +30,7 @@ saifac run list
   eed5lz6  add-login    failed     2026-03-24T23:55:15.955Z  2026-03-25T11:10:35.904Z
 ```
 
-Run ID also appears after `feat run` / `run resume`:
+Run ID also appears after `feat run` / `run start`:
 
 ```bash
 saifac feat run -n add-login
@@ -38,7 +38,7 @@ saifac feat run -n add-login
 ...
 
 Resume again with:
-  saifac run resume eed5lz6
+  saifac run start eed5lz6
 ```
 
 ## 1. Create a rule
@@ -96,7 +96,7 @@ saifac run rules list eed5lz6
 Finally, once our rules are in place, we can resume the Run:
 
 ```bash
-saifac run resume eed5lz6
+saifac run start eed5lz6
 ```
 
 The agent continues from the saved run with your new text in the task.
@@ -127,10 +127,10 @@ The agent's prompt will now include your rules:
 
 ## Recap
 
-`run list` → Run ID → `run rules create` → `run resume`
+`run list` → Run ID → `run rules create` → `run start`
 
 ## See also
 
-- [`run rules`](../commands/run-rules.md) · [`run resume`](../commands/run-resume.md) · [Runs — Run rules](../runs.md#run-rules-user-feedback)  
-- [Fix agent mistakes with inspect and resume](inspect-and-resume.md)  
+- [`run rules`](../commands/run-rules.md) · [`run start`](../commands/run-start.md) · [Runs — Run rules](../runs.md#run-rules-user-feedback)  
+- [Fix agent mistakes: inspect, then run start](inspect-and-start.md)  
 - [Usage](../usage.md) · [Troubleshooting](../troubleshooting.md)

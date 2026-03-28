@@ -11,7 +11,7 @@ More guides can slot in here—for example: first feature end-to-end, reading ru
 
 | Guide | Use it when… |
 | ----- | ------------ |
-| [Fix agent mistakes with inspect and resume](inspect-and-resume.md) | The coding agent is wrong, stuck on an error, or you need to patch the sandbox by hand and then let the agent continue. |
+| [Fix agent mistakes: inspect, then run start](inspect-and-start.md) | The coding agent is wrong, stuck on an error, or you need to patch the sandbox by hand and then let the agent continue with `run start`. |
 | [Live user feedback to the agent](providing-user-feedback.md) | Steer via **run rules** — Instructions appear in the task prompt. |
 
 ## Reference links

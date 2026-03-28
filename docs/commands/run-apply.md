@@ -55,7 +55,7 @@ saifac run apply pwc2l1j --branch saifac/my-feature-retry-2
 ## How it works
 
 1. Loads the saved run for the ID you gave.
-2. Rebuilds a **temporary copy** of your project exactly as that run left it (same approach as [`run resume`](run-resume.md), but no agent loop).
+2. Rebuilds a **temporary copy** of your project exactly as that run left it (same approach as [`run start`](run-start.md), but no agent loop).
 3. **Applies the patch to your real repo** on branch `saifac/<feature>-<runId>-<diffHash>` (default, or `--branch`),
 4. Optionally **pushes** and opens a **PR** (same flags as `feat run` / `run test`).
 
@@ -68,11 +68,11 @@ saifac run apply pwc2l1j --branch saifac/my-feature-retry-2
 
 - Patches that touch `.git/hooks/` are rejected (same guard as host apply in the main loop).
 
-- If you set `--storage none` / `runs=none`, the CLI errors and exits non-zero (`Run storage is disabled (--storage none). Cannot resume.`).
+- If you set `--storage none` / `runs=none`, the CLI errors and exits non-zero (`Run storage is disabled (--storage none). Cannot start from a stored run.`).
 
-- `run resume` MUST be run in the same git context as the original run. Otherwise resume fails with a clear error.
+- `run start` MUST be run in the same git context as the original run. Otherwise resume fails with a clear error.
 
-   Example: If you ran `feat run` on a branch with latest commit `abc123`, then the commit `abc123` must still exist when you run `run resume`.
+   Example: If you ran `feat run` on a branch with latest commit `abc123`, then the commit `abc123` must still exist when you run `run start`.
    
    We rely on git commits to faithfully reconstruct the workspace, while keeping the Run metadata light.
 
@@ -80,4 +80,4 @@ saifac run apply pwc2l1j --branch saifac/my-feature-retry-2
 
 - [Runs](../runs.md) — Artifact fields (`runCommits`, `baseCommitSha`, `basePatchDiff`)
 - [`run test`](run-test.md) — Re-test a stored run, then apply on success
-- [`run resume`](run-resume.md) — Continue the agent loop from a failed run
+- [`run start`](run-start.md) — Continue the agent loop from a failed run

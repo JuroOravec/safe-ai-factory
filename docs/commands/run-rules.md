@@ -2,7 +2,7 @@
 
 Manage **user feedback rules** stored on a run artifact. Rules are injected into the agent **task prompt** (see [Runs — Run rules](../runs.md#run-rules-user-feedback)).
 
-**Live feedback:** You can call these commands **while a run is still executing** a coding phase (`feat run` / `run resume`). New rules are picked up for the **next inner round**.
+**Live feedback:** You can call these commands **while a run is still executing** a coding phase (`feat run` / `run start`). New rules are picked up for the **next inner round**.
 
 **Subcommands:** `create`, `list` / `ls`, `get`, `update`, `remove` / `rm`.
 
@@ -152,7 +152,7 @@ saifac run rules rm abc12x a1b2c3
 
 ## Notes
 
-- If you set `--storage none` / `runs=none`, the CLI errors and exits non-zero (`Run storage is disabled (--storage none). Cannot resume.`).
+- If you set `--storage none` / `runs=none`, the CLI errors and exits non-zero (`Run storage is disabled (--storage none). Cannot start from a stored run.`).
 
 - Concurrency - `saifac` uses revision versions to handle concurrent writes. Mutating commands (`create`, `update`, `remove`) change the revision version. If another writer saved in between, you get a **stale revision** message — reload the run and retry.
 
@@ -162,7 +162,7 @@ saifac run rules rm abc12x a1b2c3
 
 - [Guide: Live user feedback to the agent](../guides/providing-user-feedback.md) — Instructions appear in the task prompt.
 - [Runs](../runs.md) — Run storage, artifact shape, rule semantics
-- [`run resume`](run-resume.md) — Next step after adding rules
+- [`run start`](run-start.md) — Next step after adding rules
 - [`run info`](run-info.md) — Inspect artifact JSON (includes `rules` when present)
 - [`run fork`](run-fork.md) — Copy a run including rules
 - [`run list`](run-list.md) — Discover `runId` values

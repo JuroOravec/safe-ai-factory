@@ -94,4 +94,4 @@ Example of the default **pretty-printed** output:
 - [`run list`](run-list.md) — List run IDs
 - [`run remove`](run-remove.md) — Delete a stored run
 - [`run clear`](run-clear.md) — Bulk delete runs
-- [`run resume`](run-resume.md) — Resume a failed run
+- [`run start`](run-start.md) — Resume a failed run

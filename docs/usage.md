@@ -311,7 +311,7 @@ After the tests successfully failed, you can start your coding agent.
 
 ## Guides
 
-- [Fix agent mistakes with inspect and resume](guides/inspect-and-resume.md) — open the saved run’s coding container in VS Code or Cursor, edit by hand, then `run resume`.
+- [Fix agent mistakes: inspect, then run start](guides/inspect-and-start.md) — open the saved run’s coding container in VS Code or Cursor, edit by hand, then `run start`.
 - [Live user feedback to the agent](guides/providing-user-feedback.md) — instructions appear in the task prompt.
 
 ## Notes

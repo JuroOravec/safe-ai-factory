@@ -15,7 +15,7 @@ The gate is **not** a replacement for the Test Runner or hidden tests; it is a c
 The gate script (`--gate-script`) runs right after the coding agent has finished its work.
 Gate script runs before the semantic reviewer.
 
-Commands that use this loop include `saifac feat run` and `saifac run resume`.
+Commands that use this loop include `saifac feat run` and `saifac run start`.
 
 ```bash
 saifac feat run -n <feature> --gate-script ./scripts/my-gate.sh

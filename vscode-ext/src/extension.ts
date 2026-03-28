@@ -211,12 +211,12 @@ export async function activate(context: vscode.ExtensionContext) {
   const getCwdForRun = (item?: vscode.TreeItem): string =>
     item instanceof RunItem ? item.projectPath : workspaceRoot;
 
-  const resumeRunCmd = vscode.commands.registerCommand(
-    'saifac.resumeRun',
+  const fromArtifactCmd = vscode.commands.registerCommand(
+    'saifac.fromArtifact',
     withCliGuard((item?: vscode.TreeItem) => {
       const runId = item?.id ?? getItemName(item);
       const cwd = getCwdForRun(item);
-      if (runId) cliService.resumeRun(runId, cwd);
+      if (runId) cliService.fromArtifact(runId, cwd);
     }),
   );
 
@@ -303,7 +303,7 @@ export async function activate(context: vscode.ExtensionContext) {
     runFeatureCmd,
     designFeatureCmd,
     refreshRunsCmd,
-    resumeRunCmd,
+    fromArtifactCmd,
     removeRunCmd,
     clearAllRunsCmd,
     revealRunInFinderCmd,

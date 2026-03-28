@@ -85,6 +85,6 @@ Run storage is disabled (--storage none).
 ## See also
 
 - [Runs](../runs.md) — Run storage, resumption, and overview
-- [`run resume`](run-resume.md) — Resume a stored run
+- [`run start`](run-start.md) — Resume a stored run
 - [`run remove`](run-remove.md) — Delete a stored run
 - [`run clear`](run-clear.md) — Bulk delete runs

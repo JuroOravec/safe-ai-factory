@@ -68,7 +68,7 @@ The Vague Specs Checker never leaks holdout test details to the implementation a
 
 ## Resolution Modes
 
-The `--resolve-ambiguity` flag controls how the orchestrator handles tests failures. It applies to `saifac feat run` and `saifac run resume`.
+The `--resolve-ambiguity` flag controls how the orchestrator handles tests failures. It applies to `saifac feat run` and `saifac run start`.
 
 | Mode       | Flag                               | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ---------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

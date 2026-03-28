@@ -3,7 +3,7 @@
  *
  *  1. fail2pass      — Verify at least one feature test fails on current codebase (sanity check; partial overlap OK)
  *  2. start          — Create a fresh sandbox and run the iterative agent loop
- *  3. resume         — Resume a failed run from storage then calls start
+ *  3. fromArtifact   — Start again from a stored run (artifact) then runs the same loop as `start`
  *  4. test           — Re-test a stored run's patch without running the coding agent loop
  *  5. inspect        — Idle coding container for a stored run (changes made in the container are saved)
  */
@@ -64,18 +64,18 @@ import {
   resolveHostApplyBranchName,
 } from './phases/apply-patch.js';
 import {
-  captureBaseGitState,
-  cleanupResumeWorkspace,
-  createResumeWorktree,
-  saveRunOnError,
-} from './resume.js';
-import {
   createSandbox,
   destroySandbox,
   extractIncrementalRoundPatch,
   SAIFAC_TEMP_ROOT,
 } from './sandbox.js';
 import { getArgusBinaryPath } from './sidecars/reviewer/argus.js';
+import {
+  captureBaseGitState,
+  cleanupArtifactRunWorktree,
+  createArtifactRunWorktree,
+  saveRunOnError,
+} from './worktree.js';
 
 export interface OrchestratorOpts extends IterativeLoopOpts {
   /**
@@ -148,33 +148,33 @@ export interface OrchestratorOpts extends IterativeLoopOpts {
    */
   runStorage: RunStorage | null;
   /**
-   * When set, runStartCore operates in resume mode: use sandboxSourceDir for createSandbox,
+   * When set, runStartCore operates in from-artifact mode: use sandboxSourceDir for createSandbox,
    * skip base git capture, and pass initialErrorFeedback to the loop.
-   * Only used when runResumeCore delegates to runStartCore.
+   * Only used when {@link fromArtifactCore} delegates to runStartCore.
    */
-  resume: {
+  fromArtifact: {
     sandboxSourceDir: string;
     runContext: RunStorageContext;
     initialErrorFeedback?: string;
-    /** Base tree copy (before run commits) — sandbox rsync source for resume/tests/inspect */
+    /** Base tree copy (before run commits) — sandbox rsync source for from-artifact/tests/inspect */
     baseSnapshotPath?: string;
     /** Stored {@link RunArtifact#runCommits} replayed after the sandbox "Base state" commit */
     seedRunCommits?: RunCommit[];
     /**
-     * When resuming from `run storage`, the run id to reuse for the sandbox and persisted artifact
-     * (same as the key passed to `saifac run resume <id>`).
+     * When starting from run storage, the run id to reuse for the sandbox and persisted artifact
+     * (same as the key passed to `saifac run start <id>`).
      */
     persistedRunId?: string;
     /**
-     * Stored {@link RunArtifact#artifactRevision} at resume time (missing treated as 0).
+     * Stored {@link RunArtifact#artifactRevision} when loading from storage (missing treated as 0).
      *
      * Used for optimistic locking on `saveRun`, same pattern as `run inspect`.
      *
      * This is used to prevent race conditions when multiple processes are trying to save the same run.
      * If the revision is not the same as the one in storage, the save will fail.
      */
-    artifactRevisionAtResume?: number;
-    /** Prior {@link RunArtifact#roundSummaries} when resuming a stored run */
+    artifactRevisionWhenFromArtifact?: number;
+    /** Prior {@link RunArtifact#roundSummaries} when continuing from a stored run */
     seedRoundSummaries?: OuterAttemptSummary[];
   } | null;
   /**
@@ -197,7 +197,7 @@ function withCleanupRegistry<T, R>(
 
     // This function is called when the user hits Ctrl+C or the process is terminated.
     // It cleans up the containers and networks created during the run.
-    // It also saves the run state to runStorage so the user can resume later.
+    // It also saves the run state to runStorage so the user can start again from the artifact later.
     const onSignal = (sig: string) => {
       if (isCleaningUp) return;
       isCleaningUp = true;
@@ -241,7 +241,7 @@ function withCleanupRegistry<T, R>(
 
 export const runFail2Pass = withCleanupRegistry(runFail2PassCore);
 export const runStart = withCleanupRegistry(runStartCore);
-export const runResume = withCleanupRegistry(runResumeCore);
+export const fromArtifact = withCleanupRegistry(fromArtifactCore);
 export const runTestsFromRun = withCleanupRegistry(runTestsFromRunCore);
 export const runApply = withCleanupRegistry(runApplyCore);
 
@@ -430,14 +430,14 @@ async function runStartCore(
   const sandboxSourceDir = getSandboxSourceDir(opts);
 
   // ─── Run context (for save-on-Ctrl+C / save-on-failure) ────────────────────
-  // Capture all the relevant state so that we can resume the run later.
+  // Capture all the relevant state so that we can start again from the artifact later.
   // Thus, if `runIterativeLoop` throws or user aborts with CTRL+C, the loop
   // will persist an artifact with all the relevant state so the user can
-  // resume later with `saifac run resume <runId>`.
+  // start again with `saifac run start <runId>`.
   let runContext: RunStorageContext;
-  if (opts.resume) {
+  if (opts.fromArtifact) {
     // Resume: use the context from the stored artifact
-    runContext = opts.resume.runContext;
+    runContext = opts.fromArtifact.runContext;
   } else {
     // Start: capture the current git state so we can reconstruct it when resuming
     runContext = await captureBaseGitState(projectDir);
@@ -490,7 +490,7 @@ async function runStartCore(
   const sandbox = await createSandbox({
     feature,
     projectDir: sandboxSourceDir,
-    codeSourceDir: opts.resume?.baseSnapshotPath ?? sandboxSourceDir,
+    codeSourceDir: opts.fromArtifact?.baseSnapshotPath ?? sandboxSourceDir,
     saifDir,
     projectName,
     sandboxBaseDir,
@@ -500,14 +500,13 @@ async function runStartCore(
     agentScript,
     stageScript,
     verbose: opts.verbose,
-    runCommits: opts.resume?.seedRunCommits ?? [],
-    runId: opts.resume?.persistedRunId,
+    runCommits: opts.fromArtifact?.seedRunCommits ?? [],
+    runId: opts.fromArtifact?.persistedRunId,
     includeDirty: opts.includeDirty,
   });
 
-  consola.log(
-    `\n[orchestrator] MODE: ${testOnly ? 'test' : 'start'} — ${feature.name} (run ${sandbox.runId})`,
-  );
+  const modeLabel = testOnly ? 'test' : opts.fromArtifact ? 'fromArtifact' : 'start';
+  consola.log(`\n[orchestrator] MODE: ${modeLabel} — ${feature.name} (run ${sandbox.runId})`);
   logIterativeLoopSettings(opts, { runId: sandbox.runId });
 
   registry.setEmergencySandboxPath(sandbox.sandboxBasePath);
@@ -515,12 +514,12 @@ async function runStartCore(
   // ─── Set status to "running" ─────
   if (runStorage) {
     try {
-      const { runStorage: _rs, resume: _res, ...loopOpts } = opts;
+      const { runStorage: _rs, fromArtifact: _fa, ...loopOpts } = opts;
       const runningArtifact = buildRunArtifact({
         runId: sandbox.runId,
         baseCommitSha: runContext.baseCommitSha,
         basePatchDiff: runContext.basePatchDiff,
-        runCommits: opts.resume?.seedRunCommits ?? [],
+        runCommits: opts.fromArtifact?.seedRunCommits ?? [],
         specRef: feature.relativePath,
         rules: runContext.rules,
         status: 'running',
@@ -559,18 +558,18 @@ async function runStartCore(
     saifDir,
     runStorage,
     runContext,
-    initialErrorFeedback: opts.resume?.initialErrorFeedback ?? null,
-    seedRunCommits: opts.resume?.seedRunCommits ?? [],
-    seedRoundSummaries: opts.resume?.seedRoundSummaries,
+    initialErrorFeedback: opts.fromArtifact?.initialErrorFeedback ?? null,
+    seedRunCommits: opts.fromArtifact?.seedRunCommits ?? [],
+    seedRoundSummaries: opts.fromArtifact?.seedRoundSummaries,
     registry,
   });
 }
 
 // ---------------------------------------------------------------------------
-// Mode 3: resume (from storage)
+// Mode 3: fromArtifact (from storage)
 // ---------------------------------------------------------------------------
 
-export interface ResumeOpts {
+export interface FromArtifactOpts {
   runId: string;
   projectDir: string;
   saifDir: string;
@@ -582,14 +581,14 @@ export interface ResumeOpts {
 }
 
 /**
- * Resumes a run from storage. Fetches the artifact, prepares workspace from
+ * Starts again from a stored run. Fetches the artifact, prepares workspace from
  * baseCommitSha + diffs, creates a fresh sandbox, and runs the loop.
- * Delegates to runStartCore with resume opts.
+ * Delegates to runStartCore with {@link OrchestratorOpts#fromArtifact} set.
  *
- * Used by both `run resume` and `run test`.
+ * Used by both `run start` and `run test`.
  */
-async function runResumeCore(
-  opts: ResumeOpts & { testOnly?: boolean },
+async function fromArtifactCore(
+  opts: FromArtifactOpts & { testOnly?: boolean },
   registry: CleanupRegistry,
 ): Promise<OrchestratorResult> {
   const {
@@ -615,12 +614,12 @@ async function runResumeCore(
     );
   }
 
-  const mode = testOnly ? 'test' : 'resume';
+  const mode = testOnly ? 'test' : 'fromArtifact';
   consola.log(`\n[orchestrator] MODE: ${mode} — ${artifact.config.featureName} (run ${runId})`);
 
-  // Fresh worktree under /tmp/saifac/resume-worktrees/ (from artifact), then fresh sandbox in runStartCore
+  // Fresh worktree under /tmp/worktrees/ (from artifact), then fresh sandbox in runStartCore
   // to reconstruct the state of the workspace at the time of the run (+ agent's changes)
-  const { worktreePath, branchName, baseSnapshotPath } = await createResumeWorktree({
+  const { worktreePath, branchName, baseSnapshotPath } = await createArtifactRunWorktree({
     projectDir,
     runId,
     baseCommitSha: artifact.baseCommitSha,
@@ -646,7 +645,7 @@ async function runResumeCore(
     engineCli,
   });
 
-  mergedOpts.resume = {
+  mergedOpts.fromArtifact = {
     sandboxSourceDir: worktreePath,
     baseSnapshotPath,
     seedRunCommits: artifact.runCommits,
@@ -658,7 +657,7 @@ async function runResumeCore(
     },
     initialErrorFeedback: artifact.lastFeedback,
     persistedRunId: runId,
-    artifactRevisionAtResume: artifact.artifactRevision ?? 0,
+    artifactRevisionWhenFromArtifact: artifact.artifactRevision ?? 0,
   };
 
   try {
@@ -666,17 +665,17 @@ async function runResumeCore(
     // (runStartCore logs MODE + settings after createSandbox, including Run ID.)
     return await runStartCore(mergedOpts, registry);
   } finally {
-    await cleanupResumeWorkspace({ worktreePath, projectDir, branchName }, () => {
+    await cleanupArtifactRunWorktree({ worktreePath, projectDir, branchName }, () => {
       // Best-effort cleanup
     });
   }
 }
 
 // ---------------------------------------------------------------------------
-// Mode 3b: inspect (stored run → resume worktree + sandbox + idle coder container)
+// Mode 3b: inspect (stored run → artifact worktree + sandbox + idle coder container)
 // ---------------------------------------------------------------------------
 
-export type InspectOpts = ResumeOpts & {
+export type InspectOpts = FromArtifactOpts & {
   /**
    * When true, run the inspect container under Leash/Cedar like the coding agent.
    * Default (false/omitted) uses plain `docker run` so operations blocked by Cedar (e.g. git commit) work.
@@ -685,7 +684,7 @@ export type InspectOpts = ResumeOpts & {
 };
 
 /**
- * Opens the same coding environment as the first round of `run resume`, with an idle container
+ * Opens the same coding environment as the first round of `run start`, with an idle container
  * (`sleep infinity`). When the process is stopped, code changes from the container are extracted
  * and saved the same way as when we run the coding agent. Thus, allowing the user
  * to manually code the feature and save the changes to the run storage.
@@ -724,7 +723,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
 
   consola.log(`\n[orchestrator] MODE: inspect — ${artifact.config.featureName} (run ${runId})`);
 
-  const { worktreePath, branchName, baseSnapshotPath } = await createResumeWorktree({
+  const { worktreePath, branchName, baseSnapshotPath } = await createArtifactRunWorktree({
     projectDir,
     runId,
     baseCommitSha: artifact.baseCommitSha,
@@ -762,7 +761,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
       );
     }
 
-    mergedOpts.resume = {
+    mergedOpts.fromArtifact = {
       sandboxSourceDir: worktreePath,
       baseSnapshotPath,
       seedRunCommits: artifact.runCommits,
@@ -778,7 +777,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
     const sandbox = await createSandbox({
       feature,
       projectDir: sandboxSourceDir,
-      codeSourceDir: mergedOpts.resume?.baseSnapshotPath ?? sandboxSourceDir,
+      codeSourceDir: mergedOpts.fromArtifact?.baseSnapshotPath ?? sandboxSourceDir,
       saifDir,
       projectName: mergedOpts.projectName,
       sandboxBaseDir: mergedOpts.sandboxBaseDir,
@@ -788,7 +787,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
       agentScript: mergedOpts.agentScript,
       stageScript: mergedOpts.stageScript,
       verbose: mergedOpts.verbose,
-      runCommits: mergedOpts.resume?.seedRunCommits ?? [],
+      runCommits: mergedOpts.fromArtifact?.seedRunCommits ?? [],
       includeDirty: mergedOpts.includeDirty,
     });
 
@@ -800,7 +799,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
 
     const patchExclude = buildPatchExcludeRules(saifDir, mergedOpts.patchExclude);
 
-    const runContext = mergedOpts.resume.runContext;
+    const runContext = mergedOpts.fromArtifact.runContext;
     const inspectRunId = `${sandbox.runId}-inspect`;
     const codingEngine = createEngine(mergedOpts.codingEnvironment);
 
@@ -917,7 +916,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
               : artifact.runCommits;
           const nextJson = JSON.stringify(nextCommits);
           if (nextJson !== prevCommitsJson) {
-            const { runStorage: _rs, resume: _r, ...artifactLoopOpts } = mergedOpts;
+            const { runStorage: _rs, fromArtifact: _fa, ...artifactLoopOpts } = mergedOpts;
             const newArtifact = buildRunArtifact({
               runId,
               baseCommitSha: runContext.baseCommitSha,
@@ -959,7 +958,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
       await destroySandbox(sandbox.sandboxBasePath);
     }
   } finally {
-    await cleanupResumeWorkspace({ worktreePath, projectDir, branchName }, () => {
+    await cleanupArtifactRunWorktree({ worktreePath, projectDir, branchName }, () => {
       consola.warn(`[orchestrator] Could not clean up worktree at ${worktreePath}`);
     });
   }
@@ -976,7 +975,7 @@ export async function runInspect(opts: InspectOpts): Promise<void> {
  * and optionally pushes to a remote repository + opens a pull request.
  */
 async function runApplyCore(
-  opts: ResumeOpts,
+  opts: FromArtifactOpts,
   _registry: CleanupRegistry,
 ): Promise<OrchestratorResult> {
   const { runId, projectDir, runStorage, cli, cliModelDelta, config, saifDir, engineCli } = opts;
@@ -1028,7 +1027,7 @@ async function runApplyCore(
     targetBranch: mergedOpts.targetBranch,
   });
 
-  const { worktreePath, branchName: wtBranch } = await createResumeWorktree({
+  const { worktreePath, branchName: wtBranch } = await createArtifactRunWorktree({
     projectDir,
     runId,
     baseCommitSha: artifact.baseCommitSha,
@@ -1066,7 +1065,7 @@ async function runApplyCore(
     });
   } finally {
     await unlink(patchFile).catch(() => {});
-    await cleanupResumeWorkspace(
+    await cleanupArtifactRunWorktree(
       { worktreePath, projectDir, branchName: wtBranch, deleteBranch: false },
       () => {
         consola.warn(`[orchestrator] Could not remove apply worktree at ${worktreePath}`);
@@ -1174,7 +1173,7 @@ export async function runExport(opts: RunExportOpts): Promise<OrchestratorResult
 // Mode 4: test
 // ---------------------------------------------------------------------------
 
-export type TestFromRunOpts = ResumeOpts;
+export type TestFromRunOpts = FromArtifactOpts;
 
 /**
  * Re-tests the patch from a stored run without running the coding agent loop.
@@ -1182,28 +1181,28 @@ export type TestFromRunOpts = ResumeOpts;
  * Useful after a run completes/fails/pauses to re-run just the test phase with
  * updated tests, a different test profile, or to promote a passing patch to a PR.
  *
- * Same pipeline as {@link runResume} with {@link OrchestratorOpts#testOnly}: materialize worktree,
- * sandbox, staging tests, optional host apply — and persist results like resume.
+ * Same pipeline as {@link fromArtifact} with {@link OrchestratorOpts#testOnly}: materialize worktree,
+ * sandbox, staging tests, optional host apply — and persist results like from-artifact runs.
  */
 async function runTestsFromRunCore(
   opts: TestFromRunOpts,
   registry: CleanupRegistry,
 ): Promise<OrchestratorResult> {
-  return runResumeCore({ ...opts, testOnly: true }, registry);
+  return fromArtifactCore({ ...opts, testOnly: true }, registry);
 }
 
 /**
  * Resolves the directory `createSandbox` rsyncs FROM.
  *
  * - **Start:** the main project directory (`opts.projectDir`).
- * - **Resume:** the ephemeral worktree path under `/tmp/saifac/resume-worktrees/`
- *   (`opts.resume.sandboxSourceDir`), materialized from the run artifact.
+ * - **From artifact:** the ephemeral worktree path under `/tmp/worktrees/`
+ *   (`opts.fromArtifact.sandboxSourceDir`), materialized from the run artifact.
  */
 export function getSandboxSourceDir(opts: {
   projectDir: string;
-  resume: { sandboxSourceDir: string } | null;
+  fromArtifact: { sandboxSourceDir: string } | null;
 }): string {
-  return opts.resume?.sandboxSourceDir ?? opts.projectDir;
+  return opts.fromArtifact?.sandboxSourceDir ?? opts.projectDir;
 }
 
 /**

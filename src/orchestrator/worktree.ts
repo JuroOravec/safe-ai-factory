@@ -1,8 +1,8 @@
 /**
- * Resume-specific logic for the Software Factory.
+ * Git worktrees and base-state capture for the Software Factory.
  *
- * Handles git state capture, worktree creation for resuming failed runs,
- * save-on-Ctrl+C artifact persistence.
+ * Handles git state capture for run storage, ephemeral worktrees materialized
+ * from stored run artifacts, and save-on-Ctrl+C artifact persistence.
  */
 
 import { createHash } from 'node:crypto';
@@ -26,23 +26,26 @@ import {
 import { pathExists, readUtf8, spawnAsync, writeUtf8 } from '../utils/io.js';
 import { type RunStorageContext } from './loop.js';
 import { applyRunCommitInRepo } from './patch.js';
-import { diffUntrackedFilesVersusDevNull, SAIFAC_TEMP_ROOT, type Sandbox } from './sandbox.js';
+import { diffUntrackedFilesVersusDevNull, type Sandbox } from './sandbox.js';
+
+/** Ephemeral artifact worktrees (not under the repo’s `.saifac/`). */
+const SAIFAC_ARTIFACT_WORKTREES_ROOT = join('/tmp', 'worktrees');
 
 // ---------------------------------------------------------------------------
 // Base git state capture (for run storage on start)
 // ---------------------------------------------------------------------------
 
 /**
- * Captures the current git state so we can reconstruct it when resuming.
+ * Captures the current git state so we can reconstruct it when starting again from a stored run.
  * Returns baseCommitSha and basePatchDiff: tracked changes (`git diff --binary HEAD`) plus untracked
- * files (`git diff --no-index --binary …`) so binary files round-trip through `git apply` on resume.
+ * files (`git diff --no-index --binary …`) so binary files round-trip through `git apply` later.
  */
 export async function captureBaseGitState(projectDir: string): Promise<RunStorageContext> {
   let baseCommitSha: string;
   let basePatchDiff: string | undefined;
 
   try {
-    // Resume always replays from a known commit; anything not in that commit must be captured as a patch.
+    // Stored runs replay from a known commit; anything not in that commit must be captured as a patch.
     baseCommitSha = (await git({ cwd: projectDir, args: ['rev-parse', 'HEAD'] })).trim();
     const status = (await git({ cwd: projectDir, args: ['status', '--porcelain'] })).trim();
     if (status) {
@@ -76,23 +79,23 @@ export async function captureBaseGitState(projectDir: string): Promise<RunStorag
 }
 
 // ---------------------------------------------------------------------------
-// Create resume worktree
+// Artifact worktree (from stored run)
 // ---------------------------------------------------------------------------
 
-export interface CreateResumeWorktreeParams {
+export interface CreateArtifactRunWorktreeParams {
   projectDir: string;
   runId: string;
   baseCommitSha: string;
   basePatchDiff: string | undefined;
   runCommits: RunCommit[];
   /**
-   * Git branch for the worktree. Defaults to `saifac-resume-${runId}` (ephemeral resume/test).
+   * Git branch for the worktree. Defaults to `saifac-run-${runId}` (ephemeral from-artifact/test).
    * For `run apply` we set this to `saifac/<feature>-<runId>-<hash>`.
    */
   outputBranchName?: string;
 }
 
-export interface CreateResumeWorktreeResult {
+export interface CreateArtifactRunWorktreeResult {
   worktreePath: string;
   branchName: string;
   /** Directory tree (no `.git`) at base + base patch — before any `runCommits`; used to build sandbox "Base state". */
@@ -109,21 +112,21 @@ async function gitWorktreeListForDebug(cwd: string): Promise<string> {
 
 /**
  * Materializes a **fresh** git worktree from the stored run artifact (always from scratch).
- * The worktree lives under `{@link SAIFAC_TEMP_ROOT}/resume-worktrees/` so it is ephemeral
- * like sandboxes — not under `.saifac/worktrees/` inside the repo (linked worktrees there
- * often break or confuse git). `runStartCore` then builds a new rsync sandbox from this path.
+ * The worktree lives under `/tmp/worktrees/` so it is ephemeral like sandboxes — not under
+ * `.saifac/worktrees/` inside the repo (linked worktrees there often break or confuse git).
+ * `runStartCore` then builds a new rsync sandbox from this path.
  *
  * Layers applied on top of `baseCommitSha`:
  * - Base patch diff — uncommitted host changes at run start (optional).
  * - Dedicated **saifac: base patch** commit (always, including empty when there was no base patch).
  * - Each {@link RunCommit} applied and committed in order.
  *
- * Also writes {@link CreateResumeWorktreeResult#baseSnapshotPath}: a copy of the tree after the
+ * Also writes {@link CreateArtifactRunWorktreeResult#baseSnapshotPath}: a copy of the tree after the
  * base patch (before run commits) for sandbox `rsync` + replayed `runCommits`.
  */
-export async function createResumeWorktree(
-  params: CreateResumeWorktreeParams,
-): Promise<CreateResumeWorktreeResult> {
+export async function createArtifactRunWorktree(
+  params: CreateArtifactRunWorktreeParams,
+): Promise<CreateArtifactRunWorktreeResult> {
   const { projectDir, runId, baseCommitSha, basePatchDiff, runCommits, outputBranchName } = params;
 
   try {
@@ -142,12 +145,11 @@ export async function createResumeWorktree(
     GIT_COMMITTER_EMAIL: process.env.GIT_COMMITTER_EMAIL ?? 'saifac@safeaifactory.com',
   };
 
-  const resumeWorktreesBase = join(SAIFAC_TEMP_ROOT, 'resume-worktrees');
-  await mkdir(resumeWorktreesBase, { recursive: true });
+  await mkdir(SAIFAC_ARTIFACT_WORKTREES_ROOT, { recursive: true });
   const dirKey = createHash('sha256').update(projectDir).digest('hex').slice(0, 16);
-  const worktreePath = join(resumeWorktreesBase, `${dirKey}-${runId}`);
-  const baseSnapshotPath = join(resumeWorktreesBase, `${dirKey}-${runId}-base`);
-  const branchName = outputBranchName ?? `saifac-resume-${runId}`;
+  const worktreePath = join(SAIFAC_ARTIFACT_WORKTREES_ROOT, `${dirKey}-${runId}`);
+  const baseSnapshotPath = join(SAIFAC_ARTIFACT_WORKTREES_ROOT, `${dirKey}-${runId}-base`);
+  const branchName = outputBranchName ?? `saifac-run-${runId}`;
 
   // Same runId may have left a broken worktree dir / branch from a prior attempt; git would
   // otherwise leave us with no usable path and Node reports spawn ENOENT when cwd is missing.
@@ -232,9 +234,9 @@ export async function createResumeWorktree(
       await applyRunCommitInRepo({ cwd: worktreePath, commit, gitEnv });
     }
   } catch (err: unknown) {
-    // Remove worktree on failure. cleanupResumeWorkspace only invokes onError when *cleanup*
+    // Remove worktree on failure. cleanupArtifactRunWorktree only invokes onError when *cleanup*
     // throws — not when apply failed — so we must rethrow the apply error here.
-    await cleanupResumeWorkspace({ worktreePath, projectDir, branchName }, () => {});
+    await cleanupArtifactRunWorktree({ worktreePath, projectDir, branchName }, () => {});
     throw new Error(
       `[orchestrator] Failed to apply stored diffs. The run state may be incompatible with the current tree.\n${err}`,
     );
@@ -242,7 +244,7 @@ export async function createResumeWorktree(
 
   if (!(await pathExists(worktreePath))) {
     throw new Error(
-      `[orchestrator] Resume worktree path missing after applying stored patches: ${worktreePath}\n` +
+      `[orchestrator] Artifact worktree path missing after applying stored patches: ${worktreePath}\n` +
         `git worktree list:\n${await gitWorktreeListForDebug(projectDir)}`,
     );
   }
@@ -252,7 +254,7 @@ export async function createResumeWorktree(
     canonicalWorktreePath = await realpath(worktreePath);
   } catch (err) {
     throw new Error(
-      `[orchestrator] Could not realpath resume worktree ${worktreePath}: ${String(err)}`,
+      `[orchestrator] Could not realpath artifact worktree ${worktreePath}: ${String(err)}`,
     );
   }
 
@@ -273,10 +275,10 @@ export async function createResumeWorktree(
 }
 
 // ---------------------------------------------------------------------------
-// Cleanup resume worktree
+// Cleanup artifact worktree
 // ---------------------------------------------------------------------------
 
-export interface CleanupResumeWorkspaceParams {
+export interface CleanupArtifactRunWorktreeParams {
   worktreePath: string;
   projectDir: string;
   branchName: string;
@@ -284,12 +286,12 @@ export interface CleanupResumeWorkspaceParams {
 }
 
 /**
- * Removes the resume worktree and optionally deletes the branch.
+ * Removes the artifact worktree and optionally deletes the branch.
  * `onError` runs only if cleanup itself throws (e.g. git worktree remove failed); it does not
  * run on success. Callers that need to propagate a prior error must throw after awaiting this.
  */
-export async function cleanupResumeWorkspace(
-  params: CleanupResumeWorkspaceParams,
+export async function cleanupArtifactRunWorktree(
+  params: CleanupArtifactRunWorktreeParams,
   onError: () => void,
 ): Promise<void> {
   const { worktreePath, projectDir, branchName, deleteBranch } = params;
@@ -327,7 +329,7 @@ export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promis
 
   const existingArtifact = await runStorage.getRun(runId);
 
-  // Interrupt path: reuse commits the loop already flushed to disk so resume isn’t blind;
+  // Interrupt path: reuse commits the loop already flushed to disk so the next start isn’t blind;
   // bad/missing JSON → empty array.
   const commitsPath = join(sandbox.sandboxBasePath, 'run-commits.json');
   let runCommits: RunCommit[] = [];
@@ -358,7 +360,7 @@ export async function saveRunOnError(params: CreateSaveRunHandlerParams): Promis
   try {
     await runStorage.saveRun(runId, artifact, saveRunOptions);
     consola.log(
-      `[orchestrator] Run artifact saved (interrupted). Resume with: saifac run resume ${runId}`,
+      `[orchestrator] Run artifact saved (interrupted). Start again with: saifac run start ${runId}`,
     );
   } catch (err) {
     if (err instanceof StaleArtifactError) {

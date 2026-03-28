@@ -111,7 +111,7 @@ export const featTestsArgs = {
   },
 };
 
-// Agent args — used by run, resume (coder container).
+// Agent args — used by run start / inspect (coder container).
 export const featAgentArgs = {
   'gate-script': {
     type: 'string' as const,
@@ -181,7 +181,7 @@ export const runTestArgs = {
   },
 };
 
-// Shared body for feat run and run resume (feature name is feat-run only; resume uses the stored artifact).
+// Shared body for feat run and `run start` (feature name is feat-run only; start-from-artifact uses the stored run).
 const featRunCoreArgs = {
   ...runTestArgs,
   ...featAgentArgs,
@@ -226,17 +226,17 @@ const featRunCoreArgs = {
   'agent-secret-file': {
     type: 'string' as const,
     description:
-      'Path(s) to .env file(s) with KEY=value secret pairs (same format as --agent-env-file; # comments allowed). Comma-separated paths; later overrides earlier. Paths are stored in the run artifact and re-read on resume (values are not persisted in the artifact).',
+      'Path(s) to .env file(s) with KEY=value secret pairs (same format as --agent-env-file; # comments allowed). Comma-separated paths; later overrides earlier. Paths are stored in the run artifact and re-read when starting from a stored run (values are not persisted in the artifact).',
   },
 };
 
-// Run-specific args (feat run, run resume). Builds on runTestArgs + agent flags + coder-only options.
+// Run-specific args (feat run, run start). Builds on runTestArgs + agent flags + coder-only options.
 export const featRunArgs = {
   name: nameArg,
   ...featRunCoreArgs,
 };
 
 /** Same options as `feat run` except `--name` / `-n` (feature comes from the stored run only). */
-export const featResumeArgs = {
+export const featFromArtifactArgs = {
   ...featRunCoreArgs,
 };

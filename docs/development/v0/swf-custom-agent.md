@@ -177,7 +177,7 @@ saifac feat run \
 
 ## Step 5: Run the Factory Loop
 
-Invoke `saifac feat run` (or `saifac run resume <runId>` for resume) with all flags combined:
+Invoke `saifac feat run` (or `saifac run start <runId>` for resume) with all flags combined:
 
 ```bash
 saifac feat run \
@@ -186,7 +186,7 @@ saifac feat run \
   --startup-script ./startup-with-aider.sh
 ```
 
-For `saifac run resume`, the same flags apply — you can change the agent script between runs.
+For `saifac run start`, the same flags apply — you can change the agent script between runs.
 
 ---
 

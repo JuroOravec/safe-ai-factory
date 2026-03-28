@@ -1,5 +1,5 @@
 /**
- * Tests for resume / base git capture.
+ * Tests for worktree helpers / base git capture.
  */
 
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { gitAdd, gitCommit, gitInit } from '../utils/git.js';
 import { writeUtf8 } from '../utils/io.js';
-import { captureBaseGitState } from './resume.js';
+import { captureBaseGitState } from './worktree.js';
 
 const gitEnv = {
   ...process.env,
@@ -27,7 +27,7 @@ describe('captureBaseGitState', () => {
   });
 
   it('includes untracked files in basePatchDiff', async () => {
-    tmp = await mkdtemp(join(process.cwd(), 'resume-capture-'));
+    tmp = await mkdtemp(join(process.cwd(), 'worktree-capture-'));
     await gitInit({ cwd: tmp, stdio: 'pipe' });
     await writeUtf8(join(tmp, 'tracked.md'), 'committed\n');
     await gitAdd({ cwd: tmp, env: gitEnv });
@@ -43,7 +43,7 @@ describe('captureBaseGitState', () => {
   });
 
   it('combines tracked and untracked when both exist', async () => {
-    tmp = await mkdtemp(join(process.cwd(), 'resume-capture-'));
+    tmp = await mkdtemp(join(process.cwd(), 'worktree-capture-'));
     await gitInit({ cwd: tmp, stdio: 'pipe' });
     await writeUtf8(join(tmp, 'a.md'), 'v1\n');
     await gitAdd({ cwd: tmp, env: gitEnv });
@@ -59,7 +59,7 @@ describe('captureBaseGitState', () => {
   });
 
   it('returns undefined basePatchDiff when working tree is clean', async () => {
-    tmp = await mkdtemp(join(process.cwd(), 'resume-capture-'));
+    tmp = await mkdtemp(join(process.cwd(), 'worktree-capture-'));
     await gitInit({ cwd: tmp, stdio: 'pipe' });
     await writeUtf8(join(tmp, 'x.md'), 'x\n');
     await gitAdd({ cwd: tmp, env: gitEnv });
@@ -70,7 +70,7 @@ describe('captureBaseGitState', () => {
   });
 
   it('skips untracked directories (only records files from ls-files)', async () => {
-    tmp = await mkdtemp(join(process.cwd(), 'resume-capture-'));
+    tmp = await mkdtemp(join(process.cwd(), 'worktree-capture-'));
     await gitInit({ cwd: tmp, stdio: 'pipe' });
     await writeUtf8(join(tmp, 'r.md'), 'r\n');
     await gitAdd({ cwd: tmp, env: gitEnv });
@@ -86,7 +86,7 @@ describe('captureBaseGitState', () => {
   });
 
   it('uses binary patches for untracked non-text files', async () => {
-    tmp = await mkdtemp(join(process.cwd(), 'resume-capture-'));
+    tmp = await mkdtemp(join(process.cwd(), 'worktree-capture-'));
     await gitInit({ cwd: tmp, stdio: 'pipe' });
     await writeUtf8(join(tmp, 'r.md'), 'r\n');
     await gitAdd({ cwd: tmp, env: gitEnv });

@@ -23,7 +23,7 @@ Round complete → exit container
 The reviewer runs only for:
 
 - `saifac feat run`
-- `saifac run resume`
+- `saifac run start`
 
 To disable the reviewer, you can, pass `--no-reviewer`.
 
