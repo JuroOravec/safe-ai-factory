@@ -19,14 +19,14 @@ describe('host apply branch naming', () => {
     expect(computeRunCommitsDiffHash(commits)).toBe(h);
   });
 
-  it('default branch uses saifac/<feature>-<runId>-<hash>', () => {
+  it('default branch uses saifctl/<feature>-<runId>-<hash>', () => {
     const commits = [{ message: 'a', diff: 'x\n' }];
     const b = defaultHostApplyBranchName({
       featureName: 'my-feature',
       runId: 'r1',
       commits,
     });
-    expect(b).toMatch(new RegExp(`^saifac/my-feature-r1-[0-9a-f]{${HOST_APPLY_DIFF_HASH_LEN}}$`));
+    expect(b).toMatch(new RegExp(`^saifctl/my-feature-r1-[0-9a-f]{${HOST_APPLY_DIFF_HASH_LEN}}$`));
   });
 
   it('resolveHostApplyBranchName uses override when set', () => {
@@ -41,6 +41,6 @@ describe('host apply branch naming', () => {
     ).toBe('custom/name');
     expect(
       resolveHostApplyBranchName({ featureName: 'f', runId: 'r', commits, targetBranch: null }),
-    ).toMatch(new RegExp(`^saifac/f-r-[0-9a-f]{${HOST_APPLY_DIFF_HASH_LEN}}$`));
+    ).toMatch(new RegExp(`^saifctl/f-r-[0-9a-f]{${HOST_APPLY_DIFF_HASH_LEN}}$`));
   });
 });

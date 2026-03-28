@@ -1,5 +1,5 @@
 /**
- * Integration tests for `saifac run info`.
+ * Integration tests for `saifctl run info`.
  * `--no-pretty` is citty’s negation of the `pretty` boolean (default true).
  */
 
@@ -16,7 +16,7 @@ import runCommand from './run.js';
 const EXIT_SENTINEL = '__PROCESS_EXIT__';
 
 async function withTempProject(fn: (projectDir: string) => Promise<void>): Promise<void> {
-  const projectDir = await mkdtemp(join(tmpdir(), 'saifac-run-info-'));
+  const projectDir = await mkdtemp(join(tmpdir(), 'saifctl-run-info-'));
   try {
     await fn(projectDir);
   } finally {
@@ -26,14 +26,14 @@ async function withTempProject(fn: (projectDir: string) => Promise<void>): Promi
 
 /** Minimal stored run JSON (matches LocalStorage layout). */
 async function writeRunJson(projectDir: string, runId: string): Promise<void> {
-  const dir = join(projectDir, '.saifac', 'runs');
+  const dir = join(projectDir, '.saifctl', 'runs');
   await mkdir(dir, { recursive: true });
   const doc = {
     runId,
     baseCommitSha: 'abc',
     basePatchDiff: 'SECRET_BASE',
     runCommits: [{ message: 'm', diff: 'SECRET_RUN' }],
-    specRef: 'saifac/features/x',
+    specRef: 'saifctl/features/x',
     config: {
       featureName: 'feat-x',
       gitProviderId: 'github',
@@ -43,7 +43,7 @@ async function writeRunJson(projectDir: string, runId: string): Promise<void> {
       projectDir: '/tmp',
       maxRuns: 5,
       overrides: {},
-      saifDir: 'saifac',
+      saifDir: 'saifctl',
       projectName: 'test',
       testImage: 'test:latest',
       resolveAmbiguity: 'ai',
@@ -117,7 +117,7 @@ async function runRunSubcommand(rawArgs: string[]): Promise<RunCapture> {
   }
 }
 
-describe('saifac run info', () => {
+describe('saifctl run info', () => {
   it('prints pretty JSON without diffs or script bodies; keeps script paths', async () => {
     await withTempProject(async (projectDir) => {
       await writeRunJson(projectDir, 'ins1');

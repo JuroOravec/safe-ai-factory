@@ -12,7 +12,7 @@ import {
   resolveAgentScriptPath,
   type SupportedAgentProfileId,
 } from '../agent-profiles/index.js';
-import { type SaifacConfig } from '../config/schema.js';
+import { type SaifctlConfig } from '../config/schema.js';
 import { DEFAULT_DESIGNER_PROFILE, resolveDesignerProfile } from '../designer-profiles/index.js';
 import type { DesignerProfile } from '../designer-profiles/types.js';
 import { getGitProvider } from '../git/index.js';
@@ -152,7 +152,7 @@ export interface OrchestratorArgs {
 /** Args shape for feat run. Extends OrchestratorArgs with run-specific flags. */
 export interface FeatRunArgs extends OrchestratorArgs {
   'project-dir'?: string;
-  'saifac-dir'?: string;
+  'saifctl-dir'?: string;
   name?: string;
   model?: string;
   'base-url'?: string;
@@ -456,9 +456,9 @@ export function readReviewerEnabledFromCli(args: {
   return undefined;
 }
 
-/** CLI-only: trimmed `--saifac-dir`, or `undefined` if omitted / empty. */
-export function readSaifDirFromCli(args: { 'saifac-dir'?: string }): string | undefined {
-  const raw = args['saifac-dir'];
+/** CLI-only: trimmed `--saifctl-dir`, or `undefined` if omitted / empty. */
+export function readSaifDirFromCli(args: { 'saifctl-dir'?: string }): string | undefined {
+  const raw = args['saifctl-dir'];
   if (typeof raw === 'string' && raw.trim()) return raw.trim();
   return undefined;
 }
@@ -546,7 +546,7 @@ export function readTestScriptPathFromCli(args: OrchestratorArgs): string | unde
  */
 export function resolveStorageOverrides(
   cliRaw: string | undefined,
-  config?: SaifacConfig,
+  config?: SaifctlConfig,
 ): StorageOverrides {
   const d = config?.defaults;
   const configOverrides: StorageOverrides = {};
@@ -581,7 +581,7 @@ export function resolveStorageOverrides(
 export function resolveRunStorage(
   cliRaw: string | undefined,
   projectDir: string,
-  config?: SaifacConfig,
+  config?: SaifctlConfig,
 ): RunStorage | null {
   const overrides = resolveStorageOverrides(cliRaw, config);
   const uri = overrides.storages?.['runs'] ?? overrides.globalStorage ?? 'local';
@@ -590,16 +590,16 @@ export function resolveRunStorage(
 
 /**
  * Absolute project directory: CLI segment relative to `cwd`, or `cwd` itself when omitted.
- * (`projectDir` is not in saifac config — it locates the repo for config discovery.)
+ * (`projectDir` is not in saifctl config — it locates the repo for config discovery.)
  */
 export function resolveCliProjectDir(cliSegment: string | undefined, cwd = process.cwd()): string {
   const dir = cliSegment?.trim() ? cliSegment.trim() : '.';
   return resolve(cwd, dir);
 }
 
-/** Relative saifac config directory name; defaults to `saifac`. */
+/** Relative saifctl config directory name; defaults to `saifctl`. */
 export function resolveSaifDirRelative(cliRaw: string | undefined): string {
-  return cliRaw?.trim() ? cliRaw.trim() : 'saifac';
+  return cliRaw?.trim() ? cliRaw.trim() : 'saifctl';
 }
 
 /**
@@ -610,7 +610,7 @@ export function resolveSaifDirRelative(cliRaw: string | undefined): string {
 export async function resolveProjectName(opts: {
   project?: string;
   projectDir: string;
-  config?: SaifacConfig;
+  config?: SaifctlConfig;
 }): Promise<string> {
   const { project, projectDir, config } = opts;
   const fromOpt = typeof project === 'string' ? project.trim() : '';
@@ -642,7 +642,7 @@ export async function resolveProjectName(opts: {
  */
 export function pickDesignerProfile(
   cliId: string | undefined,
-  config?: SaifacConfig,
+  config?: SaifctlConfig,
 ): DesignerProfile {
   const raw = (cliId ?? '').trim();
   const id =
@@ -666,7 +666,7 @@ export function pickDesignerProfile(
  */
 export function pickIndexerProfile(
   cliId: string | undefined,
-  config?: SaifacConfig,
+  config?: SaifctlConfig,
 ): IndexerProfile | undefined {
   const indexerRaw = (cliId ?? '').trim();
   const id =
@@ -691,7 +691,7 @@ export function pickIndexerProfile(
  */
 export async function mergeAgentEnvFromReads(opts: {
   projectDir: string;
-  config?: SaifacConfig;
+  config?: SaifctlConfig;
   fileRaw: string | undefined;
   pairSegments: string[];
 }): Promise<Record<string, string>> {
@@ -789,7 +789,7 @@ export interface DiscoveryOptions {
 export function resolveDiscoveryOptions(
   reads: DiscoveryCliReads,
   projectDir: string,
-  config?: SaifacConfig,
+  config?: SaifctlConfig,
 ): DiscoveryOptions {
   const d = config?.defaults;
   const mcps: Record<string, string> = { ...(d?.discoveryMcps ?? {}) };
@@ -869,7 +869,7 @@ export function shouldRunDiscovery(opts: DiscoveryOptions): boolean {
  * object (name, absolutePath, relativePath).
  */
 export async function getFeatOrPrompt(
-  args: { name?: string; 'saifac-dir'?: string },
+  args: { name?: string; 'saifctl-dir'?: string },
   projectDir: string,
 ): Promise<Feature> {
   const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
@@ -877,7 +877,7 @@ export async function getFeatOrPrompt(
   const features = [...featuresMap.keys()];
 
   if (features.length === 0) {
-    consola.error('No features found. Run `saifac feat new` first.');
+    consola.error('No features found. Run `saifctl feat new` first.');
     process.exit(1);
   }
 
@@ -1044,7 +1044,7 @@ export async function loadTestScriptFromPick(opts: {
  */
 export async function buildOrchestratorCliInputFromFeatArgs(
   args: FeatRunArgs,
-  ctx: { projectDir: string; saifDir: string; config: SaifacConfig },
+  ctx: { projectDir: string; saifDir: string; config: SaifctlConfig },
 ): Promise<OrchestratorCliInput> {
   const { projectDir, config } = ctx;
   const runArgs = args;
@@ -1278,8 +1278,8 @@ export async function buildOrchestratorCliInputFromFeatArgs(
       : undefined;
 
   const saifDirCli =
-    typeof runArgs['saifac-dir'] === 'string' && runArgs['saifac-dir'].trim()
-      ? runArgs['saifac-dir'].trim()
+    typeof runArgs['saifctl-dir'] === 'string' && runArgs['saifctl-dir'].trim()
+      ? runArgs['saifctl-dir'].trim()
       : undefined;
 
   const sandboxBaseDir =

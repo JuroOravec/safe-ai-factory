@@ -23,11 +23,11 @@ export type TestCase = z.infer<typeof TestCaseSchema>;
 
 export const TestCatalogSchema = z.object({
   version: z.string().default('1.0'),
-  featureName: z.string().describe('Name of the feature (matches saifac/features/<name>)'),
+  featureName: z.string().describe('Name of the feature (matches saifctl/features/<name>)'),
   featureDir: z
     .string()
     .describe(
-      'Path to feature directory relative to project root (e.g. "saifac/features/<featureName>")',
+      'Path to feature directory relative to project root (e.g. "saifctl/features/<featureName>")',
     ),
   testCases: z.array(TestCaseSchema),
 });

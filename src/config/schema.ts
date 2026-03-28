@@ -1,5 +1,5 @@
 /**
- * Schema for saifac/config.* file.
+ * Schema for saifctl/config.* file.
  *
  * All configurable options can be specified under `defaults`. CLI flags override
  * config defaults. Config uses richer formats where applicable (e.g. model overrides
@@ -110,7 +110,7 @@ export type NormalizedStagingEnvironment = Omit<RawStagingEnvironment, 'app' | '
 /** Normalized coding environment — always present (defaults to `{ engine: 'docker' }` when omitted). */
 export type NormalizedCodingEnvironment = NonNullable<EnvironmentsConfig['coding']>;
 
-export const saifacConfigDefaultsSchema = z.object({
+export const saifctlConfigDefaultsSchema = z.object({
   // Run params
   maxRuns: z.number().int().positive().optional(),
   testRetries: z.number().int().positive().optional(),
@@ -197,10 +197,10 @@ export const saifacConfigDefaultsSchema = z.object({
   agentInstallScript: z.string().optional(),
 });
 
-export const saifacConfigSchema = z.object({
-  defaults: saifacConfigDefaultsSchema.optional(),
+export const saifctlConfigSchema = z.object({
+  defaults: saifctlConfigDefaultsSchema.optional(),
   environments: environmentsSchema.optional(),
 });
 
-export type SaifacConfig = z.infer<typeof saifacConfigSchema>;
-export type SaifacConfigDefaults = z.infer<typeof saifacConfigDefaultsSchema>;
+export type SaifctlConfig = z.infer<typeof saifctlConfigSchema>;
+export type SaifctlConfigDefaults = z.infer<typeof saifctlConfigDefaultsSchema>;

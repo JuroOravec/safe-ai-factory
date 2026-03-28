@@ -1,7 +1,7 @@
 /**
  * Infra engines — infrastructure adaptors for SAIFAC environments.
  *
- * An engine manages the full lifecycle of an isolated SAIFAC run:
+ * An engine manages the full lifecycle of an isolated SaifCTL run:
  *   setup()        → create isolated network + start background services
  *   startStaging() → build & boot the application under test
  *   runTests()     → run the black-box test suite and return results
@@ -49,7 +49,7 @@ export function createEngine(
     case 'helm': {
       throw new Error(
         `[engine] Helm engine is not yet implemented. ` +
-          `Remove environments.*.engine = "helm" from saifac/config.ts or implement HelmEngine.`,
+          `Remove environments.*.engine = "helm" from saifctl/config.ts or implement HelmEngine.`,
       );
     }
     default: {

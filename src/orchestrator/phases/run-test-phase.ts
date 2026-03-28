@@ -79,7 +79,7 @@ export async function runTestPhase(input: RunTestPhaseInput): Promise<RunTestPha
           stagingEnvironment,
           feature,
           projectName,
-          saifacPath: sandbox.saifacPath,
+          saifctlPath: sandbox.saifctlPath,
           onLog: defaultEngineLog,
         });
 

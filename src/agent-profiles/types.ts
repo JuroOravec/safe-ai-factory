@@ -21,7 +21,7 @@ export interface AgentProfile {
   displayName: string;
 
   /**
-   * Structured stdout handling inside the `[SAIFAC:AGENT_*]` window (segment split + per-segment CLI formatting).
+   * Structured stdout handling inside the `[SAIFCTL:AGENT_*]` window (segment split + per-segment CLI formatting).
    * Use `null` when the agent emits plain line-oriented output (line-wise events + `[prefix]` formatting).
    */
   stdoutStrategy: AgentStdoutStrategy | null;

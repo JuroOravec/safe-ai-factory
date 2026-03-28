@@ -40,16 +40,16 @@ describe('agent profiles', () => {
   });
 
   it('debug agent.sh writes dummy.md matching public dummy feature checks', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'saifac-debug-agent-'));
+    const dir = mkdtempSync(join(tmpdir(), 'saifctl-debug-agent-'));
     try {
       const taskPath = join(dir, 'task.md');
       writeFileSync(taskPath, '# Task\n', 'utf8');
       execFileSync('bash', [resolveAgentScriptPath('debug')], {
         env: {
           ...process.env,
-          SAIFAC_WORKSPACE_BASE: dir,
-          SAIFAC_TASK_PATH: taskPath,
-          SAIFAC_SKIP_NETWORK_PROBE: '1',
+          SAIFCTL_WORKSPACE_BASE: dir,
+          SAIFCTL_TASK_PATH: taskPath,
+          SAIFCTL_SKIP_NETWORK_PROBE: '1',
         },
         stdio: 'pipe',
       });

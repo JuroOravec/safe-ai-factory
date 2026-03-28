@@ -48,10 +48,10 @@ export class LocalEngine implements Engine {
   }
 
   async runAgent(opts: RunAgentOpts): Promise<AgentResult> {
-    const { codePath, containerEnv, saifacPath, signal, onAgentStdout, onAgentStdoutEnd, onLog } =
+    const { codePath, containerEnv, saifctlPath, signal, onAgentStdout, onAgentStdoutEnd, onLog } =
       opts;
 
-    const coderStartHost = join(saifacPath, 'coder-start.sh');
+    const coderStartHost = join(saifctlPath, 'coder-start.sh');
     const cmd = 'bash';
     const args = [coderStartHost];
     const argsForPrint = [coderStartHost];

@@ -15,11 +15,11 @@ import { createJiti } from 'jiti';
 import { z } from 'zod';
 
 import type { DiscoveryOptions } from '../cli/utils.js';
-import { getSaifRoot } from '../constants.js';
+import { getSaifctlRoot } from '../constants.js';
 import { consola } from '../logger.js';
 import { pathExists } from '../utils/io.js';
 
-const jitiInstance = createJiti(resolve(getSaifRoot(), 'src', 'design-discovery', 'tools.ts'), {
+const jitiInstance = createJiti(resolve(getSaifctlRoot(), 'src', 'design-discovery', 'tools.ts'), {
   interopDefault: true,
 });
 
@@ -71,7 +71,7 @@ async function loadMcpTools(mcpName: string, urlOrValue: string): Promise<Record
   const url = parseMcpUrl(urlOrValue);
   const transport = new StreamableHTTPClientTransport(url);
 
-  const client = new Client({ name: 'saifac-discovery', version: '1.0.0' }, { capabilities: {} });
+  const client = new Client({ name: 'saifctl-discovery', version: '1.0.0' }, { capabilities: {} });
 
   await client.connect(transport);
 

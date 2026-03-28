@@ -1,6 +1,6 @@
 /**
  * Integration tests: create real config files (config.json, config.js) and verify
- * that loadSaifacConfig + read/resolve helpers use the config values correctly.
+ * that loadSaifctlConfig + read/resolve helpers use the config values correctly.
  */
 
 import { mkdir, rm } from 'node:fs/promises';
@@ -12,14 +12,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readStorageStringFromCli, resolveStorageOverrides } from '../cli/utils.js';
 import {
   mergeModelOverridesLayers,
-  modelOverridesFromSaifacConfig,
+  modelOverridesFromSaifctlConfig,
   parseModelOverridesCliDelta,
 } from '../orchestrator/options.js';
 import { writeUtf8 } from '../utils/io.js';
-import { loadSaifacConfig } from './load.js';
+import { loadSaifctlConfig } from './load.js';
 
 async function makeTempDir(): Promise<string> {
-  const dir = join(tmpdir(), `saifac-config-int-${Math.random().toString(36).slice(2)}`);
+  const dir = join(tmpdir(), `saifctl-config-int-${Math.random().toString(36).slice(2)}`);
   await mkdir(dir, { recursive: true });
   return dir;
 }
@@ -37,7 +37,7 @@ describe('config integration', () => {
 
   describe('config.json', () => {
     it('resolveStorageOverrides uses globalStorage and storages from config', async () => {
-      const saifDir = join(projectDir, 'saifac');
+      const saifDir = join(projectDir, 'saifctl');
       await mkdir(saifDir, { recursive: true });
       await writeUtf8(
         join(saifDir, 'config.json'),
@@ -49,7 +49,7 @@ describe('config integration', () => {
         }),
       );
 
-      const config = await loadSaifacConfig('saifac', projectDir);
+      const config = await loadSaifctlConfig('saifctl', projectDir);
       const overrides = resolveStorageOverrides(readStorageStringFromCli({}), config);
 
       expect(overrides.globalStorage).toBe('memory');
@@ -57,7 +57,7 @@ describe('config integration', () => {
     });
 
     it('resolveStorageOverrides: CLI overrides config', async () => {
-      const saifDir = join(projectDir, 'saifac');
+      const saifDir = join(projectDir, 'saifctl');
       await mkdir(saifDir, { recursive: true });
       await writeUtf8(
         join(saifDir, 'config.json'),
@@ -69,7 +69,7 @@ describe('config integration', () => {
         }),
       );
 
-      const config = await loadSaifacConfig('saifac', projectDir);
+      const config = await loadSaifctlConfig('saifctl', projectDir);
       const overrides = resolveStorageOverrides(
         readStorageStringFromCli({ storage: 'runs=s3' }),
         config,
@@ -80,7 +80,7 @@ describe('config integration', () => {
     });
 
     it('mergeModelOverridesLayers uses globalModel and agentModels from config', async () => {
-      const saifDir = join(projectDir, 'saifac');
+      const saifDir = join(projectDir, 'saifctl');
       await mkdir(saifDir, { recursive: true });
       await writeUtf8(
         join(saifDir, 'config.json'),
@@ -92,9 +92,9 @@ describe('config integration', () => {
         }),
       );
 
-      const config = await loadSaifacConfig('saifac', projectDir);
+      const config = await loadSaifctlConfig('saifctl', projectDir);
       const overrides = mergeModelOverridesLayers(
-        modelOverridesFromSaifacConfig(config),
+        modelOverridesFromSaifctlConfig(config),
         undefined,
         parseModelOverridesCliDelta({}),
       );
@@ -109,7 +109,7 @@ describe('config integration', () => {
 
   describe('config.js', () => {
     it('loads config.js and resolveStorageOverrides uses values', async () => {
-      const saifDir = join(projectDir, 'saifac');
+      const saifDir = join(projectDir, 'saifctl');
       await mkdir(saifDir, { recursive: true });
       // Use config.js (no config.json) so cosmiconfig picks .js
       await writeUtf8(
@@ -117,7 +117,7 @@ describe('config integration', () => {
         "module.exports = { defaults: { globalStorage: 'memory', storages: { runs: 'local' } } };",
       );
 
-      const config = await loadSaifacConfig('saifac', projectDir);
+      const config = await loadSaifctlConfig('saifctl', projectDir);
       expect(config.defaults?.globalStorage).toBe('memory');
 
       const overrides = resolveStorageOverrides(readStorageStringFromCli({}), config);

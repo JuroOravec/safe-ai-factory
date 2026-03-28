@@ -142,7 +142,7 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
 
     const containerEnv = await buildCoderContainerEnv({
       mode: codingIsLocal
-        ? { kind: 'host', codePath: sandbox.codePath, saifacPath: sandbox.saifacPath }
+        ? { kind: 'host', codePath: sandbox.codePath, saifctlPath: sandbox.saifctlPath }
         : { kind: 'container' },
       llmConfig: coderLlmConfig,
       reviewer: reviewer ? { llmConfig: reviewer.llmConfig } : null,
@@ -162,7 +162,7 @@ export async function runAgentPhase(input: RunAgentPhaseInput): Promise<RunAgent
       dangerousNoLeash,
       cedarPolicyPath,
       coderImage,
-      saifacPath: sandbox.saifacPath,
+      saifctlPath: sandbox.saifctlPath,
       onAgentStdout,
       onAgentStdoutEnd,
       onLog: defaultEngineLog,

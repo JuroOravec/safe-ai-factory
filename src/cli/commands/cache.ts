@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Cache CLI — manage disposable sandbox dirs under the sandbox base (default: /tmp/saifac/sandboxes/).
+ * Cache CLI — manage disposable sandbox dirs under the sandbox base (default: /tmp/saifctl/sandboxes/).
  *
  * Usage: pnpm cache <subcommand> [options]
  *   list    List sandbox dirs for this project (--all: all projects)
@@ -14,7 +14,7 @@ import { defineCommand, runMain } from 'citty';
 
 import { outputCliData } from '../../logger.js';
 import { resolveSandboxBaseDir } from '../../orchestrator/options.js';
-import { DEFAULT_SANDBOX_BASE_DIR, SAIFAC_TEMP_ROOT } from '../../orchestrator/sandbox.js';
+import { DEFAULT_SANDBOX_BASE_DIR, SAIFCTL_TEMP_ROOT } from '../../orchestrator/sandbox.js';
 import { pathExists } from '../../utils/io.js';
 import { projectDirArg, sandboxBaseDirArg } from '../args.js';
 import {
@@ -25,7 +25,7 @@ import {
 } from '../utils.js';
 
 function isSaifacTempRoot(dir: string): boolean {
-  return normalize(resolve(dir)) === normalize(resolve(SAIFAC_TEMP_ROOT));
+  return normalize(resolve(dir)) === normalize(resolve(SAIFCTL_TEMP_ROOT));
 }
 
 const listCommand = defineCommand({
@@ -106,7 +106,7 @@ const clearCommand = defineCommand({
 
     if (clearAll && isSaifacTempRoot(sandboxBase)) {
       throw new Error(
-        `Refusing to clear the entire SAIF temp root (${SAIFAC_TEMP_ROOT}): that would remove shared data such as bin/. ` +
+        `Refusing to clear the entire SAIF temp root (${SAIFCTL_TEMP_ROOT}): that would remove shared data such as bin/. ` +
           `Use the default sandbox base (${DEFAULT_SANDBOX_BASE_DIR}) or pass --sandbox-base-dir pointing at your sandboxes directory, not the temp root.`,
       );
     }
@@ -121,7 +121,7 @@ const clearCommand = defineCommand({
     const removeEntries = async (toRemove: string[]) => {
       await Promise.all(
         toRemove.map(async (entry) => {
-          // E.g. `/tmp/saifac/crawlee-one-feat-abc1234`
+          // E.g. `/tmp/saifctl/crawlee-one-feat-abc1234`
           await rmAsync(`${sandboxBase}/${entry}`, { recursive: true, force: true });
           outputCliData(`  removed ${entry}`);
         }),

@@ -15,7 +15,7 @@
  *            └─ run-tests   — staging engine + test suite (raw result + testSuites)
  *            └─ vague-specs-check — optional LLM ambiguity pass; produces sanitizedHint
  *     └─ apply-patch        — commits + pushes + PR (success path only)
- *     └─ on-failure         — persists RunArtifact so `saifac run start` works
+ *     └─ on-failure         — persists RunArtifact so `saifctl run start` works
  *
  * IMPORTANT — Hatchet requires all task inputs/outputs to be JSON-serializable
  * (JsonObject). Types like OrchestratorOpts and Sandbox are serialized to
@@ -759,7 +759,7 @@ export function createFeatRunWorkflow() {
     },
   });
 
-  // on-failure: persist RunArtifact for `saifac run start` (addresses step 1.8), then remove
+  // on-failure: persist RunArtifact for `saifctl run start` (addresses step 1.8), then remove
   // the sandbox. Without cleanup here, failures before `apply-patch` never run destroySandbox
   // (that task only runs when convergence-loop completes successfully).
   workflow.onFailure({
@@ -818,7 +818,7 @@ export function createFeatRunWorkflow() {
               : { ifRevisionEquals: expectedArtifactRevision },
           );
           consola.log(
-            `[hatchet] Run artifact saved (failed). Start again with: saifac run start ${sandboxRaw.runId}`,
+            `[hatchet] Run artifact saved (failed). Start again with: saifctl run start ${sandboxRaw.runId}`,
           );
         } catch (err) {
           if (err instanceof StaleArtifactError) {

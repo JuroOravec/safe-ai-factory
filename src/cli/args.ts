@@ -48,7 +48,7 @@ export const nameArg = {
 
 export const saifDirArg = {
   type: 'string' as const,
-  description: 'Path to saifac directory (default: saifac)',
+  description: 'Path to saifctl directory (default: saifctl)',
 };
 
 const testScriptArg = {
@@ -57,7 +57,7 @@ const testScriptArg = {
 };
 const testImageArg = {
   type: 'string' as const,
-  description: 'Test runner Docker image tag (default: saifac-test-<profile>:latest).',
+  description: 'Test runner Docker image tag (default: saifctl-test-<profile>:latest).',
 };
 
 export const profileArg = {
@@ -134,7 +134,7 @@ export const featAgentArgs = {
 
 // Args for `run test` — re-test a stored run's patch (no agent/coding flags).
 export const runTestArgs = {
-  'saifac-dir': saifDirArg,
+  'saifctl-dir': saifDirArg,
   'project-dir': projectDirArg,
   project: projectArg,
   'test-profile': testProfileArg,
@@ -167,7 +167,7 @@ export const runTestArgs = {
   branch: {
     type: 'string' as const,
     description:
-      'Override the git branch name used when applying the patch to the host (default: saifac/<feature>-<runId>-<diffHash>).',
+      'Override the git branch name used when applying the patch to the host (default: saifctl/<feature>-<runId>-<diffHash>).',
   },
   'git-provider': {
     type: 'string' as const,

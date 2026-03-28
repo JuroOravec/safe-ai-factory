@@ -1,15 +1,15 @@
 #!/usr/bin/env tsx
 /**
- * Init CLI — initialize Saifac config, saifac directory, and codebase indexer.
+ * Init CLI — initialize Saifctl config, saifctl directory, and codebase indexer.
  *
- * Usage: saifac init [options]
- *   Creates saifac/ and scaffolds saifac/config.ts when no config exists.
+ * Usage: saifctl init [options]
+ *   Creates saifctl/ and scaffolds saifctl/config.ts when no config exists.
  *   Requires at least one LLM API key for indexer operations.
  */
 
 import { defineCommand, runMain } from 'citty';
 
-import { scaffoldSaifacConfig } from '../../config/scaffold.js';
+import { scaffoldSaifctlConfig } from '../../config/scaffold.js';
 import { resolveIndexerProfile } from '../../indexer-profiles/index.js';
 import { consola } from '../../logger.js';
 import { indexerArg, projectDirArg, saifDirArg } from '../args.js';
@@ -24,7 +24,7 @@ import {
 const initCommand = defineCommand({
   meta: {
     name: 'init',
-    description: 'Initialize Saifac config + codebase indexer',
+    description: 'Initialize Saifctl config + codebase indexer',
   },
   args: {
     project: {
@@ -33,7 +33,7 @@ const initCommand = defineCommand({
       description: 'Project name override (default: package.json "name")',
     },
     'project-dir': projectDirArg,
-    'saifac-dir': saifDirArg,
+    'saifctl-dir': saifDirArg,
     indexer: indexerArg,
   },
   async run({ args }) {
@@ -42,7 +42,7 @@ const initCommand = defineCommand({
     const indexerProfile = resolveIndexerProfile(args.indexer);
     const projectName = await resolveProjectName({ project: args.project, projectDir });
 
-    const scaffolded = await scaffoldSaifacConfig(saifDir, projectDir);
+    const scaffolded = await scaffoldSaifctlConfig(saifDir, projectDir);
     if (scaffolded) {
       consola.log(`\nCreated ${saifDir}/config.ts (no config found).`);
     }

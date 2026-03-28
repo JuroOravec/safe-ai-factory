@@ -2,7 +2,7 @@
 /**
  * Feat CLI — feature workflow scaffolding.
  *
- * Usage: saifac feat <subcommand> [options]
+ * Usage: saifctl feat <subcommand> [options]
  *   new               Create scaffolding for a new feature (prompts for name if not given)
  *   design-discovery  Gather context with MCP/tools, write discovery.md (optional step before design-specs).
  *   design-specs      Generate specs from a feature's proposal only (first step of design).
@@ -10,7 +10,7 @@
  *   design-fail2pass  Verify generated tests. Runs tests against main; at least one feature test must fail (third step of design workflow).
  *   design            Generate specs, tests, and validate the tests (full design workflow)
  *   run               Start an agent to implement the specs. Runs until it passes your tests.
- *   Alias: saifac feature
+ *   Alias: saifctl feature
  */
 
 import { mkdir } from 'node:fs/promises';
@@ -19,8 +19,8 @@ import { join, resolve } from 'node:path';
 import { cancel, confirm, intro, isCancel, outro, text } from '@clack/prompts';
 import { defineCommand, runMain } from 'citty';
 
-import { loadSaifacConfig } from '../../config/load.js';
-import { type SaifacConfig } from '../../config/schema.js';
+import { loadSaifctlConfig } from '../../config/load.js';
+import { type SaifctlConfig } from '../../config/schema.js';
 import { runDiscovery } from '../../design-discovery/run.js';
 import { runDesignTests } from '../../design-tests/design.js';
 import { generateTests } from '../../design-tests/write.js';
@@ -30,7 +30,7 @@ import { consola, setVerboseLogging } from '../../logger.js';
 import { runFail2Pass, runStart } from '../../orchestrator/modes.js';
 import {
   mergeModelOverridesLayers,
-  modelOverridesFromSaifacConfig,
+  modelOverridesFromSaifctlConfig,
   parseModelOverridesCliDelta,
   pickAgentInstallScript,
   pickAgentProfile,
@@ -134,7 +134,7 @@ const newCommand = defineCommand({
       description: 'Feature name (kebab-case, e.g. add-greeting-cmd)',
     },
     yes: yesArg,
-    'saifac-dir': saifDirArg,
+    'saifctl-dir': saifDirArg,
     'project-dir': projectDirArg,
     desc: {
       type: 'string',
@@ -225,14 +225,14 @@ const designSpecsArgs = {
   },
   ...modelOverrideArgs,
   designer: designerArg,
-  'saifac-dir': saifDirArg,
+  'saifctl-dir': saifDirArg,
   'project-dir': projectDirArg,
 };
 
 const designDiscoveryArgs = {
   name: nameArg,
   yes: yesArg,
-  'saifac-dir': saifDirArg,
+  'saifctl-dir': saifDirArg,
   'project-dir': projectDirArg,
   ...modelOverrideArgs,
   'discovery-mcp': {
@@ -257,7 +257,7 @@ const designDiscoveryArgs = {
 
 async function _runDesignDiscovery(args: {
   name?: string;
-  'saifac-dir'?: string;
+  'saifctl-dir'?: string;
   'project-dir'?: string;
   model?: string;
   'base-url'?: string;
@@ -269,7 +269,7 @@ async function _runDesignDiscovery(args: {
 }) {
   const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
   const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-  const config = await loadSaifacConfig(saifDir, projectDir);
+  const config = await loadSaifctlConfig(saifDir, projectDir);
   const feature = await getFeatOrPrompt(args, projectDir);
   const discovery = resolveDiscoveryOptions(readDiscoveryCliReads(args), projectDir, config);
   if (!shouldRunDiscovery(discovery)) {
@@ -279,7 +279,7 @@ async function _runDesignDiscovery(args: {
     process.exit(1);
   }
   const overrides = mergeModelOverridesLayers(
-    modelOverridesFromSaifacConfig(config),
+    modelOverridesFromSaifctlConfig(config),
     undefined,
     parseModelOverridesCliDelta(args),
   );
@@ -300,13 +300,13 @@ async function _runDesignSpecs(args: {
   model?: string;
   'base-url'?: string;
   designer?: string;
-  'saifac-dir'?: string;
+  'saifctl-dir'?: string;
   'project-dir'?: string;
   [key: string]: unknown;
 }) {
   const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
   const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-  const config = await loadSaifacConfig(saifDir, projectDir);
+  const config = await loadSaifctlConfig(saifDir, projectDir);
   const nonInteractive = args.yes === true;
   const force = args.force === true;
   if (nonInteractive && !getFeatNameFromArgs(args)) {
@@ -316,7 +316,7 @@ async function _runDesignSpecs(args: {
   const feature = await getFeatOrPrompt(args, projectDir);
   const designerProfile = pickDesignerProfile(readDesignerProfileIdFromCli(args), config);
   const overrides = mergeModelOverridesLayers(
-    modelOverridesFromSaifacConfig(config),
+    modelOverridesFromSaifctlConfig(config),
     undefined,
     parseModelOverridesCliDelta(args),
   );
@@ -408,7 +408,7 @@ const designDiscoveryCommand = defineCommand({
 
 const designTestsArgs = {
   name: nameArg,
-  'saifac-dir': saifDirArg,
+  'saifctl-dir': saifDirArg,
   'project-dir': projectDirArg,
   'test-profile': testProfileArg,
   indexer: indexerArg,
@@ -431,7 +431,7 @@ interface DesignTestsOptions {
   skipCatalog: boolean;
   force: boolean;
   overrides: ModelOverrides;
-  config?: SaifacConfig;
+  config?: SaifctlConfig;
   args: {
     'test-profile'?: string;
     indexer?: string;
@@ -511,10 +511,10 @@ const designTestsCommand = defineCommand({
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
     const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifacConfig(saifDir, projectDir);
+    const config = await loadSaifctlConfig(saifDir, projectDir);
     const feature = await getFeatOrPrompt(args, projectDir);
     const overrides = mergeModelOverridesLayers(
-      modelOverridesFromSaifacConfig(config),
+      modelOverridesFromSaifctlConfig(config),
       undefined,
       parseModelOverridesCliDelta(args),
     );
@@ -541,7 +541,7 @@ const designTestsCommand = defineCommand({
 
 const designFail2passArgs = {
   name: nameArg,
-  'saifac-dir': saifDirArg,
+  'saifctl-dir': saifDirArg,
   'project-dir': projectDirArg,
   project: projectArg,
   'test-profile': testProfileArg,
@@ -558,7 +558,7 @@ async function _runDesignFail2pass(opts: {
   feature: Feature;
   projectDir: string;
   saifDir: string;
-  config?: SaifacConfig;
+  config?: SaifctlConfig;
   args: DesignFail2passArgs;
 }): Promise<void> {
   const { feature, projectDir, saifDir, config, args } = opts;
@@ -645,7 +645,7 @@ const designFail2passCommand = defineCommand({
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
     const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifacConfig(saifDir, projectDir);
+    const config = await loadSaifctlConfig(saifDir, projectDir);
     const feature = await getFeatOrPrompt(args, projectDir);
     await _runDesignFail2pass({
       feature,
@@ -675,7 +675,7 @@ const designCommand = defineCommand({
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
     const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifacConfig(saifDir, projectDir);
+    const config = await loadSaifctlConfig(saifDir, projectDir);
     const discovery = resolveDiscoveryOptions(readDiscoveryCliReads(args), projectDir, config);
 
     // 0. Design-discovery (when mcps or tools configured)
@@ -728,7 +728,7 @@ const runCommand = defineCommand({
     consola.log(`\n${result.message}`);
     if (result.runId && runArgs.runStorage && !result.success) {
       consola.log(`\nStart again with:`);
-      consola.log(`  saifac run start ${result.runId}`);
+      consola.log(`  saifctl run start ${result.runId}`);
     }
     if (!result.success) process.exit(1);
   },
@@ -737,7 +737,7 @@ const runCommand = defineCommand({
 export const parseRunArgs = async (args: ParsedArgsFromCommand<typeof runCommand>) => {
   const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
   const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-  const config = await loadSaifacConfig(saifDir, projectDir);
+  const config = await loadSaifctlConfig(saifDir, projectDir);
 
   const feature = await getFeatOrPrompt(args, projectDir);
   const runArgs = args as FeatRunArgs;

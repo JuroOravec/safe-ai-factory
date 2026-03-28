@@ -1,7 +1,7 @@
 /**
  * Engine interface — lifecycle contract for infrastructure adaptors.
  *
- * An Engine manages the full lifecycle of an isolated SAIFAC run environment:
+ * An Engine manages the full lifecycle of an isolated SaifCTL run environment:
  *   1. setup()        — create an isolated network + start background services (databases, etc.)
  *   2. startStaging() — build & boot the application under test (Container A) with sidecar
  *   3. runTests()     — run test runner (black-box tests) (Container B) and return results
@@ -117,10 +117,10 @@ export interface StartStagingOpts {
   feature: Feature;
   projectName: string;
   /**
-   * Absolute host path to the sandbox `saifac/` bundle directory.
-   * Mounted read-only at `/saifac` in the staging container (same layout as coder).
+   * Absolute host path to the sandbox `saifctl/` bundle directory.
+   * Mounted read-only at `/saifctl` in the staging container (same layout as coder).
    */
-  saifacPath: string;
+  saifctlPath: string;
   /** Infra log lines from the staging container "follow" (-f) stream (stdout/stderr). */
   onLog: EngineOnLog;
 }
@@ -143,14 +143,14 @@ export interface RunTestsOpts {
    * (bind-mounted to /test-runner-output inside the container).
    */
   reportDir: string;
-  /** Test runner image tag (e.g. 'saifac-test-node-vitest:latest'). */
+  /** Test runner image tag (e.g. 'saifctl-test-node-vitest:latest'). */
   testImage: string;
   /**
    * Absolute host path to test.sh, always bind-mounted at
    * /usr/local/bin/test.sh inside the Test Runner container (read-only).
    */
   testScriptPath: string;
-  /** Used to derive SAIFAC_TARGET_URL and SAIFAC_SIDECAR_URL for the test runner. */
+  /** Used to derive SAIFCTL_TARGET_URL and SAIFCTL_SIDECAR_URL for the test runner. */
   stagingHandle: StagingHandle;
   feature: Feature;
   projectName: string;
@@ -186,9 +186,9 @@ export interface RunAgentOpts {
   /** Docker image for the coder container. */
   coderImage: string;
   /**
-   * Absolute host path to the sandbox `saifac/` bundle (mounted read-only at `/saifac` in the container).
+   * Absolute host path to the sandbox `saifctl/` bundle (mounted read-only at `/saifctl` in the container).
    */
-  saifacPath: string;
+  saifctlPath: string;
   /**
    * Raw stdout chunks from the agent container. Separate from onLog because these logs
    * may have agent-specific log formatting applied to them.
@@ -225,7 +225,7 @@ export interface StartInspectOpts {
   coderImage: string;
   dangerousNoLeash: boolean;
   cedarPolicyPath: string;
-  saifacPath: string;
+  saifctlPath: string;
   reviewer: RunAgentOpts['reviewer'];
   signal?: AbortSignal;
   /** Same stdout contract as {@link RunAgentOpts.onAgentStdout}. */
@@ -259,8 +259,8 @@ export interface Engine {
   /**
    * 1. Initialize the isolated environment and start background services.
    *
-   * Docker: Creates a bridge network (`saifac-net-…`) and runs
-   *   `docker compose -p saifac-<runId> -f <file> up -d --wait`.
+   * Docker: Creates a bridge network (`saifctl-net-…`) and runs
+   *   `docker compose -p saifctl-<runId> -f <file> up -d --wait`.
    * Attaches compose services to the network via `docker network connect`.
    *
    * Must be called once before any other method.
@@ -292,7 +292,7 @@ export interface Engine {
    *
    * Docker/Leash: Spawns Leash CLI (`node …/leash.js`) as a child process,
    * starts a background polling loop to attach the Leash target container to the
-   * SAIFAC network (workaround for missing --network flag in Leash CLI),
+   * SaifCTL network (workaround for missing --network flag in Leash CLI),
    * and resolves when the process exits.
    */
   runAgent(opts: RunAgentOpts): Promise<AgentResult>;

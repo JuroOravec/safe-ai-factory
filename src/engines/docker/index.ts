@@ -31,7 +31,7 @@ import { PassThrough } from 'node:stream';
 import Docker from 'dockerode';
 
 import type { DockerEnvironment } from '../../config/schema.js';
-import { getSaifRoot } from '../../constants.js';
+import { getSaifctlRoot } from '../../constants.js';
 import { consola } from '../../logger.js';
 import {
   resolveSandboxCoderDockerfilePath,
@@ -133,20 +133,20 @@ export class DockerEngine implements Engine {
     this.projectDir = projectDir;
 
     // Create an isolated bridge network for this run
-    this.networkName = `saifac-net-${projectName}-${featureName}-${runId}`;
+    this.networkName = `saifctl-net-${projectName}-${featureName}-${runId}`;
     await ensureCreateNetwork(this.networkName);
     this.registry.registerNetwork(this.networkName);
     consola.log(`[docker] Bridge network ready: ${this.networkName}`);
 
     // Bring up compose services (if configured)
     if (this.composeFile) {
-      this.composeProjectName = `saifac-${runId.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
+      this.composeProjectName = `saifctl-${runId.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
       const absoluteFile = resolve(projectDir, this.composeFile);
 
       if (!(await pathExists(absoluteFile))) {
         throw new Error(
           `[docker] Compose file not found: "${this.composeFile}" (resolved: ${absoluteFile}). ` +
-            `Check environments.coding.file or environments.staging.file in saifac/config.ts.`,
+            `Check environments.coding.file or environments.staging.file in saifctl/config.ts.`,
         );
       }
 
@@ -158,7 +158,7 @@ export class DockerEngine implements Engine {
         { stdio: 'inherit' },
       );
 
-      // Attach every compose service to the SAIFAC bridge network
+      // Attach every compose service to the SaifCTL bridge network
       await attachComposeSvcToNetwork({
         composeProjectName: this.composeProjectName,
         absoluteFile,
@@ -185,13 +185,13 @@ export class DockerEngine implements Engine {
       stagingEnvironment,
       feature,
       projectName,
-      saifacPath,
+      saifctlPath,
       onLog,
     } = opts;
 
     const containerConfig = stagingEnvironment.app;
-    const containerName = `saifac-stage-${projectName}-${feature.name}-${this.runId}`;
-    const imageTag = `saifac-stage-${projectName}-${feature.name}-img-${this.runId}`;
+    const containerName = `saifctl-stage-${projectName}-${feature.name}-${this.runId}`;
+    const imageTag = `saifctl-stage-${projectName}-${feature.name}-img-${this.runId}`;
 
     // Build ephemeral staging image
     await buildStagingImage({
@@ -212,11 +212,11 @@ export class DockerEngine implements Engine {
     const container = await docker.createContainer({
       Image: imageTag,
       name: containerName,
-      Cmd: ['/bin/sh', '/saifac/staging-start.sh'],
+      Cmd: ['/bin/sh', '/saifctl/staging-start.sh'],
       HostConfig: {
         NetworkMode: this.networkName,
-        // Writable: putArchive injects sidecar into /saifac before start.
-        Binds: [`${codePath}:/workspace`, `${saifacPath}:/saifac`],
+        // Writable: putArchive injects sidecar into /saifctl before start.
+        Binds: [`${codePath}:/workspace`, `${saifctlPath}:/saifctl`],
         SecurityOpt: ['no-new-privileges'],
         CapDrop: ['ALL'],
       },
@@ -227,11 +227,11 @@ export class DockerEngine implements Engine {
       },
       Env: [
         ...appEnvEntries,
-        `SAIFAC_FEATURE_NAME=${feature.name}`,
-        `SAIFAC_SIDECAR_PORT=${containerConfig.sidecarPort}`,
-        `SAIFAC_SIDECAR_PATH=${containerConfig.sidecarPath}`,
-        `SAIFAC_STARTUP_SCRIPT=/saifac/startup.sh`,
-        `SAIFAC_STAGE_SCRIPT=/saifac/stage.sh`,
+        `SAIFCTL_FEATURE_NAME=${feature.name}`,
+        `SAIFCTL_SIDECAR_PORT=${containerConfig.sidecarPort}`,
+        `SAIFCTL_SIDECAR_PATH=${containerConfig.sidecarPath}`,
+        `SAIFCTL_STARTUP_SCRIPT=/saifctl/startup.sh`,
+        `SAIFCTL_STAGE_SCRIPT=/saifctl/stage.sh`,
       ],
       WorkingDir: '/workspace',
     });
@@ -241,7 +241,7 @@ export class DockerEngine implements Engine {
     const tarBuffer = createTarArchive([
       { filename: 'sidecar', content: sidecarBinary, mode: '0000755' },
     ]);
-    await container.putArchive(tarBuffer, { path: '/saifac' });
+    await container.putArchive(tarBuffer, { path: '/saifctl' });
 
     await container.start();
     consola.log(`[docker] ${containerName} started`);
@@ -289,7 +289,7 @@ export class DockerEngine implements Engine {
 
     assertSafeImageTag(testImage);
 
-    const containerName = `saifac-test-${projectName}-${runId}`;
+    const containerName = `saifctl-test-${projectName}-${runId}`;
     const containerTestsDir = '/tests';
     const containerOutputFile = '/test-runner-output/results.xml';
     const reportPath = join(reportDir, 'results.xml');
@@ -333,11 +333,11 @@ export class DockerEngine implements Engine {
         CapDrop: ['ALL'],
       },
       Env: [
-        `SAIFAC_TARGET_URL=${stagingHandle.targetUrl}`,
-        `SAIFAC_SIDECAR_URL=${stagingHandle.sidecarUrl}`,
-        `SAIFAC_FEATURE_NAME=${feature.name}`,
-        `SAIFAC_TESTS_DIR=${containerTestsDir}`,
-        `SAIFAC_OUTPUT_FILE=${containerOutputFile}`,
+        `SAIFCTL_TARGET_URL=${stagingHandle.targetUrl}`,
+        `SAIFCTL_SIDECAR_URL=${stagingHandle.sidecarUrl}`,
+        `SAIFCTL_FEATURE_NAME=${feature.name}`,
+        `SAIFCTL_TESTS_DIR=${containerTestsDir}`,
+        `SAIFCTL_OUTPUT_FILE=${containerOutputFile}`,
       ],
       WorkingDir: '/workspace',
     });
@@ -438,7 +438,7 @@ export class DockerEngine implements Engine {
       dangerousNoLeash,
       cedarPolicyPath,
       coderImage,
-      saifacPath,
+      saifctlPath,
       reviewer,
       signal,
       onAgentStdout,
@@ -459,7 +459,7 @@ export class DockerEngine implements Engine {
       assertSafeImageTag(coderImage);
 
       const codePathHost = await dockerHostBindPath(codePath);
-      const saifacDirHost = await dockerHostBindPath(saifacPath);
+      const saifctlDirHost = await dockerHostBindPath(saifctlPath);
       const containerName = leashTargetContainerName(sandboxBasePath);
 
       const dockerRunArgs: string[] = [
@@ -475,7 +475,7 @@ export class DockerEngine implements Engine {
         '-v',
         `${codePathHost}:${CONTAINER_WORKSPACE}`,
         '-v',
-        `${saifacDirHost}:/saifac:ro`,
+        `${saifctlDirHost}:/saifctl:ro`,
       ];
 
       if (this.networkName) {
@@ -488,7 +488,7 @@ export class DockerEngine implements Engine {
       }
 
       dockerRunArgs.push(...dockerRunCoderEnvArgs(containerEnv));
-      dockerRunArgs.push(coderImage, 'bash', '/saifac/coder-start.sh');
+      dockerRunArgs.push(coderImage, 'bash', '/saifctl/coder-start.sh');
 
       argsForPrint = redactDockerRunArgsForPrint(dockerRunArgs, containerEnv);
 
@@ -510,7 +510,7 @@ export class DockerEngine implements Engine {
     } else {
       // Leash mode
       const codePathHost = await dockerHostBindPath(codePath);
-      const saifacDirHost = await dockerHostBindPath(saifacPath);
+      const saifctlDirHost = await dockerHostBindPath(saifctlPath);
 
       const leashArgs: string[] = [
         'leash',
@@ -521,7 +521,7 @@ export class DockerEngine implements Engine {
         '--volume',
         `${codePathHost}:${CONTAINER_WORKSPACE}`,
         '--volume',
-        `${saifacDirHost}:/saifac:ro`,
+        `${saifctlDirHost}:/saifctl:ro`,
       ];
 
       if (reviewer) {
@@ -540,7 +540,7 @@ export class DockerEngine implements Engine {
       pushLeashContainerEnv(leashArgs, containerEnv);
       // Invoke via bash so the script doesn't need +x in the mounted directory.
       // This mirrors how gate.sh and reviewer.sh are invoked inside coder-start.sh.
-      leashArgs.push('bash', '/saifac/coder-start.sh');
+      leashArgs.push('bash', '/saifctl/coder-start.sh');
 
       argsForPrint = redactLeashArgsForPrint(leashArgs, containerEnv);
 
@@ -558,7 +558,7 @@ export class DockerEngine implements Engine {
           Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
         ),
         // WORKAROUND(leash-network): inject a predictable name via Leash's TARGET_CONTAINER,
-        // so we know which container to attach to the SAIFAC network after Leash starts it.
+        // so we know which container to attach to the SaifCTL network after Leash starts it.
         // See other `WORKAROUND(leash-network)` comments in this file.
         ...(this.networkName ? { TARGET_CONTAINER: `leash-target-${workspaceId}` } : {}),
       };
@@ -680,7 +680,7 @@ export class DockerEngine implements Engine {
       coderImage,
       dangerousNoLeash,
       cedarPolicyPath,
-      saifacPath,
+      saifctlPath,
       reviewer,
       signal,
       onAgentStdout,
@@ -702,7 +702,7 @@ export class DockerEngine implements Engine {
       assertSafeImageTag(coderImage);
 
       const codePathHost = await dockerHostBindPath(codePath);
-      const saifacDirHost = await dockerHostBindPath(saifacPath);
+      const saifctlDirHost = await dockerHostBindPath(saifctlPath);
 
       const dockerRunArgs: string[] = [
         'run',
@@ -717,7 +717,7 @@ export class DockerEngine implements Engine {
         '-v',
         `${codePathHost}:${CONTAINER_WORKSPACE}`,
         '-v',
-        `${saifacDirHost}:/saifac:ro`,
+        `${saifctlDirHost}:/saifctl:ro`,
       ];
 
       if (this.networkName) {
@@ -749,7 +749,7 @@ export class DockerEngine implements Engine {
       dockerDirectRunContainerToRemove = containerName;
     } else {
       const codePathHost = await dockerHostBindPath(codePath);
-      const saifacDirHost = await dockerHostBindPath(saifacPath);
+      const saifctlDirHost = await dockerHostBindPath(saifctlPath);
 
       const leashArgs: string[] = [
         'leash',
@@ -760,7 +760,7 @@ export class DockerEngine implements Engine {
         '--volume',
         `${codePathHost}:${CONTAINER_WORKSPACE}`,
         '--volume',
-        `${saifacDirHost}:/saifac:ro`,
+        `${saifctlDirHost}:/saifctl:ro`,
       ];
 
       if (reviewer) {
@@ -1141,7 +1141,7 @@ async function removeDockerImage(imageTag: string): Promise<void> {
 
 /**
  * Lists service names for a compose project (`docker compose ps --services`).
- * Used to discover which containers to attach to the SAIFAC bridge network.
+ * Used to discover which containers to attach to the SaifCTL bridge network.
  */
 async function listComposeServices(opts: {
   composeProjectName: string;
@@ -1214,7 +1214,7 @@ async function attachComposeSvcToNetwork(opts: {
 //
 // Leash doesn't support a --network flag. We set TARGET_CONTAINER (Leash's own env var
 // for overriding the target container name) to a predictable value so we know which
-// container to attach to the SAIFAC bridge network after Leash starts it. We then
+// container to attach to the SaifCTL bridge network after Leash starts it. We then
 // poll `docker inspect` until the container appears and call `docker network connect`.
 //
 // See https://github.com/strongdm/leash/issues/69
@@ -1269,7 +1269,7 @@ async function getSidecarBinary(): Promise<Buffer> {
   const hostArch = arch();
   const binaryName = hostArch === 'arm64' ? 'sidecar-linux-arm64' : 'sidecar-linux-amd64';
   const binaryPath = join(
-    getSaifRoot(),
+    getSaifctlRoot(),
     'src',
     'orchestrator',
     'sidecars',
@@ -1440,7 +1440,7 @@ function demuxDockerLogs(buffer: Buffer): { stdout: string; stderr: string } {
 }
 
 /**
- * Builds a one-line summary of `NetworkSettings.Networks` for logs: whether the SAIFAC bridge
+ * Builds a one-line summary of `NetworkSettings.Networks` for logs: whether the SaifCTL bridge
  * is present, DNS aliases, and IP (helps debug “staging not reachable” / wrong network).
  */
 function formatContainerNetworkEndpoint(
@@ -1464,7 +1464,7 @@ function formatContainerNetworkEndpoint(
 }
 
 /**
- * After staging starts, logs how that container is attached to the SAIFAC network (aliases + IP).
+ * After staging starts, logs how that container is attached to the SaifCTL network (aliases + IP).
  * Confirms DNS names like `staging` resolve as expected for the test runner.
  */
 async function logStagingContainerNetworkAliases(opts: {
@@ -1675,7 +1675,7 @@ function redactDockerRunArgsForPrint(args: string[], c: ContainerEnv): string[] 
     if (eq <= 2) return a;
     const k = a.slice(2, eq);
     if (secretKeys.has(k)) return `-e${k}=****`;
-    if (k === 'SAIFAC_INITIAL_TASK') return `-e${k}=<task (${a.length - eq - 1} chars)>`;
+    if (k === 'SAIFCTL_INITIAL_TASK') return `-e${k}=<task (${a.length - eq - 1} chars)>`;
     return a;
   });
 }
@@ -1688,7 +1688,7 @@ function redactLeashArgsForPrint(leashArgs: string[], c: ContainerEnv): string[]
     const eq = a.indexOf('=');
     const k = a.slice(0, eq);
     if (secretKeys.has(k)) return `${k}=****`;
-    if (k === 'SAIFAC_INITIAL_TASK') return `${k}=<task (${a.length - eq - 1} chars)>`;
+    if (k === 'SAIFCTL_INITIAL_TASK') return `${k}=<task (${a.length - eq - 1} chars)>`;
     return a;
   });
 }
@@ -1700,7 +1700,7 @@ function redactLeashArgsForPrint(leashArgs: string[], c: ContainerEnv): string[]
 /**
  * Resolve symlinks on the host path before passing to `docker run -v`.
  * On macOS, `/tmp` often symlinks to `/private/tmp`; mixing non-canonical paths with
- * Colima/Docker Desktop bind mounts can yield empty mounts (e.g. `/saifac/startup.sh` missing).
+ * Colima/Docker Desktop bind mounts can yield empty mounts (e.g. `/saifctl/startup.sh` missing).
  * Leash also uses `getcwd()` as `callerDir`; keep {@link spawn} `cwd` aligned with the same path.
  */
 async function dockerHostBindPath(hostPath: string): Promise<string> {

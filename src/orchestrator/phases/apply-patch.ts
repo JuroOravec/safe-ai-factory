@@ -27,7 +27,7 @@ import { resolveRunCommitAuthor } from '../patch.js';
 
 export type { OrchestratorResult } from '../loop.js';
 
-/** Count of hex digits taken from SHA-256 for the branch suffix (`saifac/...-<diffHash>`). */
+/** Count of hex digits taken from SHA-256 for the branch suffix (`saifctl/...-<diffHash>`). */
 export const HOST_APPLY_DIFF_HASH_LEN = 6;
 
 /**
@@ -45,12 +45,12 @@ export interface HostApplyBranchNameOpts {
 }
 
 /**
- * Default local branch for host apply: `saifac/<feature>-<runId>-<diffHash>`.
+ * Default local branch for host apply: `saifctl/<feature>-<runId>-<diffHash>`.
  */
 export function defaultHostApplyBranchName(opts: HostApplyBranchNameOpts): string {
   const { featureName, runId, commits } = opts;
   const h = computeRunCommitsDiffHash(commits);
-  return `saifac/${featureName}-${runId}-${h}`;
+  return `saifctl/${featureName}-${runId}-${h}`;
 }
 
 export interface ResolveHostApplyBranchNameOpts extends HostApplyBranchNameOpts {
@@ -136,7 +136,7 @@ export async function pushHostApplyBranch(opts: PushHostApplyBranchOpts): Promis
 
       // Generate AI title + body; fall back to generic strings on any error.
       let prTitle = `feat(${feature.name}): auto-generated implementation`;
-      let prBody = `Automated implementation produced by the [SAIFAC](https://github.com/JuroOravec/safe-ai-factory) for feature \`${feature.name}\`.\n\nRun ID: \`${runId}\``;
+      let prBody = `Automated implementation produced by the [SaifCTL](https://github.com/JuroOravec/safe-ai-factory) for feature \`${feature.name}\`.\n\nRun ID: \`${runId}\``;
       try {
         consola.log(`[orchestrator] Generating AI PR summary for ${feature.name}...`);
         const summary = await generatePRSummary({
@@ -205,7 +205,7 @@ export interface ApplyPatchOpts {
   overrides: ModelOverrides;
   /** When true, verbose logs are enabled. */
   verbose?: boolean;
-  /** Target branch name (`--branch`); when null/undefined, use default `saifac/...-<diffHash>`. */
+  /** Target branch name (`--branch`); when null/undefined, use default `saifctl/...-<diffHash>`. */
   targetBranch?: string | null;
   /**
    * When set, `git worktree add` starts the new branch at this commit instead of `HEAD`.
@@ -219,7 +219,7 @@ export interface ApplyPatchOpts {
  * the main working tree's checked-out branch is never modified — safe for parallel runs.
  *
  * Flow:
- *   1. Create a temporary worktree at <sandboxBasePath>/worktree on branch saifac/<feature>-<runId>-<diffHash>
+ *   1. Create a temporary worktree at <sandboxBasePath>/worktree on branch saifctl/<feature>-<runId>-<diffHash>
  *   2. Apply each run commit inside the worktree
  *   3. Optionally push the branch to the remote target
  *   4. Optionally open a Pull Request via the configured git provider
@@ -271,10 +271,10 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
 
   const gitEnv = {
     ...process.env,
-    GIT_AUTHOR_NAME: process.env.GIT_AUTHOR_NAME ?? 'saifac',
-    GIT_AUTHOR_EMAIL: process.env.GIT_AUTHOR_EMAIL ?? 'saifac@safeaifactory.com',
-    GIT_COMMITTER_NAME: process.env.GIT_COMMITTER_NAME ?? 'saifac',
-    GIT_COMMITTER_EMAIL: process.env.GIT_COMMITTER_EMAIL ?? 'saifac@safeaifactory.com',
+    GIT_AUTHOR_NAME: process.env.GIT_AUTHOR_NAME ?? 'saifctl',
+    GIT_AUTHOR_EMAIL: process.env.GIT_AUTHOR_EMAIL ?? 'saifctl@safeaifactory.com',
+    GIT_COMMITTER_NAME: process.env.GIT_COMMITTER_NAME ?? 'saifctl',
+    GIT_COMMITTER_EMAIL: process.env.GIT_COMMITTER_EMAIL ?? 'saifctl@safeaifactory.com',
   };
 
   consola.log(`[orchestrator] Creating worktree at ${wtPath} on branch ${branchName}...`);
@@ -301,7 +301,7 @@ export async function applyPatchToHost(opts: ApplyPatchOpts): Promise<void> {
     // 2b. Apply each run commit (preserves messages / authors from storage)
     for (const commit of commits) {
       if (!commit.diff.trim()) continue;
-      const tmpPatch = join(sandboxBasePath, '.saifac-host-commit.patch');
+      const tmpPatch = join(sandboxBasePath, '.saifctl-host-commit.patch');
       const safe = commit.diff.endsWith('\n') ? commit.diff : `${commit.diff}\n`;
       await writeUtf8(tmpPatch, safe);
       await gitApply({ cwd: wtPath, env: gitEnv, patchFile: tmpPatch });

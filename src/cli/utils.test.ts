@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { SaifacConfig } from '../config/schema.js';
+import type { SaifctlConfig } from '../config/schema.js';
 import { consola } from '../logger.js';
 import { loadAgentSecretEnvFromSecretFiles } from '../orchestrator/agent-env.js';
 import {
@@ -23,8 +23,8 @@ describe('buildOrchestratorCliInputFromFeatArgs', () => {
   it('loads bundled agent scripts for --agent when install/script paths omitted', async () => {
     const cli = await buildOrchestratorCliInputFromFeatArgs({ agent: 'debug' } as FeatRunArgs, {
       projectDir: process.cwd(),
-      saifDir: 'saifac',
-      config: {} as SaifacConfig,
+      saifDir: 'saifctl',
+      config: {} as SaifctlConfig,
     });
     expect(cli.agentProfileId).toBe('debug');
     expect(cli.agentInstallScript).toContain('[agent-install/debug]');
@@ -70,7 +70,7 @@ describe('resolveStorageOverrides', () => {
 
 describe('loadAgentSecretEnvFromSecretFiles', () => {
   it('parses KEY=value lines like agent-env-file', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'saifac-secret-'));
+    const dir = mkdtempSync(join(tmpdir(), 'saifctl-secret-'));
     const f = join(dir, 's.env');
     writeFileSync(f, '# c\nFOO_TOKEN=bar\nBAZ=qux\n', 'utf8');
     const out = await loadAgentSecretEnvFromSecretFiles(dir, ['s.env']);
@@ -84,14 +84,14 @@ describe('loadAgentSecretEnvFromSecretFiles', () => {
 
 describe('scriptSourcePathForReporting', () => {
   it('returns a relative path when the script is under projectDir', () => {
-    const proj = resolve('/tmp/saifac-proj');
-    const script = resolve('/tmp/saifac-proj/scripts/hook.sh');
+    const proj = resolve('/tmp/saifctl-proj');
+    const script = resolve('/tmp/saifctl-proj/scripts/hook.sh');
     expect(scriptSourcePathForReporting(proj, script)).toMatch(/scripts[/\\]hook\.sh$/);
   });
 
   it('returns an absolute path when the script is outside projectDir', () => {
-    const proj = resolve('/tmp/saifac-proj');
-    const script = resolve('/opt/saifac/builtin.sh');
+    const proj = resolve('/tmp/saifctl-proj');
+    const script = resolve('/opt/saifctl/builtin.sh');
     expect(scriptSourcePathForReporting(proj, script)).toBe(script);
   });
 });

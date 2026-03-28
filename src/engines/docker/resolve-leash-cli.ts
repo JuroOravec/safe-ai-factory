@@ -15,7 +15,7 @@ const require = createRequire(import.meta.url);
 
 export function resolveLeashCliPath(): string {
   // Optionally override path to `@strongdm/leash`'s `bin/leash.js`
-  const override = process.env.SAIFAC_LEASH_BIN?.trim();
+  const override = process.env.SAIFCTL_LEASH_BIN?.trim();
   if (override) {
     return override;
   }
@@ -24,7 +24,7 @@ export function resolveLeashCliPath(): string {
   } catch {
     throw new Error(
       'Cannot find @strongdm/leash. Run install in the project that depends on safe-ai-factory, ' +
-        `or set SAIFAC_LEASH_BIN to the absolute path of leash.js.`,
+        `or set SAIFCTL_LEASH_BIN to the absolute path of leash.js.`,
     );
   }
 }

@@ -4,12 +4,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { saifacConfigSchema } from './schema.js';
+import { saifctlConfigSchema } from './schema.js';
 
-describe('saifacConfigSchema', () => {
+describe('saifctlConfigSchema', () => {
   describe('agentModels', () => {
     it('accepts valid agent keys', () => {
-      const result = saifacConfigSchema.parse({
+      const result = saifctlConfigSchema.parse({
         defaults: {
           agentModels: { coder: 'openai/gpt-4o', 'vague-specs-check': 'openai/gpt-4o-mini' },
         },
@@ -22,7 +22,7 @@ describe('saifacConfigSchema', () => {
 
     it('rejects unknown agent keys', () => {
       expect(() =>
-        saifacConfigSchema.parse({
+        saifctlConfigSchema.parse({
           defaults: {
             agentModels: { 'bad-agent': 'openai/gpt-4o' },
           },
@@ -31,14 +31,14 @@ describe('saifacConfigSchema', () => {
     });
 
     it('accepts undefined agentModels', () => {
-      const result = saifacConfigSchema.parse({ defaults: {} });
+      const result = saifctlConfigSchema.parse({ defaults: {} });
       expect(result.defaults?.agentModels).toBeUndefined();
     });
   });
 
   describe('agentBaseUrls', () => {
     it('accepts valid agent keys', () => {
-      const result = saifacConfigSchema.parse({
+      const result = saifctlConfigSchema.parse({
         defaults: {
           agentBaseUrls: { coder: 'https://api.example.com/v1' },
         },
@@ -50,7 +50,7 @@ describe('saifacConfigSchema', () => {
 
     it('rejects unknown agent keys', () => {
       expect(() =>
-        saifacConfigSchema.parse({
+        saifctlConfigSchema.parse({
           defaults: {
             agentBaseUrls: { unknown: 'https://api.example.com/v1' },
           },
@@ -61,7 +61,7 @@ describe('saifacConfigSchema', () => {
 
   describe('storages', () => {
     it('accepts valid storage keys', () => {
-      const result = saifacConfigSchema.parse({
+      const result = saifctlConfigSchema.parse({
         defaults: {
           storages: { runs: 'local', tasks: 's3://bucket/tasks' },
         },
@@ -74,7 +74,7 @@ describe('saifacConfigSchema', () => {
 
     it('rejects unknown storage keys', () => {
       expect(() =>
-        saifacConfigSchema.parse({
+        saifctlConfigSchema.parse({
           defaults: {
             storages: { badkey: 'local' },
           },

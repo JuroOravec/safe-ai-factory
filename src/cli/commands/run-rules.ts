@@ -1,11 +1,11 @@
 #!/usr/bin/env tsx
 /**
- * Run rules CLI — user feedback rules stored on the run artifact (`saifac run rules …`).
+ * Run rules CLI — user feedback rules stored on the run artifact (`saifctl run rules …`).
  */
 
 import { defineCommand } from 'citty';
 
-import { loadSaifacConfig } from '../../config/load.js';
+import { loadSaifctlConfig } from '../../config/load.js';
 import { consola, outputCliData } from '../../logger.js';
 import {
   createRunRule,
@@ -102,7 +102,7 @@ async function resolveContentExclusive(
 
 const commonRunArgs = {
   'project-dir': projectDirArg,
-  'saifac-dir': saifDirArg,
+  'saifctl-dir': saifDirArg,
   storage: storageArg,
 };
 
@@ -110,7 +110,7 @@ const commonRunArgs = {
 type RunRulesCliArgs = {
   runId: string;
   'project-dir'?: string;
-  'saifac-dir'?: string;
+  'saifctl-dir'?: string;
   storage?: string;
 } & ContentCliArgs;
 
@@ -127,7 +127,7 @@ async function withRunArtifact(
 ): Promise<void> {
   const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
   const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-  const config = await loadSaifacConfig(saifDir, projectDir);
+  const config = await loadSaifctlConfig(saifDir, projectDir);
   const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
   if (!storage) {
     consola.error('Run storage is disabled (--storage none).');

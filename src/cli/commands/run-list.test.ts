@@ -1,5 +1,5 @@
 /**
- * Integration tests for `saifac run ls` (and `run list`) using a temp project with `.saifac/runs/*.json`.
+ * Integration tests for `saifctl run ls` (and `run list`) using a temp project with `.saifctl/runs/*.json`.
  */
 
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -13,7 +13,7 @@ import * as loggerModule from '../../logger.js';
 import runCommand from './run.js';
 
 async function withTempProject(fn: (projectDir: string) => Promise<void>): Promise<void> {
-  const projectDir = await mkdtemp(join(tmpdir(), 'saifac-run-ls-'));
+  const projectDir = await mkdtemp(join(tmpdir(), 'saifctl-run-ls-'));
   try {
     await fn(projectDir);
   } finally {
@@ -33,14 +33,14 @@ async function writeRunJson(
     taskId?: string;
   },
 ): Promise<void> {
-  const dir = join(projectDir, '.saifac', 'runs');
+  const dir = join(projectDir, '.saifctl', 'runs');
   await mkdir(dir, { recursive: true });
   const doc = {
     runId,
     taskId: row.taskId,
     baseCommitSha: 'abc',
     runCommits: [],
-    specRef: 'saifac/features/x',
+    specRef: 'saifctl/features/x',
     config: { featureName: row.featureName },
     status: row.status,
     startedAt: row.startedAt ?? '2026-01-01T00:00:00.000Z',
@@ -62,7 +62,7 @@ async function runRunSubcommand(rawArgs: string[]): Promise<string[]> {
   }
 }
 
-describe('saifac run ls', () => {
+describe('saifctl run ls', () => {
   it('sorts rows by updatedAt descending (newest first), then runId', async () => {
     await withTempProject(async (projectDir) => {
       await writeRunJson(projectDir, 'older', {
@@ -85,7 +85,7 @@ describe('saifac run ls', () => {
     });
   });
 
-  it('prints table headers and one row per run under .saifac/runs', async () => {
+  it('prints table headers and one row per run under .saifctl/runs', async () => {
     await withTempProject(async (projectDir) => {
       await writeRunJson(projectDir, 'aaa111', {
         featureName: 'feat-a',
@@ -120,7 +120,7 @@ describe('saifac run ls', () => {
     });
   });
 
-  it('prints no runs when .saifac/runs is missing', async () => {
+  it('prints no runs when .saifctl/runs is missing', async () => {
     await withTempProject(async (projectDir) => {
       const lines = await runRunSubcommand(['ls', '--project-dir', projectDir]);
       expect(lines.some((l) => l.includes('No stored runs found.'))).toBe(true);

@@ -2,7 +2,7 @@
 /**
  * Doctor CLI — environment health checks.
  *
- * Usage: saifac doctor
+ * Usage: saifctl doctor
  *
  * Checks:
  *   1. Docker is running and reachable.
@@ -61,7 +61,7 @@ async function checkHatchet(): Promise<boolean> {
 
   if (!token) {
     warn(
-      'HATCHET_CLIENT_TOKEN is not set — saifac will run in local (in-process) mode.\n' +
+      'HATCHET_CLIENT_TOKEN is not set — saifctl will run in local (in-process) mode.\n' +
         'To enable Hatchet durability + dashboard, see: docs/hatchet.md',
     );
     return true; // Not an error — local mode is a valid configuration.
@@ -99,7 +99,7 @@ const doctorCommand = defineCommand({
   },
   async run() {
     consola.log('');
-    consola.log(colors.bold('saifac doctor'));
+    consola.log(colors.bold('saifctl doctor'));
     consola.log('');
 
     const results: boolean[] = [];
@@ -122,7 +122,7 @@ const doctorCommand = defineCommand({
   },
 });
 
-export default doctorCommand; // export for `saifac` root CLI
+export default doctorCommand; // export for `saifctl` root CLI
 
 // Allow running directly: `tsx src/cli/commands/doctor.ts`
 if (process.argv[1]?.endsWith('doctor.ts') || process.argv[1]?.endsWith('doctor.js')) {

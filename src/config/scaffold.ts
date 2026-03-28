@@ -7,13 +7,13 @@ import { resolve } from 'node:path';
 
 import { pathExists, writeUtf8 } from '../utils/io.js';
 
-const CONFIG_TEMPLATE = `import type { SaifacConfig } from 'safe-ai-factory';
+const CONFIG_TEMPLATE = `import type { SaifctlConfig } from 'safe-ai-factory';
 
 /**
  * SAIFAC configuration.
  * See docs/config.md and docs/services.md
  */
-const config: SaifacConfig = {
+const config: SaifctlConfig = {
   // CLI defaults
   defaults: {
     // project: 'my-app',
@@ -23,14 +23,14 @@ const config: SaifacConfig = {
     coding: {
       // Docker is always the runtime. Optionally add a Compose file for ephemeral services:
       // file: './docker/docker-compose.dev.yml',
-      // Or use Helm: engine: 'helm', chart: './k8s/charts/saifac-mocks'
+      // Or use Helm: engine: 'helm', chart: './k8s/charts/saifctl-mocks'
       engine: 'docker',
       agentEnvironment: {},
     },
     staging: {
       // Docker is always the runtime. Optionally add a Compose file for ephemeral services:
       // file: './docker/docker-compose.staging.yml',
-      // Or use Helm: engine: 'helm', chart: './k8s/charts/saifac-mocks'
+      // Or use Helm: engine: 'helm', chart: './k8s/charts/saifctl-mocks'
       engine: 'docker',
       // Configure how to expose the code as application for testing:
       app: {
@@ -58,14 +58,14 @@ const SEARCH_PLACES = [
 ];
 
 /**
- * Scaffold saifac/config.ts if the saifac directory has no config file.
+ * Scaffold saifctl/config.ts if the saifctl directory has no config file.
  * Creates saifDir when it does not exist.
  *
- * @param saifDir - Path to saifac directory (e.g. "saifac")
+ * @param saifDir - Path to saifctl directory (e.g. "saifctl")
  * @param projectDir - Project root
  * @returns true if a config was scaffolded, false if one already existed
  */
-export async function scaffoldSaifacConfig(saifDir: string, projectDir: string): Promise<boolean> {
+export async function scaffoldSaifctlConfig(saifDir: string, projectDir: string): Promise<boolean> {
   const configDir = resolve(projectDir, saifDir);
 
   for (const name of SEARCH_PLACES) {

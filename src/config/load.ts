@@ -1,5 +1,5 @@
 /**
- * Load saifac config from saifDir using cosmiconfig.
+ * Load saifctl config from saifDir using cosmiconfig.
  *
  * Config can be written as config.json, config.yml, config.js, config.ts, etc.
  * Returns empty defaults when no config file exists.
@@ -11,9 +11,9 @@ import { cosmiconfig } from 'cosmiconfig';
 
 import { consola } from '../logger.js';
 import { pathExists } from '../utils/io.js';
-import { type SaifacConfig, saifacConfigSchema } from './schema.js';
+import { type SaifctlConfig, saifctlConfigSchema } from './schema.js';
 
-const EXPLORER = cosmiconfig('saifac', {
+const EXPLORER = cosmiconfig('saifctl', {
   searchPlaces: [
     'config.ts',
     'config.js',
@@ -30,11 +30,14 @@ const EXPLORER = cosmiconfig('saifac', {
  * Load config from saifDir. Resolves saifDir relative to projectDir when saifDir
  * is not absolute.
  *
- * @param saifDir - Path to saifac directory (default "saifac", can be relative to cwd or projectDir)
+ * @param saifDir - Path to saifctl directory (default "saifctl", can be relative to cwd or projectDir)
  * @param projectDir - Project root (for resolving relative saifDir when needed)
  * @returns Parsed and validated config, or empty defaults if no file found
  */
-export async function loadSaifacConfig(saifDir: string, projectDir: string): Promise<SaifacConfig> {
+export async function loadSaifctlConfig(
+  saifDir: string,
+  projectDir: string,
+): Promise<SaifctlConfig> {
   const configDir = resolve(projectDir, saifDir);
   if (!(await pathExists(configDir))) {
     return {};
@@ -46,7 +49,7 @@ export async function loadSaifacConfig(saifDir: string, projectDir: string): Pro
   }
 
   try {
-    return saifacConfigSchema.parse(result.config);
+    return saifctlConfigSchema.parse(result.config);
   } catch (err) {
     consola.error(`Error parsing config at ${result.filepath}:`);
     consola.error(err);

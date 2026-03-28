@@ -10,7 +10,7 @@ Caused by: Error: getaddrinfo ENOTFOUND staging`;
     expect(
       detectRunnerError({
         exitCode: 1,
-        stdout: '[test-runner] SAIFAC_TARGET_URL:   http://staging:8080/exec\n',
+        stdout: '[test-runner] SAIFCTL_TARGET_URL:   http://staging:8080/exec\n',
         stderr,
       }),
     ).toBe(

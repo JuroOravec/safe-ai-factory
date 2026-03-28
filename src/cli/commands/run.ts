@@ -2,7 +2,7 @@
 /**
  * Run CLI — manage stored runs and start again from artifacts.
  *
- * Usage: saifac run <subcommand> [options]
+ * Usage: saifctl run <subcommand> [options]
  *   ls, list      List stored runs
  *   rm, remove    Delete a run
  *   info          Print stored run as JSON
@@ -18,8 +18,8 @@
 
 import { defineCommand, runMain } from 'citty';
 
-import { loadSaifacConfig } from '../../config/load.js';
-import { type SaifacConfig } from '../../config/schema.js';
+import { loadSaifctlConfig } from '../../config/load.js';
+import { type SaifctlConfig } from '../../config/schema.js';
 import type { ModelOverrides } from '../../llm-config.js';
 import { consola, outputCliData, setVerboseLogging } from '../../logger.js';
 import {
@@ -60,18 +60,18 @@ import {
 } from '../utils.js';
 import { runRulesCommand } from './run-rules.js';
 
-/** CLI parsing for `saifac run start` */
+/** CLI parsing for `saifctl run start` */
 async function parseFromArtifactOrchestratorCli(args: FeatRunArgs): Promise<{
   projectDir: string;
   saifDir: string;
-  config: SaifacConfig;
+  config: SaifctlConfig;
   cli: OrchestratorCliInput;
   cliModelDelta: ModelOverrides | undefined;
   engineCli: string | undefined;
 }> {
   const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
   const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-  const config = await loadSaifacConfig(saifDir, projectDir);
+  const config = await loadSaifctlConfig(saifDir, projectDir);
   setVerboseLogging(args.verbose === true);
   const cli = await buildOrchestratorCliInputFromFeatArgs(args, { projectDir, saifDir, config });
   const cliModelDelta = parseModelOverridesCliDelta(args);
@@ -81,7 +81,7 @@ async function parseFromArtifactOrchestratorCli(args: FeatRunArgs): Promise<{
 
 const commonRunArgs = {
   'project-dir': projectDirArg,
-  'saifac-dir': saifDirArg,
+  'saifctl-dir': saifDirArg,
   storage: storageArg,
 };
 
@@ -104,7 +104,7 @@ const lsCommand = defineCommand({
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
     const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifacConfig(saifDir, projectDir);
+    const config = await loadSaifctlConfig(saifDir, projectDir);
     const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!storage) {
       outputCliData('Run storage is disabled (--storage none).');
@@ -169,7 +169,7 @@ const rmCommand = defineCommand({
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
     const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifacConfig(saifDir, projectDir);
+    const config = await loadSaifctlConfig(saifDir, projectDir);
     const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!storage) {
       consola.error('Run storage is disabled (--storage none).');
@@ -208,7 +208,7 @@ const infoCommand = defineCommand({
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
     const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifacConfig(saifDir, projectDir);
+    const config = await loadSaifctlConfig(saifDir, projectDir);
     const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!storage) {
       consola.error('Run storage is disabled (--storage none).');
@@ -243,7 +243,7 @@ const clearCommand = defineCommand({
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
     const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifacConfig(saifDir, projectDir);
+    const config = await loadSaifctlConfig(saifDir, projectDir);
     const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!storage) {
       outputCliData('Run storage is disabled (--storage none).');
@@ -353,7 +353,7 @@ const forkCommand = defineCommand({
 
     consola.log(`\nForked run ${sourceRunId} → ${newRunId}`);
     consola.log(`\nStart the agent with:`);
-    consola.log(`  saifac run start ${newRunId}`);
+    consola.log(`  saifctl run start ${newRunId}`);
   },
 });
 
@@ -394,7 +394,7 @@ const startCommand = defineCommand({
     consola.log(`\n${result.message}`);
     if (result.runId) {
       consola.log(`\nStart again with:`);
-      consola.log(`  saifac run start ${result.runId}`);
+      consola.log(`  saifctl run start ${result.runId}`);
     }
     if (!result.success) process.exit(1);
   },
@@ -416,7 +416,7 @@ const testCommand = defineCommand({
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
     const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifacConfig(saifDir, projectDir);
+    const config = await loadSaifctlConfig(saifDir, projectDir);
 
     const runArgs = args as FeatRunArgs;
     setVerboseLogging(runArgs.verbose === true);
@@ -464,14 +464,14 @@ const applyCommand = defineCommand({
     ...runTestArgs,
     runId: {
       type: 'positional' as const,
-      description: 'Run ID to apply (from saifac run ls)',
+      description: 'Run ID to apply (from saifctl run ls)',
       required: true,
     },
   },
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
     const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifacConfig(saifDir, projectDir);
+    const config = await loadSaifctlConfig(saifDir, projectDir);
 
     const runArgs = args as FeatRunArgs;
     setVerboseLogging(runArgs.verbose === true);
@@ -518,19 +518,19 @@ const exportCommand = defineCommand({
     ...commonRunArgs,
     runId: {
       type: 'positional' as const,
-      description: 'Run ID to export (from saifac run ls)',
+      description: 'Run ID to export (from saifctl run ls)',
       required: true,
     },
     output: {
       type: 'string' as const,
       alias: 'o' as const,
-      description: 'Output path (default: ./saifac-<feature>-<runId>-<diffHash>.patch)',
+      description: 'Output path (default: ./saifctl-<feature>-<runId>-<diffHash>.patch)',
     },
   },
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
     const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifacConfig(saifDir, projectDir);
+    const config = await loadSaifctlConfig(saifDir, projectDir);
 
     const runStorage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!runStorage) {

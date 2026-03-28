@@ -11,7 +11,7 @@
 
 import { join } from 'node:path';
 
-import { getSaifRoot } from '../constants.js';
+import { getSaifctlRoot } from '../constants.js';
 import { aiderProfile } from './aider/profile.js';
 import { claudeProfile } from './claude/profile.js';
 import { codexProfile } from './codex/profile.js';
@@ -58,11 +58,11 @@ export const SUPPORTED_AGENT_PROFILES = {
 /** Returns the default agent profile (openhands). */
 export const DEFAULT_AGENT_PROFILE: AgentProfile = SUPPORTED_AGENT_PROFILES['openhands'];
 
-const _agentProfilesDir = join(getSaifRoot(), 'src', 'agent-profiles');
+const _agentProfilesDir = join(getSaifctlRoot(), 'src', 'agent-profiles');
 
 /**
  * Returns the absolute path to the agent.sh script for the given profile id.
- * Used by the saifac CLI (`loadAgentScriptsFromPicks`) as the default `--agent-script` when no override is provided.
+ * Used by the saifctl CLI (`loadAgentScriptsFromPicks`) as the default `--agent-script` when no override is provided.
  */
 export function resolveAgentScriptPath(profileId: SupportedAgentProfileId): string {
   return join(_agentProfilesDir, profileId, 'agent.sh');
@@ -70,7 +70,7 @@ export function resolveAgentScriptPath(profileId: SupportedAgentProfileId): stri
 
 /**
  * Returns the absolute path to the agent-install.sh script for the given profile id.
- * Used by the saifac CLI (`loadAgentScriptsFromPicks`) as the default `--agent-install-script` when no override is provided.
+ * Used by the saifctl CLI (`loadAgentScriptsFromPicks`) as the default `--agent-install-script` when no override is provided.
  */
 export function resolveAgentInstallScriptPath(profileId: SupportedAgentProfileId): string {
   return join(_agentProfilesDir, profileId, 'agent-install.sh');

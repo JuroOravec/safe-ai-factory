@@ -8,7 +8,7 @@
  *                       (default: "python"). Example: SHOTGUN_PYTHON=$(uv run which python)
  *   CONTEXT7_API_KEY  — (optional) API key for Context7 documentation lookup in Shotgun
  *
- * Indexing is done during `saifac init`:
+ * Indexing is done during `saifctl init`:
  *   <python> -m shotgun.main config init
  *   <python> -m shotgun.main config set-context7 --api-key <key>  (if CONTEXT7_API_KEY is set)
  *   <python> -m shotgun.main codebase index . --name <projectName>
@@ -64,7 +64,7 @@ export const shotgunIndexerProfile: IndexerProfile = {
         'Query the codebase index with a natural language question. Returns AST-aware results ' +
         '(modules, classes, functions, files, folders). Use to find where things are defined, ' +
         'how components relate, etc. ' +
-        'Requires the codebase to be indexed first via `saifac init`.',
+        'Requires the codebase to be indexed first via `saifctl init`.',
       inputSchema: z.object({
         question: z
           .string()
@@ -77,7 +77,7 @@ export const shotgunIndexerProfile: IndexerProfile = {
         if (!graphId) {
           throw new Error(
             `Could not find a READY Shotgun index for project "${projectName}". ` +
-              'Run `saifac init` to index the codebase first.',
+              'Run `saifctl init` to index the codebase first.',
           );
         }
         const result = await queryShotgunIndex({ graphId, question, projectDir });

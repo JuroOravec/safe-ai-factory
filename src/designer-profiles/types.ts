@@ -8,16 +8,16 @@
  *                  for a given feature directory (used to prompt "Redo?")
  *   2. `run`     — executing the design phase: reading the proposal + any existing
  *                  files in <feat>, querying the codebase if needed, and writing
- *                  the output files to saifac/features/<feat>/
+ *                  the output files to saifctl/features/<feat>/
  *
  * Contract:
  *   Input  (read from disk by the profile):
- *     - saifac/features/<feat>/proposal.md      (optional, but strongly recommended)
+ *     - saifctl/features/<feat>/proposal.md      (optional, but strongly recommended)
  *     - any other existing files under <feat>/   (research, notes, etc.)
  *   Output (written to disk by the profile):
- *     - saifac/features/<feat>/plan.md          (REQUIRED — consumed by downstream agents)
- *     - saifac/features/<feat>/specification.md (REQUIRED — consumed by tests design)
- *     - saifac/features/<feat>/<others>         (optional, e.g. research.md, tasks.md)
+ *     - saifctl/features/<feat>/plan.md          (REQUIRED — consumed by downstream agents)
+ *     - saifctl/features/<feat>/specification.md (REQUIRED — consumed by tests design)
+ *     - saifctl/features/<feat>/<others>         (optional, e.g. research.md, tasks.md)
  *
  * Environment variables required by each profile should be documented in the profile
  * file (not enforced programmatically here), following the same convention used by
@@ -33,7 +33,7 @@ export interface DesignerBaseOpts {
   cwd: string;
   /** Resolved feature (name, absolutePath, relativePath). */
   feature: Feature;
-  /** Saifac directory name relative to repo root (e.g. "saifac"). */
+  /** Saifctl directory name relative to repo root (e.g. "saifctl"). */
   saifDir: string;
 }
 

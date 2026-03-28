@@ -42,7 +42,7 @@ function imperativeCatalog(extra: object = {}): string {
   return JSON.stringify({
     version: '1.0',
     featureName: 'test-feature',
-    featureDir: 'saifac/features/test-feature',
+    featureDir: 'saifctl/features/test-feature',
     testCases: [
       {
         id: 'tc-001',
@@ -74,7 +74,7 @@ function imperativeCatalog(extra: object = {}): string {
 describe('generateTests', () => {
   let projectDir: string;
   let feature: Awaited<ReturnType<typeof resolveFeature>>;
-  const saifDir = 'saifac';
+  const saifDir = 'saifctl';
   const featureName = 'test-feature';
 
   beforeEach(async () => {
@@ -175,7 +175,7 @@ describe('generateTests', () => {
     const webCatalog = JSON.stringify({
       version: '1.0',
       featureName: 'test-feature',
-      featureDir: 'saifac/features/test-feature',
+      featureDir: 'saifctl/features/test-feature',
       testCases: [
         {
           id: 'tc-001',
@@ -205,9 +205,9 @@ describe('generateTests', () => {
 describe('generateTests (error cases)', () => {
   it('throws when tests.json does not exist', async () => {
     const projectDir = await makeTempDir();
-    const featureDir = join(projectDir, 'saifac', 'features', 'missing');
+    const featureDir = join(projectDir, 'saifctl', 'features', 'missing');
     await mkdir(featureDir, { recursive: true });
-    const feature = await resolveFeature({ input: 'missing', projectDir, saifDir: 'saifac' });
+    const feature = await resolveFeature({ input: 'missing', projectDir, saifDir: 'saifctl' });
     await expect(
       generateTests({
         feature,
@@ -218,12 +218,12 @@ describe('generateTests (error cases)', () => {
 
   it('throws when tests.json fails schema validation', async () => {
     const projectDir = await makeTempDir();
-    const featureDir = join(projectDir, 'saifac', 'features', 'bad-feature');
+    const featureDir = join(projectDir, 'saifctl', 'features', 'bad-feature');
     await mkdir(featureDir, { recursive: true });
     const testsDir = join(featureDir, 'tests');
     await mkdir(testsDir, { recursive: true });
     await writeUtf8(join(testsDir, 'tests.json'), '{"invalid": true}');
-    const feature = await resolveFeature({ input: 'bad-feature', projectDir, saifDir: 'saifac' });
+    const feature = await resolveFeature({ input: 'bad-feature', projectDir, saifDir: 'saifctl' });
     await expect(
       generateTests({
         feature,

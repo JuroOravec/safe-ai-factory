@@ -14,7 +14,7 @@
 import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { getSaifRoot } from '../constants.js';
+import { getSaifctlRoot } from '../constants.js';
 import { type ModelOverrides } from '../llm-config.js';
 import { consola } from '../logger.js';
 import type { Feature } from '../specs/discover.js';
@@ -24,7 +24,7 @@ import { pathExists, readUtf8, writeUtf8 } from '../utils/io.js';
 import { runTestsWriterAgent } from './agents/tests-writer.js';
 import { TestCatalogSchema } from './schema.js';
 
-const _srcDir = join(getSaifRoot(), 'src');
+const _srcDir = join(getSaifctlRoot(), 'src');
 
 /** Reads a template file from src/test-profiles/<profileId>/templates/<filename>. */
 async function readTemplate(profileId: string, filename: string): Promise<string> {
@@ -72,7 +72,7 @@ export interface GenerateTestsResult {
  * For Rust, also emits public/mod.rs and hidden/mod.rs declaring all generated modules
  * so `cargo test` can discover them.
  *
- * Expects tests.json to already exist (produced by `saifac feat design`).
+ * Expects tests.json to already exist (produced by `saifctl feat design`).
  */
 export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTestsResult> {
   const {
@@ -90,7 +90,7 @@ export async function generateTests(opts: GenerateTestsOpts): Promise<GenerateTe
 
   if (!(await pathExists(catalogPath))) {
     throw new Error(
-      `tests.json not found at ${catalogPath}. Run 'saifac feat design -n ${feature.name}' first.`,
+      `tests.json not found at ${catalogPath}. Run 'saifctl feat design -n ${feature.name}' first.`,
     );
   }
 

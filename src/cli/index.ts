@@ -11,7 +11,7 @@ import runCommand from './commands/run.js';
 
 const main = defineCommand({
   meta: {
-    name: 'saifac',
+    name: 'saifctl',
     description:
       'safe-ai-factory: Spec-driven AI factory. Use with any agentic CLI. Language-agnostic. Safe by design.',
   },
