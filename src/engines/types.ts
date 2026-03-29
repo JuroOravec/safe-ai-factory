@@ -7,7 +7,7 @@
  *   3. runTests()     — run test runner (black-box tests) (Container B) and return results
  *   4. runAgent()     — spawn the AI coding agent container and return when it exits
  *   4b. startInspect() — idle coder container for `run inspect` (same mounts/network as runAgent)
- *   5. teardown()     — stop and remove all resources created during this run
+ *   5. teardown()     — stop and remove all resources listed in {@link LiveInfra}
  *
  * DockerEngine is the concrete implementation for Docker (with optional Compose services).
  * A HelmEngine would implement the same interface using Kubernetes.
@@ -15,9 +15,17 @@
 
 import type { SupportedSandboxProfileId } from '../sandbox-profiles/types.js';
 import type { Feature } from '../specs/discover.js';
+import type { DockerLiveInfra } from './docker/types.js';
+import type { LocalLiveInfra } from './local/types.js';
 import type { EngineOnLog } from './logs.js';
 
+export type { DockerLiveInfra } from './docker/types.js';
+export type { LocalLiveInfra } from './local/types.js';
 export type { EngineLogEvent, EngineLogSource, EngineOnLog } from './logs.js';
+
+export type LiveInfra = DockerLiveInfra | LocalLiveInfra | { engine: EngineName };
+
+export type EngineName = 'docker' | 'local' | 'helm';
 
 // ---------------------------------------------------------------------------
 // Shared value objects (implementation-agnostic)
@@ -80,6 +88,34 @@ export interface AgentResult {
 }
 
 // ---------------------------------------------------------------------------
+// Engine method results (infra threading)
+// ---------------------------------------------------------------------------
+
+export interface EngineSetupResult {
+  infra: LiveInfra;
+}
+
+export interface StartStagingResult {
+  stagingHandle: StagingHandle;
+  infra: LiveInfra;
+}
+
+export interface RunTestsEngineResult {
+  tests: TestsResult;
+  infra: LiveInfra;
+}
+
+export interface RunAgentEngineResult {
+  agent: AgentResult;
+  infra: LiveInfra;
+}
+
+export interface StartInspectResult {
+  session: CoderInspectSessionHandle;
+  infra: LiveInfra;
+}
+
+// ---------------------------------------------------------------------------
 // Method option types
 // ---------------------------------------------------------------------------
 
@@ -89,6 +125,21 @@ export interface EngineSetupOpts {
   featureName: string;
   /** Absolute path to the host project root (used to resolve relative compose files, etc.). */
   projectDir: string;
+  /**
+   * Docker Engine uses this to derive the name of the Leash coder container.
+   *
+   * {@link DockerEngine.setup} (coding or inspect) appends the deterministic
+   * coder container name to the returned {@link DockerLiveInfra.containers} list as soon as
+   * the bridge network (and optional compose stack) exists,
+   * **before** {@link Engine.runAgent} runs.
+   *
+   * That way {@link CleanupRegistry} `getInfra()` and {@link Engine.teardown} can still
+   * `docker rm -f` the coder if `runAgent` throws or the process is signalled after
+   * the container exists but before `runAgent` returns an updated infra snapshot.
+   *
+   * Staging engines omit this. {@link LocalEngine} ignores it.
+   */
+  sandboxBasePath?: string;
 }
 
 /** NormalizedStagingEnvironment shape re-declared inline to avoid circular deps. */
@@ -108,6 +159,8 @@ export interface NormalizedStagingEnvironmentRef {
 }
 
 export interface StartStagingOpts {
+  /** Same logical run id as {@link Engine.setup} (container / image naming). */
+  runId: string;
   sandboxProfileId: SupportedSandboxProfileId;
   /** Absolute path to the sandbox code directory on the host. */
   codePath: string;
@@ -123,6 +176,8 @@ export interface StartStagingOpts {
   saifctlPath: string;
   /** Infra log lines from the staging container "follow" (-f) stream (stdout/stderr). */
   onLog: EngineOnLog;
+  /** Infra state from {@link Engine.setup}; updated with staging container + image. */
+  infra: LiveInfra;
 }
 
 /**
@@ -162,6 +217,8 @@ export interface RunTestsOpts {
   signal?: AbortSignal;
   /** Infra log lines from the test-runner container "follow" (-f) stream (stdout/stderr). */
   onLog: EngineOnLog;
+  /** From {@link startStaging}; test runner container names appended then removed when the container exits. */
+  infra: LiveInfra;
 }
 
 export interface RunAgentOpts {
@@ -210,7 +267,11 @@ export interface RunAgentOpts {
    * agent child process is killed immediately and teardown() is still called
    * by the caller's finally block.
    */
-  signal?: AbortSignal;
+  signal: AbortSignal | null;
+  /** Logical run id (logging; must match {@link Engine.setup} for this attempt). */
+  runId: string;
+  /** From {@link Engine.setup} (and any prior steps); coder container name appended on fresh run. */
+  infra: LiveInfra;
 }
 
 /**
@@ -220,7 +281,6 @@ export interface RunAgentOpts {
 export interface StartInspectOpts {
   codePath: string;
   sandboxBasePath: string;
-  /** Same pre-built env as {@link RunAgentOpts.containerEnv}. */
   containerEnv: ContainerEnv;
   coderImage: string;
   dangerousNoLeash: boolean;
@@ -228,12 +288,11 @@ export interface StartInspectOpts {
   saifctlPath: string;
   reviewer: RunAgentOpts['reviewer'];
   signal?: AbortSignal;
-  /** Same stdout contract as {@link RunAgentOpts.onAgentStdout}. */
   onAgentStdout: (chunk: string) => void;
-  /** Same as {@link RunAgentOpts.onAgentStdoutEnd}. */
   onAgentStdoutEnd?: () => void;
-  /** Same as {@link RunAgentOpts.onLog}. */
   onLog: EngineOnLog;
+  /** From {@link Engine.setup}; inspect container appended when the session starts. */
+  infra: LiveInfra;
 }
 
 /** Handle for an idle coding container started by {@link Engine.startInspect}. */
@@ -248,6 +307,34 @@ export interface CoderInspectSessionHandle {
 
 export interface EngineTeardownOpts {
   runId: string;
+  /**
+   * `null` means "setup() threw before returning infra". Implementations must not guess —
+   * {@link DockerEngine.teardown} logs and no-ops; {@link LocalEngine.teardown} no-ops.
+   */
+  infra: LiveInfra | null;
+  /** Host project root (Docker compose resolution; {@link LocalEngine} ignores). */
+  projectDir: string;
+}
+
+/** Options for {@link Engine.pauseInfra} / {@link Engine.resumeInfra}. */
+export interface EnginePauseInfraOpts {
+  /** Sandbox root on the host (used to derive the coder container name). */
+  sandboxBasePath: string;
+  /** Docker coding infra from the current attempt (compose project + network context). */
+  infra: LiveInfra;
+}
+
+/** Options for {@link Engine.resumeInfra}. */
+export interface EngineResumeInfraOpts {
+  sandboxBasePath: string;
+  runId: string;
+  projectName: string;
+  featureName: string;
+  projectDir: string;
+}
+
+export interface EngineVerifyResumeInfraOpts extends EngineResumeInfraOpts {
+  infra: LiveInfra;
 }
 
 // ---------------------------------------------------------------------------
@@ -256,6 +343,8 @@ export interface EngineTeardownOpts {
 
 /** Infrastructure adaptor contract (Docker today, Kubernetes later). */
 export interface Engine {
+  /** Engine name (e.g. 'docker', 'local'). */
+  name: EngineName;
   /**
    * 1. Initialize the isolated environment and start background services.
    *
@@ -265,7 +354,7 @@ export interface Engine {
    *
    * Must be called once before any other method.
    */
-  setup(opts: EngineSetupOpts): Promise<void>;
+  setup(opts: EngineSetupOpts): Promise<EngineSetupResult>;
 
   /**
    * 2. Build and start the staging application (Container A).
@@ -276,7 +365,7 @@ export interface Engine {
    *
    * Returns a StagingHandle with the abstract URLs of the running app.
    */
-  startStaging(opts: StartStagingOpts): Promise<StagingHandle>;
+  startStaging(opts: StartStagingOpts): Promise<StartStagingResult>;
 
   /**
    * 3. Run the black-box test suite (Container B) to completion.
@@ -285,7 +374,7 @@ export interface Engine {
    * exit, demuxes the log stream, reads raw JUnit XML from the report file, and returns
    * {@link TestsResult} (orchestrator parses XML).
    */
-  runTests(opts: RunTestsOpts): Promise<TestsResult>;
+  runTests(opts: RunTestsOpts): Promise<RunTestsEngineResult>;
 
   /**
    * 4. Run the AI coding agent and wait for it to finish.
@@ -295,7 +384,7 @@ export interface Engine {
    * SaifCTL network (workaround for missing --network flag in Leash CLI),
    * and resolves when the process exits.
    */
-  runAgent(opts: RunAgentOpts): Promise<AgentResult>;
+  runAgent(opts: RunAgentOpts): Promise<RunAgentEngineResult>;
 
   /**
    * Idle coding container for `run inspect`: same image, mounts, network, and compose stack as
@@ -303,7 +392,7 @@ export interface Engine {
    *
    * Requires {@link setup} first. Call {@link CoderInspectSessionHandle.stop}, then {@link teardown}.
    */
-  startInspect(opts: StartInspectOpts): Promise<CoderInspectSessionHandle>;
+  startInspect(opts: StartInspectOpts): Promise<StartInspectResult>;
 
   /**
    * 5. Tear down all resources created during this run.
@@ -313,4 +402,29 @@ export interface Engine {
    * Safe to call even when setup() was never called or partially failed.
    */
   teardown(opts: EngineTeardownOpts): Promise<void>;
+
+  /**
+   * Pause sidecar infra for this run: freeze Compose services (if any) and stop the coder
+   * container without removing it or the bridge network. Used by `run pause`.
+   *
+   * {@link LocalEngine} throws — host coding has no Docker coder container.
+   */
+  pauseInfra(opts: EnginePauseInfraOpts): Promise<void>;
+
+  /**
+   * Unpause Compose services (if any). The coder container is started by the next
+   * `runAgent` (Docker: detects stopped container by name and `docker start`s it).
+   *
+   * {@link LocalEngine} no-ops.
+   */
+  resumeInfra(opts: EngineResumeInfraOpts): Promise<void>;
+
+  /**
+   * Check whether the paused infrastructure for a run is still present and intact.
+   * Used by `run resume` before attempting to restore the sandbox.
+   *
+   * Docker: verifies the bridge network and the stopped coder container both exist.
+   * Local: always returns `true` (no external infra to verify).
+   */
+  verifyInfraToResume(opts: EngineVerifyResumeInfraOpts): Promise<boolean>;
 }

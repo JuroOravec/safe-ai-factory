@@ -14,6 +14,9 @@
  *   export        Export run's changes as a single diff
  *   inspect       Open an idle coding container for a stored run
  *   rules         Manage user feedback rules on a stored run (create, list, get, update, remove)
+ *   pause         Pause a run. Resumable. Stops containers but does not delete them. Waits until paused or --timeout
+ *   resume        Resume a paused run: reuse cached state if still present; otherwise continue like run start
+ *   stop          Stop a running or paused run (full teardown). Waits up to --timeout for orchestrator to finish.
  */
 
 import { defineCommand, runMain } from 'citty';
@@ -27,6 +30,9 @@ import {
   runApply,
   runExport,
   runInspect,
+  runPause,
+  runResume,
+  runStop,
   runTestsFromRun,
 } from '../../orchestrator/modes.js';
 import {
@@ -34,7 +40,7 @@ import {
   parseModelOverridesCliDelta,
 } from '../../orchestrator/options.js';
 import { forkStoredRun } from '../../runs/fork.js';
-import type { RunStatus } from '../../runs/types.js';
+import { RunCannotPauseError, RunCannotStopError, type RunStatus } from '../../runs/types.js';
 import { toRunInfoJson } from '../../runs/utils/run-info.js';
 import { omit } from '../../utils/omit.js';
 import {
@@ -42,7 +48,7 @@ import {
   featRunArgs,
   projectDirArg,
   runTestArgs,
-  saifDirArg,
+  saifctlDirArg,
   storageArg,
 } from '../args.js';
 import {
@@ -52,38 +58,55 @@ import {
   parseRunId,
   readEngineCliFromCli,
   readProjectDirFromCli,
-  readSaifDirFromCli,
+  readSaifctlDirFromCli,
   readStorageStringFromCli,
   resolveCliProjectDir,
   resolveRunStorage,
-  resolveSaifDirRelative,
+  resolveSaifctlDirRelative,
 } from '../utils.js';
 import { runRulesCommand } from './run-rules.js';
 
 /** CLI parsing for `saifctl run start` */
 async function parseFromArtifactOrchestratorCli(args: FeatRunArgs): Promise<{
   projectDir: string;
-  saifDir: string;
+  saifctlDir: string;
   config: SaifctlConfig;
   cli: OrchestratorCliInput;
   cliModelDelta: ModelOverrides | undefined;
   engineCli: string | undefined;
 }> {
   const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
-  const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-  const config = await loadSaifctlConfig(saifDir, projectDir);
+  const saifctlDir = resolveSaifctlDirRelative(readSaifctlDirFromCli(args));
+  const config = await loadSaifctlConfig(saifctlDir, projectDir);
   setVerboseLogging(args.verbose === true);
-  const cli = await buildOrchestratorCliInputFromFeatArgs(args, { projectDir, saifDir, config });
+  const cli = await buildOrchestratorCliInputFromFeatArgs(args, { projectDir, saifctlDir, config });
   const cliModelDelta = parseModelOverridesCliDelta(args);
   const engineCli = readEngineCliFromCli(args);
-  return { projectDir, saifDir, config, cli, cliModelDelta, engineCli };
+  return { projectDir, saifctlDir, config, cli, cliModelDelta, engineCli };
 }
 
 const commonRunArgs = {
   'project-dir': projectDirArg,
-  'saifctl-dir': saifDirArg,
+  'saifctl-dir': saifctlDirArg,
   storage: storageArg,
 };
+
+const DEFAULT_RUN_PAUSE_STOP_TIMEOUT_SEC = 60;
+
+const runPauseStopTimeoutArg = {
+  type: 'string' as const,
+  valueHint: 'sec',
+  default: String(DEFAULT_RUN_PAUSE_STOP_TIMEOUT_SEC),
+};
+
+function parseRunPauseStopTimeoutSec(args: { timeout?: string }): number {
+  const raw = (args.timeout ?? String(DEFAULT_RUN_PAUSE_STOP_TIMEOUT_SEC)).trim();
+  if (!/^\d+$/.test(raw)) {
+    consola.error(`Invalid --timeout: expected a non-negative integer (seconds), got "${raw}"`);
+    process.exit(1);
+  }
+  return parseInt(raw, 10);
+}
 
 const lsCommand = defineCommand({
   meta: {
@@ -98,13 +121,13 @@ const lsCommand = defineCommand({
     },
     status: {
       type: 'string' as const,
-      description: 'Filter by status (failed, completed, running, etc.)',
+      description: 'Filter by status (failed, completed, running, paused, etc.)',
     },
   },
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
-    const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifctlConfig(saifDir, projectDir);
+    const saifctlDir = resolveSaifctlDirRelative(readSaifctlDirFromCli(args));
+    const config = await loadSaifctlConfig(saifctlDir, projectDir);
     const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!storage) {
       outputCliData('Run storage is disabled (--storage none).');
@@ -168,8 +191,8 @@ const rmCommand = defineCommand({
   },
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
-    const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifctlConfig(saifDir, projectDir);
+    const saifctlDir = resolveSaifctlDirRelative(readSaifctlDirFromCli(args));
+    const config = await loadSaifctlConfig(saifctlDir, projectDir);
     const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!storage) {
       consola.error('Run storage is disabled (--storage none).');
@@ -182,6 +205,15 @@ const rmCommand = defineCommand({
       consola.error(`Run not found: ${runId}`);
       process.exit(1);
     }
+
+    // Prevent removal if there's possibly live resources (e.g. ephemeral containers)
+    if (['running', 'paused'].includes(existing.status)) {
+      consola.error(
+        `Run "${runId}" is active (status: "${existing.status}"). Stop it first with: 'saifctl run stop ${runId}' — then run rm.`,
+      );
+      process.exit(1);
+    }
+
     await storage.deleteRun(runId);
     consola.log(`Deleted run ${runId}`);
   },
@@ -207,8 +239,8 @@ const infoCommand = defineCommand({
   },
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
-    const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifctlConfig(saifDir, projectDir);
+    const saifctlDir = resolveSaifctlDirRelative(readSaifctlDirFromCli(args));
+    const config = await loadSaifctlConfig(saifctlDir, projectDir);
     const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!storage) {
       consola.error('Run storage is disabled (--storage none).');
@@ -242,8 +274,8 @@ const clearCommand = defineCommand({
   },
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
-    const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifctlConfig(saifDir, projectDir);
+    const saifctlDir = resolveSaifctlDirRelative(readSaifctlDirFromCli(args));
+    const config = await loadSaifctlConfig(saifctlDir, projectDir);
     const storage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!storage) {
       outputCliData('Run storage is disabled (--storage none).');
@@ -357,6 +389,132 @@ const forkCommand = defineCommand({
   },
 });
 
+const stopCommand = defineCommand({
+  meta: {
+    name: 'stop',
+    description:
+      'Stop a running or paused run (full teardown). Waits up to --timeout for orchestrator to finish.',
+  },
+  args: {
+    ...commonRunArgs,
+    timeout: {
+      ...runPauseStopTimeoutArg,
+      description: 'Seconds. Max duration to wait for the run to finish stopping. Default: 60.',
+    },
+    runId: {
+      type: 'positional' as const,
+      description: 'Run ID to stop',
+      required: true,
+    },
+  },
+  async run({ args }) {
+    const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
+    const saifctlDir = resolveSaifctlDirRelative(readSaifctlDirFromCli(args));
+    const config = await loadSaifctlConfig(saifctlDir, projectDir);
+    const runStorage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
+    if (!runStorage) {
+      consola.error('Run storage is disabled (--storage none). Cannot stop a stored run.');
+      process.exit(1);
+    }
+    const runId = parseRunId(args);
+    const waitTimeoutMs = parseRunPauseStopTimeoutSec(args) * 1000;
+    try {
+      await runStop({ runId, projectDir, runStorage, waitTimeoutMs });
+    } catch (err) {
+      if (err instanceof RunCannotStopError) {
+        consola.error(err.message);
+        process.exit(1);
+      }
+      throw err;
+    }
+  },
+});
+
+const pauseCommand = defineCommand({
+  meta: {
+    name: 'pause',
+    description:
+      'Pause a run. Resumable. Stops containers but does not delete them. Waits until paused or --timeout',
+  },
+  args: {
+    ...commonRunArgs,
+    timeout: {
+      ...runPauseStopTimeoutArg,
+      description: 'Seconds. Max duration to wait for the run to finish pausing. Default: 60.',
+    },
+    runId: {
+      type: 'positional' as const,
+      description: 'Run ID to pause',
+      required: true,
+    },
+  },
+  async run({ args }) {
+    const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
+    const saifctlDir = resolveSaifctlDirRelative(readSaifctlDirFromCli(args));
+    const config = await loadSaifctlConfig(saifctlDir, projectDir);
+    const runStorage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
+    if (!runStorage) {
+      consola.error('Run storage is disabled (--storage none). Cannot pause a stored run.');
+      process.exit(1);
+    }
+    const runId = parseRunId(args);
+    const waitTimeoutMs = parseRunPauseStopTimeoutSec(args) * 1000;
+    try {
+      await runPause({ runId, runStorage, waitTimeoutMs });
+    } catch (err) {
+      if (err instanceof RunCannotPauseError) {
+        consola.error(err.message);
+        process.exit(1);
+      }
+      throw err;
+    }
+  },
+});
+
+const resumeCommand = defineCommand({
+  meta: {
+    name: 'resume',
+    description:
+      'Resume a paused run: reuse cached state if still present; otherwise continue like run start',
+  },
+  args: {
+    ...commonRunArgs,
+    ...featFromArtifactArgs,
+    runId: {
+      type: 'positional' as const,
+      description: 'Run ID to resume',
+      required: true,
+    },
+  },
+  async run({ args }) {
+    const runArgs = args as FeatRunArgs;
+    const ctx = await parseFromArtifactOrchestratorCli(runArgs);
+    const runStorage = resolveRunStorage(
+      readStorageStringFromCli(runArgs),
+      ctx.projectDir,
+      ctx.config,
+    );
+    if (!runStorage) {
+      consola.error('Run storage is disabled (--storage none). Cannot resume a stored run.');
+      process.exit(1);
+    }
+    const runId = parseRunId(args);
+
+    const result = await runResume({
+      ...ctx,
+      runId,
+      runStorage,
+    });
+
+    consola.log(`\n${result.message}`);
+    if (result.runId) {
+      consola.log(`\nResume again with:`);
+      consola.log(`  saifctl run resume ${result.runId}`);
+    }
+    if (result.status === 'failed') process.exit(1);
+  },
+});
+
 const startCommand = defineCommand({
   meta: {
     name: 'start',
@@ -396,7 +554,7 @@ const startCommand = defineCommand({
       consola.log(`\nStart again with:`);
       consola.log(`  saifctl run start ${result.runId}`);
     }
-    if (!result.success) process.exit(1);
+    if (result.status !== 'success' && result.status !== 'stopped') process.exit(1);
   },
 });
 
@@ -415,8 +573,8 @@ const testCommand = defineCommand({
   },
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
-    const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifctlConfig(saifDir, projectDir);
+    const saifctlDir = resolveSaifctlDirRelative(readSaifctlDirFromCli(args));
+    const config = await loadSaifctlConfig(saifctlDir, projectDir);
 
     const runArgs = args as FeatRunArgs;
     setVerboseLogging(runArgs.verbose === true);
@@ -430,7 +588,7 @@ const testCommand = defineCommand({
     const runId = parseRunId(args);
     const cli = await buildOrchestratorCliInputFromFeatArgs(runArgs, {
       projectDir,
-      saifDir,
+      saifctlDir,
       config,
     });
     const cliModelDelta = parseModelOverridesCliDelta(runArgs);
@@ -442,7 +600,7 @@ const testCommand = defineCommand({
       runId,
       runStorage,
       projectDir,
-      saifDir,
+      saifctlDir,
       config,
       cli,
       cliModelDelta,
@@ -450,7 +608,7 @@ const testCommand = defineCommand({
     });
 
     consola.log(`\n${result.message}`);
-    if (!result.success) process.exit(1);
+    if (result.status !== 'success') process.exit(1);
   },
 });
 
@@ -470,8 +628,8 @@ const applyCommand = defineCommand({
   },
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
-    const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifctlConfig(saifDir, projectDir);
+    const saifctlDir = resolveSaifctlDirRelative(readSaifctlDirFromCli(args));
+    const config = await loadSaifctlConfig(saifctlDir, projectDir);
 
     const runArgs = args as FeatRunArgs;
     setVerboseLogging(runArgs.verbose === true);
@@ -485,7 +643,7 @@ const applyCommand = defineCommand({
     const runId = parseRunId(args);
     const cli = await buildOrchestratorCliInputFromFeatArgs(runArgs, {
       projectDir,
-      saifDir,
+      saifctlDir,
       config,
     });
     const cliModelDelta = parseModelOverridesCliDelta(runArgs);
@@ -497,7 +655,7 @@ const applyCommand = defineCommand({
       runId,
       runStorage,
       projectDir,
-      saifDir,
+      saifctlDir,
       config,
       cli,
       cliModelDelta,
@@ -505,7 +663,7 @@ const applyCommand = defineCommand({
     });
 
     consola.log(`\n${result.message}`);
-    if (!result.success) process.exit(1);
+    if (result.status !== 'success') process.exit(1);
   },
 });
 
@@ -529,8 +687,8 @@ const exportCommand = defineCommand({
   },
   async run({ args }) {
     const projectDir = resolveCliProjectDir(readProjectDirFromCli(args));
-    const saifDir = resolveSaifDirRelative(readSaifDirFromCli(args));
-    const config = await loadSaifctlConfig(saifDir, projectDir);
+    const saifctlDir = resolveSaifctlDirRelative(readSaifctlDirFromCli(args));
+    const config = await loadSaifctlConfig(saifctlDir, projectDir);
 
     const runStorage = resolveRunStorage(readStorageStringFromCli(args), projectDir, config);
     if (!runStorage) {
@@ -552,7 +710,7 @@ const exportCommand = defineCommand({
     });
 
     consola.log(`\n${result.message}`);
-    if (!result.success) process.exit(1);
+    if (result.status !== 'success') process.exit(1);
   },
 });
 
@@ -569,6 +727,9 @@ const runCommand = defineCommand({
     info: infoCommand,
     clear: clearCommand,
     fork: forkCommand,
+    pause: pauseCommand,
+    stop: stopCommand,
+    resume: resumeCommand,
     start: startCommand,
     inspect: inspectCommand,
     test: testCommand,

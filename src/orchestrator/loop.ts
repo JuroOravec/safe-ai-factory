@@ -3,8 +3,7 @@
  * Used by mode 'start' (and 'fromArtifact' via runStartCore).
  */
 
-import { mkdir } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 import { isCancel, text } from '@clack/prompts';
 
@@ -21,28 +20,24 @@ import { createEngine } from '../engines/index.js';
 import { defaultEngineLog } from '../engines/logs.js';
 import {
   type AssertionSuiteResult,
+  type LiveInfra,
   type RunTestsOpts,
   type TestsResult,
 } from '../engines/types.js';
 import { parseJUnitXmlString } from '../engines/utils/test-parser.js';
 import type { GitProvider } from '../git/types.js';
-import { type ModelOverrides, resolveAgentLlmConfig } from '../llm-config.js';
+import { type ModelOverrides } from '../llm-config.js';
 import { consola } from '../logger.js';
 import {
   activeOnceRuleIds,
-  appendMissingRunRules,
-  formatRuleBlockForPending,
   markOnceRulesConsumed,
-  pendingRulesPath,
-  preparePendingRulesFile,
   reconcileRunRulesWithStorage,
   rulesForPrompt,
-  startRulesWatcher,
 } from '../runs/rules.js';
 import {
-  type InnerRoundSummary,
   type OuterAttemptSummary,
   type RunCommit,
+  type RunLiveInfra,
   type RunRule,
   StaleArtifactError,
 } from '../runs/types.js';
@@ -53,12 +48,10 @@ import type { TestProfile } from '../test-profiles/types.js';
 import type { CleanupRegistry } from '../utils/cleanup.js';
 import { git, gitClean, gitResetHard } from '../utils/git.js';
 import { appendUtf8, pathExists, readUtf8, writeUtf8 } from '../utils/io.js';
-import { buildCoderContainerEnv } from './agent-env.js';
-import { buildTaskPrompt } from './agent-task.js';
 import { runVagueSpecsChecker } from './agents/vague-specs-check.js';
-import { createAgentStdoutPipe, createDefaultAgentLog } from './logs.js';
 import type { OrchestratorOpts } from './modes.js';
 import { applyPatchToHost } from './phases/apply-patch.js';
+import { runCodingPhase } from './phases/run-coding-phase.js';
 import {
   destroySandbox,
   extractIncrementalRoundPatch,
@@ -66,29 +59,23 @@ import {
   type PatchExcludeRule,
   type Sandbox,
 } from './sandbox.js';
-import { getArgusBinaryPath } from './sidecars/reviewer/argus.js';
-import {
-  buildOuterAttemptSummary,
-  prepareRoundsStatsFile,
-  readInnerRounds,
-  roundsStatsPath,
-} from './stats.js';
+import { buildOuterAttemptSummary } from './stats.js';
 
 /**
  * Builds `extractPatch` exclude rules: fixed guardrails plus optional caller rules.
  *
  * Always excludes:
- * - `{saifDir}/**` — reward-hacking prevention (agent must not modify its own test specs).
+ * - `{saifctlDir}/**` — reward-hacking prevention (agent must not modify its own test specs).
  * - `.git/hooks/**` — prevents a malicious patch from installing hooks that execute on the host
  *   when the orchestrator runs `git commit` in applyPatchToHost.
  * - `.saifctl/**` — factory-internal workspace state (e.g. per-round task file), not product code.
  */
 export function buildPatchExcludeRules(
-  saifDir: string,
+  saifctlDir: string,
   patchExclude?: PatchExcludeRule[],
 ): PatchExcludeRule[] {
   return [
-    { type: 'glob', pattern: `${saifDir}/**` },
+    { type: 'glob', pattern: `${saifctlDir}/**` },
     { type: 'glob', pattern: '.git/hooks/**' },
     { type: 'glob', pattern: '.saifctl/**' },
     ...(patchExclude ?? []),
@@ -155,9 +142,9 @@ export interface IterativeLoopOpts {
   overrides: ModelOverrides;
   /**
    * Saifctl directory name relative to repo root (e.g. 'saifctl').
-   * Resolved by caller (e.g. readSaifDirFromCli + resolveSaifDirRelative).
+   * Resolved by caller (e.g. readSaifctlDirFromCli + resolveSaifctlDirRelative).
    */
-  saifDir: string;
+  saifctlDir: string;
   /**
    * Project name prefix for sandbox directory names (e.g. 'crawlee-one').
    * Resolved by caller (e.g. resolveProjectName from -p/--project or package.json).
@@ -270,7 +257,7 @@ export interface IterativeLoopOpts {
   testRetries: number;
   /**
    * Additional file sections to strip from the extracted patch before it is
-   * applied to the host repo. The saifDir/ glob is always prepended
+   * applied to the host repo. The saifctlDir/ glob is always prepended
    * automatically — passing rules here adds to that, not replaces it.
    */
   patchExclude?: PatchExcludeRule[];
@@ -321,12 +308,15 @@ export interface IterativeLoopOpts {
   testOnly?: boolean;
 }
 
+/** Outcome of {@link runIterativeLoop} and other orchestrator entry points (distinct from stored {@link RunArtifact} status). */
+export type OrchestratorOutcomeStatus = 'success' | 'failed' | 'paused' | 'stopped';
+
 export interface OrchestratorResult {
-  success: boolean;
+  status: OrchestratorOutcomeStatus;
   attempts: number;
   /** Run ID for starting again when run storage is enabled (artifact under .saifctl/runs/) */
   runId?: string;
-  /** Path to the winning patch.diff if success=true */
+  /** Path to the winning patch.diff when {@link OrchestratorResult#status} is `success`. */
   patchPath?: string;
   message: string;
 }
@@ -382,17 +372,35 @@ export async function runStagingTestVerification(params: {
     );
 
     const stagingEngine = createEngine(stagingEnvironment);
-    registry?.registerEngine(stagingEngine, lastRunId);
-    await stagingEngine.setup({
+
+    // Track latest live infra for this engine: SIGINT cleanup and teardown() need
+    // the same snapshot. Each operation like Engine.setup() may mutate the live infra shape.
+    let stagingInfraRef: LiveInfra | null = null;
+
+    // Register before setup so an early signal still sees infra once setup()
+    // has assigned stagingInfraRef.
+    registry?.registerEngine({
+      engine: stagingEngine,
+      runId: lastRunId,
+      label: lastRunId,
+      projectDir,
+      getInfra: () => stagingInfraRef,
+    });
+
+    // Provision staging engine network (and optional compose) for this test attempt.
+    const { infra: stAfterSetup } = await stagingEngine.setup({
       runId: lastRunId,
       projectName,
       featureName: feature.name,
       projectDir,
     });
+    stagingInfraRef = stAfterSetup;
 
     const result: TestsResult = await (async (): Promise<TestsResult> => {
       try {
-        const stagingHandle = await stagingEngine.startStaging({
+        // Bring up the staging profile (sidecar / app) against the sandbox workspace.
+        const { stagingHandle, infra: stAfterStaging } = await stagingEngine.startStaging({
+          runId: lastRunId,
           sandboxProfileId,
           codePath: sandbox.codePath,
           projectDir,
@@ -401,9 +409,12 @@ export async function runStagingTestVerification(params: {
           projectName,
           saifctlPath: sandbox.saifctlPath,
           onLog: defaultEngineLog,
+          infra: stAfterSetup,
         });
+        stagingInfraRef = stAfterStaging;
 
-        return await stagingEngine.runTests({
+        // Execute the feature test suite inside the staging environment.
+        const { tests, infra: stAfterTests } = await stagingEngine.runTests({
           ...testRunnerOpts,
           stagingHandle,
           testImage,
@@ -411,10 +422,19 @@ export async function runStagingTestVerification(params: {
           feature,
           projectName,
           onLog: defaultEngineLog,
+          infra: stAfterStaging,
         });
+        stagingInfraRef = stAfterTests;
+        return tests;
       } finally {
+        // Deregister first; then teardown when we have an infra snapshot
+        // (null ⇒ failed setup ⇒ teardown no-ops / warns).
         registry?.deregisterEngine(stagingEngine);
-        await stagingEngine.teardown({ runId: lastRunId });
+        await stagingEngine.teardown({
+          runId: lastRunId,
+          infra: stagingInfraRef,
+          projectDir,
+        });
       }
     })();
 
@@ -502,7 +522,7 @@ export async function runIterativeLoop(
     projectDir,
     maxRuns,
     overrides,
-    saifDir,
+    saifctlDir,
     projectName,
     registry,
     dangerousNoLeash,
@@ -707,7 +727,7 @@ export async function runIterativeLoop(
         sandboxDestroyed = true;
 
         return {
-          success: true,
+          status: 'success',
           attempts: 1,
           runId,
           message: 'Stored run verified; patch applied to host repository.',
@@ -719,7 +739,7 @@ export async function runIterativeLoop(
         await destroySandbox(sandbox.sandboxBasePath);
         sandboxDestroyed = true;
         return {
-          success: false,
+          status: 'failed',
           attempts: 1,
           runId,
           message: 'Tests were aborted.',
@@ -735,7 +755,7 @@ export async function runIterativeLoop(
       if (runContext) runContext.lastErrorFeedback = feedback;
 
       return {
-        success: false,
+        status: 'failed',
         attempts: 1,
         runId,
         message: `Tests failed after ${verifyOnly.testAttempts} run(s). Last error:\n${feedback}`,
@@ -774,7 +794,7 @@ export async function runIterativeLoop(
       const onceIdsThisRound = runContext ? activeOnceRuleIds(runContext.rules) : [];
       const task = await buildInitialTask({
         feature,
-        saifDir,
+        saifctlDir,
         rules: runContext ? rulesForPrompt(runContext.rules) : [],
       });
 
@@ -1005,7 +1025,7 @@ export async function runIterativeLoop(
         sandboxDestroyed = true;
 
         return {
-          success: true,
+          status: 'success',
           attempts,
           runId,
           message: `Feature implemented successfully in ${attempts} attempt(s).`,
@@ -1037,7 +1057,7 @@ export async function runIterativeLoop(
         await destroySandbox(sandbox.sandboxBasePath);
         sandboxDestroyed = true;
         return {
-          success: false,
+          status: 'failed',
           attempts,
           message: `Tests were aborted after ${attempts} attempt(s).`,
         };
@@ -1094,7 +1114,7 @@ export async function runIterativeLoop(
     consola.error(`\n[orchestrator] Max runs (${maxRuns}) reached without success.`);
 
     return {
-      success: false,
+      status: 'failed',
       attempts,
       runId,
       message: `Failed after ${maxRuns} runs. Last error:\n${errorFeedback}`,
@@ -1262,19 +1282,19 @@ export async function runVagueSpecsCheckerForFailure(
 
 interface BuildInitialTaskOpts {
   feature: Feature;
-  saifDir: string;
+  saifctlDir: string;
   /** User rules to inject (already filtered and orderedempty to skip section. */
   rules: readonly RunRule[];
 }
 
 export async function buildInitialTask(opts: BuildInitialTaskOpts): Promise<string> {
-  const { feature, saifDir, rules } = opts;
+  const { feature, saifctlDir, rules } = opts;
   const planPath = join(feature.absolutePath, 'plan.md');
   const specPath = join(feature.absolutePath, 'specification.md');
 
   const parts = [
     `Implement the feature '${feature.name}' as described in the plan below.`,
-    `Write code in the /workspace directory. Do NOT modify files in the /${saifDir}/ directory.`,
+    `Write code in the /workspace directory. Do NOT modify files in the /${saifctlDir}/ directory.`,
     'When complete, ensure the code compiles and passes linting.',
   ];
 
